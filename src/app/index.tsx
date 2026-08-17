@@ -8,10 +8,9 @@ import { SuggestionCard } from "@/components/dashboard/suggestion-card";
 import { WorkoutCard } from "@/components/dashboard/workout-card";
 import { GymFAB } from "@/components/fab/gym-fab";
 import { GymColors, Spacing } from "@/constants/theme";
-import { getDailyRecord, updateDailyRecord } from "@/storage/daily";
+import { addWater, getTodayWater } from "@/storage/repositories/water";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
-
 
 const DEFAULT_WATER = 0;
 
@@ -30,23 +29,23 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-  async function loadToday() {
-    const today = await getDailyRecord();
-    setWater(today.water);
-  }
+    async function loadToday() {
+      const totalWaterMl = await getTodayWater();
 
-  loadToday();
+      setWater(totalWaterMl / 1000);
+    }
 
-}, []);
+    loadToday();
+  }, []);
 
-  async function handleWaterAdd(amount: number) {
-    const newWater = water + amount;
+  async function handleWaterAdd(amountLitres: number) {
+    const amountMl = amountLitres * 1000;
 
-    setWater(newWater);
+    await addWater(amountMl);
 
-    await updateDailyRecord({
-      water: newWater,
-    });
+    const totalWaterMl = await getTodayWater();
+
+    setWater(totalWaterMl / 1000);
   }
 
   return (

@@ -1,7 +1,12 @@
 import { getStorage, setStorage } from "@/storage/storage";
+import type { DailyActivity, WaterEntry } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
 
-export type DailyRecord = {
+const DAILY_STORAGE_KEY = "@gymos/daily";
+
+type DailyData = Record<string, DailyActivity>;
+
+type LegacyDailyRecord = {
   water: number;
   sleep?: number;
   steps?: number;
@@ -9,42 +14,109 @@ export type DailyRecord = {
   journal?: string;
 };
 
-const DAILY_STORAGE_KEY = "@gymos/daily";
+type StoredDailyData = Record<
+  string,
+  DailyActivity | LegacyDailyRecord
+>;
 
-type DailyData = Record<string, DailyRecord>;
+function createId(): string {
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 9)}`;
+}
 
-export async function getDailyRecord(
-  dateKey: string = getTodayKey(),
-): Promise<DailyRecord> {
-  const data =
-    (await getStorage<DailyData>(DAILY_STORAGE_KEY)) ?? {};
+function createEmptyDailyActivity(
+  date: string,
+): DailyActivity {
+  return {
+    date,
+    water: [],
+    workouts: [],
+    meals: [],
+    sleep: [],
+    measurements: [],
+    journal: [],
+  };
+}
 
+function isLegacyRecord(
+  record: DailyActivity | LegacyDailyRecord,
+): record is LegacyDailyRecord {
   return (
-    data[dateKey] ?? {
-      water: 0,
-    }
+    "water" in record &&
+    typeof record.water === "number"
   );
 }
 
-export async function updateDailyRecord(
-  updates: Partial<DailyRecord>,
-  dateKey: string = getTodayKey(),
-): Promise<DailyRecord> {
-  const data =
-    (await getStorage<DailyData>(DAILY_STORAGE_KEY)) ?? {};
+function migrateRecord(
+  date: string,
+  record: DailyActivity | LegacyDailyRecord,
+): DailyActivity {
+  if (!isLegacyRecord(record)) {
+    return record;
+  }
 
-  const current = data[dateKey] ?? {
-    water: 0,
-  };
+  const activity = createEmptyDailyActivity(date);
 
-  const updated: DailyRecord = {
-    ...current,
-    ...updates,
-  };
+  if (record.water > 0) {
+    const waterEntry: WaterEntry = {
+      id: createId(),
+      amountMl: record.water * 1000,
+      timestamp: new Date(`${date}T12:00:00`).toISOString(),
+    };
 
-  data[dateKey] = updated;
+    activity.water.push(waterEntry);
+  }
 
-  await setStorage(DAILY_STORAGE_KEY, data);
-
-  return updated;
+  return activity;
 }
+
+export async function getDailyActivity(
+  dateKey: string = getTodayKey(),
+): Promise<DailyActivity> {
+  const stored =
+    (await getStorage<StoredDailyData>(
+      DAILY_STORAGE_KEY,
+    )) ?? {};
+
+  const rawRecord = stored[dateKey];
+
+  if (!rawRecord) {
+    return createEmptyDailyActivity(dateKey);
+  }
+
+  const activity = migrateRecord(
+    dateKey,
+    rawRecord,
+  );
+
+  if (activity !== rawRecord) {
+    const migratedData = stored as DailyData;
+
+    migratedData[dateKey] = activity;
+
+    await setStorage(
+      DAILY_STORAGE_KEY,
+      migratedData,
+    );
+  }
+
+  return activity;
+}
+
+export async function saveDailyActivity(
+  activity: DailyActivity,
+): Promise<void> {
+  const data =
+    (await getStorage<DailyData>(
+      DAILY_STORAGE_KEY,
+    )) ?? {};
+
+  data[activity.date] = activity;
+
+  await setStorage(
+    DAILY_STORAGE_KEY,
+    data,
+  );
+}
+
