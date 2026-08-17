@@ -8,11 +8,16 @@ import { SuggestionCard } from "@/components/dashboard/suggestion-card";
 import { WorkoutCard } from "@/components/dashboard/workout-card";
 import { GymFAB } from "@/components/fab/gym-fab";
 import { GymColors, Spacing } from "@/constants/theme";
-import { useState } from "react";
+import { getDailyRecord, updateDailyRecord } from "@/storage/daily";
+import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
+
+const DEFAULT_WATER = 0;
+
 export default function HomeScreen() {
-  const [water, setWater] = useState(2.1);
+  const [water, setWater] = useState(DEFAULT_WATER);
+
   const northStar: NorthStar = {
     title: "18 inch biceps",
     metric: {
@@ -23,6 +28,27 @@ export default function HomeScreen() {
     },
     why: "Build the physique I want.",
   };
+
+  useEffect(() => {
+  async function loadToday() {
+    const today = await getDailyRecord();
+    setWater(today.water);
+  }
+
+  loadToday();
+
+}, []);
+
+  async function handleWaterAdd(amount: number) {
+    const newWater = water + amount;
+
+    setWater(newWater);
+
+    await updateDailyRecord({
+      water: newWater,
+    });
+  }
+
   return (
     <View style={styles.container}>
       <Greeting text="Good evening" />
@@ -34,11 +60,8 @@ export default function HomeScreen() {
       <DailyTargetsCard water={water} sleep="7h 12m" steps="6,430" />
 
       <SuggestionCard message="Today's workout is Push." />
-      <GymFAB
-        onWaterAdd={(amount) => {
-          setWater((current) => current + amount);
-        }}
-      />
+
+      <GymFAB onWaterAdd={handleWaterAdd} />
     </View>
   );
 }
