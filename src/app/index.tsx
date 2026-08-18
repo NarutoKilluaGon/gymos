@@ -1,14 +1,14 @@
 import { DailyTargetsCard } from "@/components/dashboard/daily-targets-card";
 import { Greeting } from "@/components/dashboard/greeting";
-import {
-  NorthStarCard,
-  type NorthStar,
-} from "@/components/dashboard/north-star-card";
+import { NorthStarCard } from "@/components/dashboard/north-star-card";
 import { SuggestionCard } from "@/components/dashboard/suggestion-card";
 import { WorkoutCard } from "@/components/dashboard/workout-card";
 import { GymFAB } from "@/components/fab/gym-fab";
 import { GymColors, Spacing } from "@/constants/theme";
+import { addMeasurement } from "@/storage/repositories/measurements";
+import { getNorthStar } from "@/storage/repositories/north-star";
 import { addWater, getTodayWater } from "@/storage/repositories/water";
+import type { NorthStar } from "@/types/gymos";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
@@ -17,25 +17,20 @@ const DEFAULT_WATER = 0;
 export default function HomeScreen() {
   const [water, setWater] = useState(DEFAULT_WATER);
 
-  const northStar: NorthStar = {
-    title: "18 inch biceps",
-    metric: {
-      name: "Biceps",
-      current: 16.2,
-      target: 18,
-      unit: "in",
-    },
-    why: "Build the physique I want.",
-  };
+  const [northStar, setNorthStar] = useState<NorthStar | null>(null);
 
   useEffect(() => {
-    async function loadToday() {
+    async function loadHome() {
       const totalWaterMl = await getTodayWater();
 
       setWater(totalWaterMl / 1000);
+
+      const storedNorthStar = await getNorthStar();
+
+      setNorthStar(storedNorthStar);
     }
 
-    loadToday();
+    loadHome();
   }, []);
 
   async function handleWaterAdd(amountLitres: number) {
@@ -48,19 +43,25 @@ export default function HomeScreen() {
     setWater(totalWaterMl / 1000);
   }
 
+  async function handleWeightAdd(weight: number) {
+    await addMeasurement("weight", weight, "kg");
+  }
+
   return (
     <View style={styles.container}>
       <Greeting text="Good evening" />
 
       <WorkoutCard workoutName="Push" message="Pick up where you left off." />
 
-      <NorthStarCard northStar={northStar} />
+      {northStar && (
+        <NorthStarCard northStar={northStar} onNorthStarChange={setNorthStar} />
+      )}
 
       <DailyTargetsCard water={water} sleep="7h 12m" steps="6,430" />
 
       <SuggestionCard message="Today's workout is Push." />
 
-      <GymFAB onWaterAdd={handleWaterAdd} />
+      <GymFAB onWaterAdd={handleWaterAdd} onWeightAdd={handleWeightAdd} />
     </View>
   );
 }

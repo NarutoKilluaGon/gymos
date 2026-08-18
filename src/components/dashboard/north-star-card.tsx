@@ -1,78 +1,96 @@
 import { X } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { GymCard } from "@/components/ui/gym-card";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
-
-export type NorthStar = {
-  title: string;
-  metric?: {
-    name: string;
-    current?: number;
-    target?: number;
-    unit?: string;
-  };
-  why?: string;
-};
+import { saveNorthStar } from "@/storage/repositories/north-star";
+import type { NorthStar } from "@/types/gymos";
 
 type NorthStarCardProps = {
   northStar: NorthStar;
+  onNorthStarChange?: (northStar: NorthStar) => void;
 };
 
-export function NorthStarCard({ northStar }: NorthStarCardProps) {
+export function NorthStarCard({
+  northStar,
+  onNorthStarChange,
+}: NorthStarCardProps) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [confirmingChange, setConfirmingChange] = useState(false);
 
   const [title, setTitle] = useState(northStar.title);
-  const [metricName, setMetricName] = useState(northStar.metric?.name ?? "");
-  const [current, setCurrent] = useState(
-    northStar.metric?.current?.toString() ?? "",
-  );
-  const [target, setTarget] = useState(
-    northStar.metric?.target?.toString() ?? "",
-  );
-  const [unit, setUnit] = useState(northStar.metric?.unit ?? "");
-  const [why, setWhy] = useState(northStar.why ?? "");
+  const [why, setWhy] = useState(northStar.why);
+
+  useEffect(() => {
+    setTitle(northStar.title);
+    setWhy(northStar.why);
+  }, [northStar]);
 
   function openEditor() {
-    setEditing(true);
     setOpen(false);
+    setEditing(true);
   }
 
-  function save() {
+  function requestChange() {
+    setEditing(false);
+    setConfirmingChange(true);
+  }
+
+  async function save() {
+    const updatedNorthStar: NorthStar = {
+      title: title.trim(),
+      why: why.trim(),
+      lastChangedAt: new Date().toISOString(),
+    };
+
+    await saveNorthStar(updatedNorthStar);
+
+    onNorthStarChange?.(updatedNorthStar);
+
+    setConfirmingChange(false);
+    setOpen(true);
+  }
+
+  function cancelChange() {
+    setTitle(northStar.title);
+    setWhy(northStar.why);
+    setConfirmingChange(false);
     setEditing(false);
     setOpen(true);
   }
 
   return (
     <>
-      {/* North Star Card */}
-      <Pressable onPress={() => setOpen(true)}>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Open North Star"
+      >
         <GymCard style={styles.card}>
           <Text style={styles.eyebrow}>NORTH STAR</Text>
 
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title}>{northStar.title}</Text>
 
-          {current && target && (
-            <Text style={styles.progress}>
-              {current} → {target}
-              {unit ? ` ${unit}` : ""}
-            </Text>
-          )}
+          <View style={styles.whySection}>
+            <Text style={styles.whyLabel}>WHY</Text>
+
+            <Text style={styles.why}>{northStar.why}</Text>
+          </View>
         </GymCard>
       </Pressable>
 
-      {/* Details Sheet */}
+      {/* North Star details */}
       <Modal
         visible={open}
         transparent
@@ -89,46 +107,34 @@ export function NorthStarCard({ northStar }: NorthStarCardProps) {
               <Pressable
                 onPress={() => setOpen(false)}
                 style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Close North Star"
               >
                 <X size={22} color={GymColors.text.secondary} />
               </Pressable>
             </View>
 
-            <Text style={styles.goal}>{title}</Text>
+            <Text style={styles.goal}>{northStar.title}</Text>
 
-            {current && target && (
-              <>
-                <DetailRow
-                  label={`Current ${metricName}`}
-                  value={`${current}${unit ? ` ${unit}` : ""}`}
-                />
+            <View style={styles.whySection}>
+              <Text style={styles.detailLabel}>Why</Text>
 
-                <DetailRow
-                  label={`Target ${metricName}`}
-                  value={`${target}${unit ? ` ${unit}` : ""}`}
-                />
-              </>
-            )}
-
-            {why && (
-              <View style={styles.whySection}>
-                <Text style={styles.detailLabel}>Why</Text>
-                <Text style={styles.why}>{why}</Text>
-              </View>
-            )}
-
-            <Pressable style={styles.editButton} onPress={openEditor}>
-              <Text style={styles.editButtonText}>Edit</Text>
-            </Pressable>
+              <Text style={styles.why}>{northStar.why}</Text>
+            </View>
 
             <Text style={styles.note}>
-              North Star represents direction, not completion.
+              Your North Star is your direction. It isn't something that needs
+              to change every time your motivation changes.
             </Text>
+
+            <Pressable style={styles.editButton} onPress={openEditor}>
+              <Text style={styles.editButtonText}>Change North Star</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
 
-      {/* Editor Sheet */}
+      {/* Edit North Star */}
       <Modal
         visible={editing}
         transparent
@@ -146,101 +152,88 @@ export function NorthStarCard({ northStar }: NorthStarCardProps) {
 
           <View style={styles.sheet}>
             <View style={styles.header}>
-              <Text style={styles.sheetTitle}>Edit North Star</Text>
+              <Text style={styles.sheetTitle}>Change North Star</Text>
 
               <Pressable
                 onPress={() => setEditing(false)}
                 style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Close North Star editor"
               >
                 <X size={22} color={GymColors.text.secondary} />
               </Pressable>
             </View>
 
-            <Text style={styles.inputLabel}>North Star</Text>
+            <Text style={styles.warning}>
+              This is your long-term direction. Change it deliberately, not
+              impulsively.
+            </Text>
+
+            <Text style={styles.inputLabel}>What are you working toward?</Text>
 
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="What are you working toward?"
+              placeholder="Your North Star"
               placeholderTextColor={GymColors.text.tertiary}
               style={styles.input}
             />
 
-            <Text style={styles.inputLabel}>Metric name</Text>
-
-            <TextInput
-              value={metricName}
-              onChangeText={setMetricName}
-              placeholder="Optional"
-              placeholderTextColor={GymColors.text.tertiary}
-              style={styles.input}
-            />
-
-            <View style={styles.inputRow}>
-              <View style={styles.inputHalf}>
-                <Text style={styles.inputLabel}>Current</Text>
-
-                <TextInput
-                  value={current}
-                  onChangeText={setCurrent}
-                  placeholder="Optional"
-                  placeholderTextColor={GymColors.text.tertiary}
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                />
-              </View>
-
-              <View style={styles.inputHalf}>
-                <Text style={styles.inputLabel}>Target</Text>
-
-                <TextInput
-                  value={target}
-                  onChangeText={setTarget}
-                  placeholder="Optional"
-                  placeholderTextColor={GymColors.text.tertiary}
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                />
-              </View>
-            </View>
-
-            <Text style={styles.inputLabel}>Unit</Text>
-
-            <TextInput
-              value={unit}
-              onChangeText={setUnit}
-              placeholder="kg, in, min, etc."
-              placeholderTextColor={GymColors.text.tertiary}
-              style={styles.input}
-            />
-
-            <Text style={styles.inputLabel}>Why</Text>
+            <Text style={styles.inputLabel}>Why does this matter?</Text>
 
             <TextInput
               value={why}
               onChangeText={setWhy}
-              placeholder="Why does this matter to you?"
+              placeholder="Why are you pursuing this?"
               placeholderTextColor={GymColors.text.tertiary}
               multiline
               style={[styles.input, styles.whyInput]}
             />
 
-            <Pressable style={styles.saveButton} onPress={save}>
-              <Text style={styles.saveButtonText}>Save</Text>
+            <Pressable
+              style={styles.saveButton}
+              onPress={requestChange}
+              disabled={!title.trim() || !why.trim()}
+            >
+              <Text style={styles.saveButtonText}>Continue</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </>
-  );
-}
 
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detail}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
-    </View>
+      {/* Change confirmation */}
+      <Modal
+        visible={confirmingChange}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelChange}
+      >
+        <View style={styles.confirmModal}>
+          <Pressable style={styles.backdrop} onPress={cancelChange} />
+
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmEyebrow}>CHANGE NORTH STAR</Text>
+
+            <Text style={styles.confirmTitle}>Are you sure?</Text>
+
+            <Text style={styles.confirmText}>
+              Your North Star is supposed to provide direction when motivation
+              changes. Don't replace it just because today feels different.
+            </Text>
+
+            <View style={styles.confirmActions}>
+              <Pressable style={styles.cancelButton} onPress={cancelChange}>
+                <Text style={styles.cancelButtonText}>Keep it</Text>
+              </Pressable>
+
+              <Pressable style={styles.confirmButton} onPress={save}>
+                <Text style={styles.confirmButtonText}>Change it</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -261,10 +254,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  progress: {
+  whySection: {
+    marginTop: Spacing.three,
+  },
+
+  whyLabel: {
+    color: GymColors.text.tertiary,
+    fontSize: Typography.caption,
+    marginBottom: Spacing.one,
+  },
+
+  why: {
     color: GymColors.text.secondary,
     fontSize: Typography.body,
-    marginTop: Spacing.one,
+    lineHeight: 22,
   },
 
   modal: {
@@ -284,7 +287,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
     paddingBottom: Spacing.five,
-    maxHeight: "90%",
   },
 
   header: {
@@ -312,42 +314,19 @@ const styles = StyleSheet.create({
     color: GymColors.text.primary,
     fontSize: Typography.h1,
     fontWeight: "700",
-    marginBottom: Spacing.four,
-  },
-
-  detail: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: Spacing.two,
-    borderBottomWidth: 1,
-    borderBottomColor: GymColors.background.card,
   },
 
   detailLabel: {
     color: GymColors.text.secondary,
     fontSize: Typography.body,
-  },
-
-  detailValue: {
-    color: GymColors.text.primary,
-    fontSize: Typography.body,
     fontWeight: "600",
-  },
-
-  whySection: {
-    marginTop: Spacing.four,
-  },
-
-  why: {
-    color: GymColors.text.secondary,
-    fontSize: Typography.body,
-    marginTop: Spacing.one,
-    lineHeight: 22,
+    marginBottom: Spacing.one,
   },
 
   note: {
     color: GymColors.text.tertiary,
     fontSize: Typography.caption,
+    lineHeight: 19,
     marginTop: Spacing.four,
   },
 
@@ -363,6 +342,13 @@ const styles = StyleSheet.create({
     color: GymColors.text.primary,
     fontSize: Typography.body,
     fontWeight: "600",
+  },
+
+  warning: {
+    color: GymColors.text.secondary,
+    fontSize: Typography.body,
+    lineHeight: 22,
+    marginBottom: Spacing.two,
   },
 
   inputLabel: {
@@ -381,17 +367,8 @@ const styles = StyleSheet.create({
     fontSize: Typography.body,
   },
 
-  inputRow: {
-    flexDirection: "row",
-    gap: Spacing.two,
-  },
-
-  inputHalf: {
-    flex: 1,
-  },
-
   whyInput: {
-    minHeight: 80,
+    minHeight: 100,
     textAlignVertical: "top",
   },
 
@@ -404,6 +381,71 @@ const styles = StyleSheet.create({
   },
 
   saveButtonText: {
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+    fontWeight: "600",
+  },
+
+  confirmModal: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: Spacing.four,
+  },
+
+  confirmCard: {
+    backgroundColor: GymColors.background.surface,
+    borderRadius: Radius.extraLarge,
+    padding: Spacing.four,
+  },
+
+  confirmEyebrow: {
+    color: GymColors.text.tertiary,
+    fontSize: Typography.caption,
+    marginBottom: Spacing.two,
+  },
+
+  confirmTitle: {
+    color: GymColors.text.primary,
+    fontSize: Typography.h1,
+    fontWeight: "700",
+  },
+
+  confirmText: {
+    color: GymColors.text.secondary,
+    fontSize: Typography.body,
+    lineHeight: 22,
+    marginTop: Spacing.two,
+  },
+
+  confirmActions: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    marginTop: Spacing.four,
+  },
+
+  cancelButton: {
+    flex: 1,
+    backgroundColor: GymColors.background.card,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.medium,
+    alignItems: "center",
+  },
+
+  cancelButtonText: {
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+    fontWeight: "600",
+  },
+
+  confirmButton: {
+    flex: 1,
+    backgroundColor: GymColors.semantic.accent,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.medium,
+    alignItems: "center",
+  },
+
+  confirmButtonText: {
     color: GymColors.text.primary,
     fontSize: Typography.body,
     fontWeight: "600",

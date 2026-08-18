@@ -2,12 +2,15 @@ export type ID = string;
 
 export type Timestamp = string;
 
-export type MeasurementUnit =
-  | "kg"
-  | "lb"
-  | "in"
-  | "cm"
-  | "%";
+export type MeasurementUnit = "kg" | "lb" | "in" | "cm" | "%";
+
+export type MeasurementType =
+  | "weight"
+  | "bodyFat"
+  | "biceps"
+  | "waist"
+  | "chest"
+  | "thigh";
 
 export type WaterEntry = {
   id: ID;
@@ -54,14 +57,6 @@ export type SleepSession = {
   endedAt?: Timestamp;
 };
 
-export type MeasurementType =
-  | "weight"
-  | "bodyFat"
-  | "biceps"
-  | "waist"
-  | "chest"
-  | "thigh";
-
 export type Measurement = {
   id: ID;
   type: MeasurementType;
@@ -77,15 +72,9 @@ export type JournalEntry = {
 };
 
 export type NorthStar = {
-  id: ID;
   title: string;
-  metric: {
-    name: string;
-    current: number;
-    target: number;
-    unit: string;
-  };
-  why?: string;
+  why: string;
+  lastChangedAt: string;
 };
 
 export type DailyActivity = {

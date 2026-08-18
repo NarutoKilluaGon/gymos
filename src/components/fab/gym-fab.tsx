@@ -1,22 +1,26 @@
 import * as Haptics from "expo-haptics";
 import {
-    BookOpen,
-    Camera,
-    Droplets,
-    Dumbbell,
-    Moon,
-    Plus,
-    Scale,
-    Utensils,
-    X,
+  BookOpen,
+  Camera,
+  Droplets,
+  Dumbbell,
+  Moon,
+  Plus,
+  Ruler,
+  Scale,
+  Utensils,
+  X,
 } from "lucide-react-native";
 import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { MeasurementSheet } from "@/components/quick-add/measurement-sheet";
+import { WeightSheet } from "@/components/quick-add/weight-sheet";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 
 type GymFABProps = {
   onWaterAdd?: (amount: number) => void;
+  onWeightAdd?: (weight: number) => void;
 };
 
 const actions = [
@@ -25,13 +29,16 @@ const actions = [
   { label: "Water", icon: Droplets },
   { label: "Sleep", icon: Moon },
   { label: "Weight", icon: Scale },
+  { label: "Measurements", icon: Ruler },
   { label: "Journal", icon: BookOpen },
   { label: "Progress photo", icon: Camera },
 ];
 
-export function GymFAB({ onWaterAdd }: GymFABProps) {
+export function GymFAB({ onWaterAdd, onWeightAdd }: GymFABProps) {
   const [open, setOpen] = useState(false);
   const [waterSheetOpen, setWaterSheetOpen] = useState(false);
+  const [weightSheetOpen, setWeightSheetOpen] = useState(false);
+  const [measurementSheetOpen, setMeasurementSheetOpen] = useState(false);
 
   async function openSheet() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -55,6 +62,16 @@ export function GymFAB({ onWaterAdd }: GymFABProps) {
       return;
     }
 
+    if (label === "Weight") {
+      setWeightSheetOpen(true);
+      return;
+    }
+
+    if (label === "Measurements") {
+      setMeasurementSheetOpen(true);
+      return;
+    }
+
     console.log(`GymOS quick action: ${label}`);
   }
 
@@ -62,7 +79,16 @@ export function GymFAB({ onWaterAdd }: GymFABProps) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     onWaterAdd?.(amount / 1000);
+
     setWaterSheetOpen(false);
+  }
+
+  async function handleWeightSave(weight: number) {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    onWeightAdd?.(weight);
+
+    setWeightSheetOpen(false);
   }
 
   return (
@@ -163,6 +189,19 @@ export function GymFAB({ onWaterAdd }: GymFABProps) {
           </View>
         </View>
       </Modal>
+
+      {/* Weight Sheet */}
+      <WeightSheet
+        visible={weightSheetOpen}
+        onClose={() => setWeightSheetOpen(false)}
+        onSave={handleWeightSave}
+      />
+
+      {/* Measurements Sheet */}
+      <MeasurementSheet
+        visible={measurementSheetOpen}
+        onClose={() => setMeasurementSheetOpen(false)}
+      />
     </>
   );
 }
