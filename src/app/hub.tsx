@@ -1,4 +1,4 @@
-import { BarChart3, Bell, BookOpen, Dumbbell, FileDown, FolderInput, Info, Pill, SlidersHorizontal, Utensils } from "lucide-react-native";
+import { BarChart3, Bell, BookOpen, Dumbbell, FileDown, FolderInput, Info, Pill, SlidersHorizontal, Trophy, Utensils } from "lucide-react-native";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -8,6 +8,7 @@ import { ImportSheet } from "@/components/hub/import-sheet";
 import { ExerciseLibrarySheet } from "@/components/hub/exercise-library-sheet";
 import { HubSectionRow } from "@/components/hub/hub-section-row";
 import { ModulesSheet } from "@/components/hub/modules-sheet";
+import { PersonalRecordsSheet } from "@/components/hub/prs-sheet";
 import { RemindersSheet } from "@/components/hub/reminders-sheet";
 import { SavedFoodsSheet } from "@/components/hub/saved-foods-sheet";
 import { SupplementsSheet } from "@/components/hub/supplements-sheet";
@@ -29,6 +30,7 @@ export default function HubScreen() {
   const [importOpen, setImportOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [prsOpen, setPrsOpen] = useState(false);
 
   async function handleRemindersSaved(prefs: ReminderPrefs) {
     try {
@@ -108,6 +110,15 @@ export default function HubScreen() {
             title="Supplements"
             subtitle="What you take daily"
             onPress={() => setSupplementsOpen(true)}
+          />
+
+          <View style={styles.divider} />
+
+          <HubSectionRow
+            icon={Trophy}
+            title="Personal records"
+            subtitle="Your best lift for each exercise"
+            onPress={() => setPrsOpen(true)}
           />
 
           <View style={styles.divider} />
@@ -214,6 +225,21 @@ export default function HubScreen() {
             onPress={() => setSupplementsOpen(false)}
           />
           <SupplementsSheet onClose={() => setSupplementsOpen(false)} />
+        </View>
+      </Modal>
+
+      <Modal
+        visible={prsOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPrsOpen(false)}
+      >
+        <View style={styles.modal}>
+          <Pressable
+            style={styles.backdrop}
+            onPress={() => setPrsOpen(false)}
+          />
+          <PersonalRecordsSheet onClose={() => setPrsOpen(false)} />
         </View>
       </Modal>
 
