@@ -14,18 +14,41 @@ import {
 import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { JournalSheet } from "@/components/quick-add/journal-sheet";
+import {
+  MealSheet,
+  type MealInput,
+} from "@/components/quick-add/meal-sheet";
 import { MeasurementSheet } from "@/components/quick-add/measurement-sheet";
+import {
+  SleepSheet,
+  type SleepInput,
+} from "@/components/quick-add/sleep-sheet";
 import { WeightSheet } from "@/components/quick-add/weight-sheet";
+import { useModules } from "@/contexts/modules-context";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
+import type { ModuleId } from "@/storage/repositories/modules";
+import type { JournalEntry } from "@/types/gymos";
 
 type GymFABProps = {
   onWaterAdd?: (amount: number) => void;
   onWeightAdd?: (weight: number) => void;
+  onMealAdd?: (meal: MealInput) => void;
+  onSleepAdd?: (sleep: SleepInput) => void;
+  onWorkoutStart?: () => void;
+  onJournalAdd?: (text: string, mood?: JournalEntry["mood"]) => void;
+  onProgressPhoto?: () => void;
 };
 
-const actions = [
-  { label: "Workout", icon: Dumbbell },
-  { label: "Meal", icon: Utensils },
+type FABAction = {
+  label: string;
+  icon: typeof Dumbbell;
+  module?: ModuleId;
+};
+
+const actions: FABAction[] = [
+  { label: "Workout", icon: Dumbbell, module: "workouts" },
+  { label: "Meal", icon: Utensils, module: "nutrition" },
   { label: "Water", icon: Droplets },
   { label: "Sleep", icon: Moon },
   { label: "Weight", icon: Scale },
@@ -34,11 +57,24 @@ const actions = [
   { label: "Progress photo", icon: Camera },
 ];
 
-export function GymFAB({ onWaterAdd, onWeightAdd }: GymFABProps) {
+export function GymFAB({
+  onWaterAdd,
+  onWeightAdd,
+  onMealAdd,
+  onSleepAdd,
+  onWorkoutStart,
+  onJournalAdd,
+  onProgressPhoto,
+}: GymFABProps) {
+  const { enabled } = useModules();
+
   const [open, setOpen] = useState(false);
   const [waterSheetOpen, setWaterSheetOpen] = useState(false);
   const [weightSheetOpen, setWeightSheetOpen] = useState(false);
   const [measurementSheetOpen, setMeasurementSheetOpen] = useState(false);
+  const [mealSheetOpen, setMealSheetOpen] = useState(false);
+  const [sleepSheetOpen, setSleepSheetOpen] = useState(false);
+  const [journalSheetOpen, setJournalSheetOpen] = useState(false);
 
   async function openSheet() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -72,7 +108,30 @@ export function GymFAB({ onWaterAdd, onWeightAdd }: GymFABProps) {
       return;
     }
 
-    console.log(`GymOS quick action: ${label}`);
+    if (label === "Meal") {
+      setMealSheetOpen(true);
+      return;
+    }
+
+    if (label === "Sleep") {
+      setSleepSheetOpen(true);
+      return;
+    }
+
+    if (label === "Journal") {
+      setJournalSheetOpen(true);
+      return;
+    }
+
+    if (label === "Workout") {
+      onWorkoutStart?.();
+      return;
+    }
+
+    if (label === "Progress photo") {
+      onProgressPhoto?.();
+      return;
+    }
   }
 
   async function handleWaterAdd(amount: number) {
@@ -90,6 +149,34 @@ export function GymFAB({ onWaterAdd, onWeightAdd }: GymFABProps) {
 
     setWeightSheetOpen(false);
   }
+
+  async function handleMealSave(meal: MealInput) {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    onMealAdd?.(meal);
+
+    setMealSheetOpen(false);
+  }
+
+  async function handleSleepSave(sleep: SleepInput) {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    onSleepAdd?.(sleep);
+
+    setSleepSheetOpen(false);
+  }
+
+  async function handleJournalSave(text: string, mood?: JournalEntry["mood"]) {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    onJournalAdd?.(text, mood);
+
+    setJournalSheetOpen(false);
+  }
+
+  const visibleActions = actions.filter(
+    ({ module }) => !module || enabled[module],
+  );
 
   return (
     <>
@@ -128,7 +215,7 @@ export function GymFAB({ onWaterAdd, onWeightAdd }: GymFABProps) {
             </View>
 
             <View style={styles.grid}>
-              {actions.map(({ label, icon: Icon }) => (
+              {visibleActions.map(({ label, icon: Icon }) => (
                 <Pressable
                   key={label}
                   onPress={() => handleAction(label)}
@@ -201,6 +288,27 @@ export function GymFAB({ onWaterAdd, onWeightAdd }: GymFABProps) {
       <MeasurementSheet
         visible={measurementSheetOpen}
         onClose={() => setMeasurementSheetOpen(false)}
+      />
+
+      {/* Meal Sheet */}
+      <MealSheet
+        visible={mealSheetOpen}
+        onClose={() => setMealSheetOpen(false)}
+        onSave={handleMealSave}
+      />
+
+      {/* Sleep Sheet */}
+      <SleepSheet
+        visible={sleepSheetOpen}
+        onClose={() => setSleepSheetOpen(false)}
+        onSave={handleSleepSave}
+      />
+
+      {/* Journal Sheet */}
+      <JournalSheet
+        visible={journalSheetOpen}
+        onClose={() => setJournalSheetOpen(false)}
+        onSave={handleJournalSave}
       />
     </>
   );

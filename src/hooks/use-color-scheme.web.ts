@@ -1,21 +1,8 @@
-import { useEffect, useState } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 
-/**
- * To support static rendering, this value needs to be re-calculated on the client side for web
- */
+// RN's useColorScheme is useSyncExternalStore-based: on web it resolves from
+// matchMedia on the client and re-renders itself after static render, so no
+// manual hydration flag is needed. The null guard covers server-side render.
 export function useColorScheme() {
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme;
-  }
-
-  return 'light';
+  return useRNColorScheme() ?? 'light';
 }

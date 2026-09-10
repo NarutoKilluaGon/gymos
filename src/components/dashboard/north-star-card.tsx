@@ -1,5 +1,5 @@
 import { X } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -14,7 +14,54 @@ import {
 import { GymCard } from "@/components/ui/gym-card";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import { saveNorthStar } from "@/storage/repositories/north-star";
-import type { NorthStar } from "@/types/gymos";
+import { showToast } from "@/utils/toast";
+import type {
+  GoalType,
+  MeasurementType,
+  MeasurementUnit,
+  NorthStar,
+} from "@/types/gymos";
+
+const GOAL_TYPES: { value: GoalType; label: string }[] = [
+  { value: "gainMuscle", label: "Gain muscle" },
+  { value: "loseWeight", label: "Lose weight" },
+  { value: "buildStrength", label: "Build strength" },
+  { value: "maintainWeight", label: "Maintain weight" },
+  { value: "improveEndurance", label: "Improve endurance" },
+];
+
+// bodyFat is intentionally excluded — there is no logging UI for it, so a
+// body-fat goal could never show progress.
+const GOAL_METRICS: { value: MeasurementType; label: string }[] = [
+  { value: "weight", label: "Weight" },
+  { value: "biceps", label: "Biceps" },
+  { value: "chest", label: "Chest" },
+  { value: "waist", label: "Waist" },
+  { value: "thigh", label: "Thigh" },
+];
+
+function unitForMetric(metric: MeasurementType): MeasurementUnit {
+  return metric === "weight" ? "kg" : "in";
+}
+
+function goalDraftValid(
+  goalEnabled: boolean,
+  goalType: GoalType | null,
+  metric: MeasurementType | null,
+  targetValue: string,
+): boolean {
+  if (!goalEnabled) {
+    return true;
+  }
+
+  if (goalType === null || metric === null) {
+    return false;
+  }
+
+  const numeric = Number(targetValue);
+
+  return Number.isFinite(numeric) && numeric > 0;
+}
 
 type NorthStarCardProps = {
   northStar: NorthStar;
@@ -32,12 +79,31 @@ export function NorthStarCard({
   const [title, setTitle] = useState(northStar.title);
   const [why, setWhy] = useState(northStar.why);
 
-  useEffect(() => {
-    setTitle(northStar.title);
-    setWhy(northStar.why);
-  }, [northStar]);
+  const [goalEnabled, setGoalEnabled] = useState(false);
+  const [goalType, setGoalType] = useState<GoalType | null>(null);
+  const [metric, setMetric] = useState<MeasurementType | null>(null);
+  const [targetValue, setTargetValue] = useState("");
+
+  function seedGoalDraft() {
+    const hasGoal =
+      northStar.metric !== undefined &&
+      northStar.targetValue !== undefined &&
+      northStar.unit !== undefined;
+
+    setGoalEnabled(hasGoal);
+    setGoalType(northStar.goalType ?? null);
+    setMetric(northStar.metric ?? null);
+    setTargetValue(
+      northStar.targetValue !== undefined
+        ? String(northStar.targetValue)
+        : "",
+    );
+  }
 
   function openEditor() {
+    setTitle(northStar.title);
+    setWhy(northStar.why);
+    seedGoalDraft();
     setOpen(false);
     setEditing(true);
   }
@@ -49,22 +115,54 @@ export function NorthStarCard({
 
   async function save() {
     const updatedNorthStar: NorthStar = {
+      // Spread-and-override: preserves the measurable goal fields when the
+      // user only changes the title/why. Building a fresh object here would
+      // silently drop them.
+      ...northStar,
       title: title.trim(),
       why: why.trim(),
       lastChangedAt: new Date().toISOString(),
     };
 
-    await saveNorthStar(updatedNorthStar);
+    const hasGoal =
+      goalEnabled &&
+      goalType !== null &&
+      metric !== null &&
+      goalDraftValid(
+        goalEnabled,
+        goalType,
+        metric,
+        targetValue,
+      );
 
-    onNorthStarChange?.(updatedNorthStar);
+    if (hasGoal) {
+      updatedNorthStar.goalType = goalType;
+      updatedNorthStar.metric = metric;
+      updatedNorthStar.targetValue = Number(targetValue);
+      updatedNorthStar.unit = unitForMetric(metric);
+    } else {
+      delete updatedNorthStar.goalType;
+      delete updatedNorthStar.metric;
+      delete updatedNorthStar.targetValue;
+      delete updatedNorthStar.unit;
+    }
 
-    setConfirmingChange(false);
-    setOpen(true);
+    try {
+      await saveNorthStar(updatedNorthStar);
+
+      onNorthStarChange?.(updatedNorthStar);
+
+      setConfirmingChange(false);
+      setOpen(true);
+    } catch {
+      showToast("Couldn't save North Star");
+    }
   }
 
   function cancelChange() {
     setTitle(northStar.title);
     setWhy(northStar.why);
+    seedGoalDraft();
     setConfirmingChange(false);
     setEditing(false);
     setOpen(true);
@@ -123,7 +221,7 @@ export function NorthStarCard({
             </View>
 
             <Text style={styles.note}>
-              Your North Star is your direction. It isn't something that needs
+              Your North Star is your direction. It isn&apos;t something that needs
               to change every time your motivation changes.
             </Text>
 
@@ -191,9 +289,130 @@ export function NorthStarCard({
             />
 
             <Pressable
+              style={styles.toggleRow}
+              onPress={() => setGoalEnabled(!goalEnabled)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: goalEnabled }}
+            >
+              <View>
+                <Text style={styles.toggleLabel}>
+                  Make it measurable
+                </Text>
+
+                <Text style={styles.toggleHint}>
+                  Track progress toward a target value
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.toggleTrack,
+                  goalEnabled && styles.toggleTrackOn,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.toggleThumb,
+                    goalEnabled && styles.toggleThumbOn,
+                  ]}
+                />
+              </View>
+            </Pressable>
+
+            {goalEnabled ? (
+              <View style={styles.goalFields}>
+                <Text style={styles.fieldLabel}>Goal type</Text>
+
+                <View style={styles.chipWrap}>
+                  {GOAL_TYPES.map((option) => {
+                    const selected = option.value === goalType;
+
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setGoalType(option.value)}
+                        style={[
+                          styles.chip,
+                          selected && styles.chipSelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            selected && styles.chipTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.fieldLabel}>Metric</Text>
+
+                <View style={styles.chipWrap}>
+                  {GOAL_METRICS.map((option) => {
+                    const selected = option.value === metric;
+
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setMetric(option.value)}
+                        style={[
+                          styles.chip,
+                          selected && styles.chipSelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            selected && styles.chipTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.fieldLabel}>Target value</Text>
+
+                <View style={styles.inputRow}>
+                  <TextInput
+                    value={targetValue}
+                    onChangeText={setTargetValue}
+                    placeholder="0.0"
+                    placeholderTextColor={GymColors.text.tertiary}
+                    keyboardType="decimal-pad"
+                    style={[styles.input, styles.targetInput]}
+                  />
+
+                  <View style={styles.unitContainer}>
+                    <Text style={styles.unitText}>
+                      {metric !== null
+                        ? unitForMetric(metric)
+                        : "—"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
+            <Pressable
               style={styles.saveButton}
               onPress={requestChange}
-              disabled={!title.trim() || !why.trim()}
+              disabled={
+                !title.trim() ||
+                !why.trim() ||
+                !goalDraftValid(
+                  goalEnabled,
+                  goalType,
+                  metric,
+                  targetValue,
+                )
+              }
             >
               <Text style={styles.saveButtonText}>Continue</Text>
             </Pressable>
@@ -218,7 +437,7 @@ export function NorthStarCard({
 
             <Text style={styles.confirmText}>
               Your North Star is supposed to provide direction when motivation
-              changes. Don't replace it just because today feels different.
+              changes. Don&apos;t replace it just because today feels different.
             </Text>
 
             <View style={styles.confirmActions}>
@@ -370,6 +589,116 @@ const styles = StyleSheet.create({
   whyInput: {
     minHeight: 100,
     textAlignVertical: "top",
+  },
+
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    marginTop: Spacing.three,
+  },
+
+  toggleLabel: {
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+    fontWeight: "600",
+  },
+
+  toggleHint: {
+    color: GymColors.text.tertiary,
+    fontSize: Typography.caption,
+    marginTop: Spacing.half,
+  },
+
+  toggleTrack: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: GymColors.background.surface,
+    padding: 3,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  toggleTrackOn: {
+    backgroundColor: GymColors.semantic.accent,
+    justifyContent: "flex-end",
+  },
+
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: GymColors.text.secondary,
+  },
+
+  toggleThumbOn: {
+    backgroundColor: "#FFFFFF",
+  },
+
+  goalFields: {
+    marginTop: Spacing.two,
+  },
+
+  fieldLabel: {
+    color: GymColors.text.secondary,
+    fontSize: Typography.caption,
+    marginBottom: Spacing.one,
+    marginTop: Spacing.three,
+  },
+
+  chipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.two,
+  },
+
+  chip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+    borderRadius: Radius.medium,
+    backgroundColor: GymColors.background.card,
+  },
+
+  chipSelected: {
+    backgroundColor: GymColors.semantic.accent,
+  },
+
+  chipText: {
+    color: GymColors.text.secondary,
+    fontSize: Typography.caption,
+    fontWeight: "600",
+  },
+
+  chipTextSelected: {
+    color: GymColors.text.primary,
+  },
+
+  inputRow: {
+    flexDirection: "row",
+    gap: Spacing.two,
+  },
+
+  targetInput: {
+    flex: 1,
+  },
+
+  unitContainer: {
+    width: 64,
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  unitText: {
+    color: GymColors.text.secondary,
+    fontSize: Typography.body,
+    fontWeight: "600",
   },
 
   saveButton: {

@@ -1,7 +1,7 @@
+import { NORTH_STAR_STORAGE_KEY } from "@/storage/constants";
+import { appendEvent } from "@/storage/events";
 import { getStorage, setStorage } from "@/storage/storage";
 import type { NorthStar } from "@/types/gymos";
-
-const NORTH_STAR_STORAGE_KEY = "@gymos/north-star";
 
 const DEFAULT_NORTH_STAR: NorthStar = {
   title: "18 inch biceps",
@@ -21,8 +21,15 @@ export async function getNorthStar(): Promise<NorthStar> {
 export async function saveNorthStar(
   northStar: NorthStar,
 ): Promise<void> {
+  const previous = await getNorthStar();
+
   await setStorage(
     NORTH_STAR_STORAGE_KEY,
     northStar,
   );
+
+  await appendEvent("northstar.changed", {
+    previousTitle: previous.title,
+    newTitle: northStar.title,
+  });
 }

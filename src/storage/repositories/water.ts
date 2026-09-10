@@ -1,13 +1,11 @@
-import type { WaterEntry } from "@/types/gymos";
+import { appendEvent } from "@/storage/events";
 import {
   getDailyActivity,
   saveDailyActivity,
 } from "@/storage/daily";
+import type { WaterEntry } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
-
-function createId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
+import { createId } from "@/utils/id";
 
 export async function addWater(
   amountMl: number,
@@ -23,6 +21,8 @@ export async function addWater(
   activity.water.push(entry);
 
   await saveDailyActivity(activity);
+
+  await appendEvent("water.logged", { amountMl });
 
   return entry;
 }

@@ -1,20 +1,12 @@
-import { getDailyActivity, saveDailyActivity } from "@/storage/daily";
-import { getStorage } from "@/storage/storage";
+import { getAllDailyActivities, getDailyActivity, saveDailyActivity } from "@/storage/daily";
+import { appendEvent } from "@/storage/events";
 import type {
-  DailyActivity,
   Measurement,
   MeasurementType,
   MeasurementUnit,
 } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
-
-const DAILY_STORAGE_KEY = "@gymos/daily";
-
-type DailyData = Record<string, DailyActivity>;
-
-function createId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
+import { createId } from "@/utils/id";
 
 export async function addMeasurement(
   type: MeasurementType,
@@ -39,16 +31,29 @@ export async function addMeasurement(
 
   await saveDailyActivity(activity);
 
+  if (type === "weight") {
+    await appendEvent("weight.logged", {
+      weight: value,
+      unit,
+    });
+  } else {
+    await appendEvent("measurement.logged", {
+      measurementId: measurement.id,
+      type,
+      value,
+      unit,
+    });
+  }
+
   return measurement;
 }
 
 export async function getMeasurements(
   type?: MeasurementType,
 ): Promise<Measurement[]> {
-  const data = (await getStorage<DailyData>(DAILY_STORAGE_KEY)) ?? {};
+  const data = await getAllDailyActivities();
 
   return Object.values(data)
-    .filter((activity): activity is DailyActivity => Boolean(activity))
     .flatMap((activity) =>
       Array.isArray(activity.measurements) ? activity.measurements : [],
     )

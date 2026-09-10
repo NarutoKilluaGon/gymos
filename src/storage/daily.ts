@@ -1,10 +1,8 @@
+import { DAILY_STORAGE_KEY, type DailyData } from "@/storage/constants";
 import { getStorage, setStorage } from "@/storage/storage";
 import type { DailyActivity, WaterEntry } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
-
-const DAILY_STORAGE_KEY = "@gymos/daily";
-
-type DailyData = Record<string, DailyActivity>;
+import { createId } from "@/utils/id";
 
 type LegacyDailyRecord = {
   water: number;
@@ -18,12 +16,6 @@ type StoredDailyData = Record<
   string,
   DailyActivity | LegacyDailyRecord
 >;
-
-function createId(): string {
-  return `${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 9)}`;
-}
 
 function createEmptyDailyActivity(
   date: string,
@@ -118,5 +110,31 @@ export async function saveDailyActivity(
     DAILY_STORAGE_KEY,
     data,
   );
+}
+
+/**
+ * Load the full daily store, migrating any legacy records
+ * in place. Repositories that query across days should use
+ * this instead of reading raw storage so migration logic
+ * is never bypassed.
+ */
+export async function getAllDailyActivities(): Promise<DailyData> {
+  const stored =
+    (await getStorage<StoredDailyData>(
+      DAILY_STORAGE_KEY,
+    )) ?? {};
+
+  const data: DailyData = {};
+
+  for (const [dateKey, rawRecord] of Object.entries(
+    stored,
+  )) {
+    data[dateKey] = migrateRecord(
+      dateKey,
+      rawRecord,
+    );
+  }
+
+  return data;
 }
 

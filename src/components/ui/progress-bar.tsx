@@ -1,19 +1,41 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { GymColors, Radius, Spacing, Typography } from '@/constants/theme';
+import { TimingConfig } from '@/utils/motion';
 
 type ProgressBarProps = {
   current: number;
   target: number;
   unit: string;
+  compact?: boolean;
 };
 
 export function ProgressBar({
   current,
   target,
   unit,
+  compact = false,
 }: ProgressBarProps) {
   const progress = Math.min(current / target, 1);
+
+  const width = useSharedValue(0);
+
+  useEffect(() => {
+    width.value = withTiming(
+      progress,
+      TimingConfig.medium,
+    );
+  }, [progress, width]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${width.value * 100}%`,
+  }));
 
   const status =
     current >= target
@@ -21,6 +43,36 @@ export function ProgressBar({
       : current > 0
         ? 'In progress'
         : 'Pending';
+
+  if (compact) {
+    return (
+      <View style={styles.containerCompact}>
+        <View style={styles.headerCompact}>
+          <Text style={styles.valueCompact}>
+            {current.toFixed(current >= 10 ? 0 : 1)} / {target.toFixed(target >= 10 ? 0 : 1)} {unit}
+          </Text>
+
+          <Text
+            style={[
+              styles.statusCompact,
+              current >= target && styles.completedCompact,
+            ]}>
+            {current >= target ? '✓' : ''}
+          </Text>
+        </View>
+
+        <View style={styles.trackCompact}>
+          <Animated.View
+            style={[
+              styles.fillCompact,
+              fillStyle,
+              current >= target && styles.completedFillCompact,
+            ]}
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -40,10 +92,10 @@ export function ProgressBar({
       </View>
 
       <View style={styles.track}>
-        <View
+        <Animated.View
           style={[
             styles.fill,
-            { width: `${progress * 100}%` },
+            fillStyle,
             current >= target && styles.completedFill,
           ]}
         />
@@ -93,5 +145,48 @@ const styles = StyleSheet.create({
   completedFill: {
     backgroundColor: GymColors.semantic.success,
   },
-});
 
+  // Compact styles
+  containerCompact: {
+    gap: Spacing.half,
+    width: "48%",
+  },
+
+  headerCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  valueCompact: {
+    color: GymColors.text.primary,
+    fontSize: Typography.caption,
+    fontWeight: "600",
+  },
+
+  statusCompact: {
+    color: GymColors.text.tertiary,
+    fontSize: Typography.caption,
+  },
+
+  completedCompact: {
+    color: GymColors.semantic.success,
+  },
+
+  trackCompact: {
+    height: 4,
+    borderRadius: Radius.small,
+    backgroundColor: GymColors.background.surface,
+    overflow: 'hidden',
+  },
+
+  fillCompact: {
+    height: '100%',
+    backgroundColor: GymColors.semantic.accent,
+    borderRadius: Radius.small,
+  },
+
+  completedFillCompact: {
+    backgroundColor: GymColors.semantic.success,
+  },
+});

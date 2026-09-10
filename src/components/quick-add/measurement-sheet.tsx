@@ -21,6 +21,7 @@ import type {
   MeasurementType,
   MeasurementUnit,
 } from "@/types/gymos";
+import { showToast } from "@/utils/toast";
 
 type MeasurementOption = {
   type: MeasurementType;
@@ -54,9 +55,14 @@ const MEASUREMENTS: MeasurementOption[] = [
 type MeasurementSheetProps = {
   visible: boolean;
   onClose: () => void;
+  onSaved?: () => void;
 };
 
-export function MeasurementSheet({ visible, onClose }: MeasurementSheetProps) {
+export function MeasurementSheet({
+  visible,
+  onClose,
+  onSaved,
+}: MeasurementSheetProps) {
   const [selected, setSelected] = useState<MeasurementOption | null>(null);
 
   const [value, setValue] = useState("");
@@ -74,17 +80,20 @@ export function MeasurementSheet({ visible, onClose }: MeasurementSheetProps) {
       }),
     );
 
-    setLatest(Object.fromEntries(entries));
+    return Object.fromEntries(entries);
   }
 
   useEffect(() => {
     if (!visible) {
-      setSelected(null);
-      setValue("");
       return;
     }
 
-    loadLatestMeasurements();
+    loadLatestMeasurements()
+      .then(setLatest)
+      .catch(() => {
+        // Fall back to no "previous" values on a read failure.
+        setLatest({});
+      });
   }, [visible]);
 
   function selectMeasurement(measurement: MeasurementOption) {
@@ -103,19 +112,24 @@ export function MeasurementSheet({ visible, onClose }: MeasurementSheetProps) {
       return;
     }
 
-    const measurement = await addMeasurement(
-      selected.type,
-      numericValue,
-      selected.unit,
-    );
+    try {
+      const measurement = await addMeasurement(
+        selected.type,
+        numericValue,
+        selected.unit,
+      );
 
-    setLatest((current) => ({
-      ...current,
-      [selected.type]: measurement,
-    }));
+      setLatest((current) => ({
+        ...current,
+        [selected.type]: measurement,
+      }));
 
-    setSelected(null);
-    setValue("");
+      setSelected(null);
+      setValue("");
+      onSaved?.();
+    } catch {
+      showToast("Couldn't log measurement");
+    }
   }
 
   function handleClose() {
@@ -163,6 +177,8 @@ export function MeasurementSheet({ visible, onClose }: MeasurementSheetProps) {
                     key={measurement.type}
                     style={styles.option}
                     onPress={() => selectMeasurement(measurement)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Track ${measurement.label}`}
                   >
                     <View style={styles.optionContent}>
                       <Text style={styles.optionLabel}>
@@ -218,6 +234,8 @@ export function MeasurementSheet({ visible, onClose }: MeasurementSheetProps) {
                 ]}
                 onPress={handleSave}
                 disabled={!value.trim()}
+                accessibilityRole="button"
+                accessibilityLabel="Save measurement"
               >
                 <Text style={styles.saveButtonText}>Save measurement</Text>
               </Pressable>
@@ -228,6 +246,8 @@ export function MeasurementSheet({ visible, onClose }: MeasurementSheetProps) {
                   setSelected(null);
                   setValue("");
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="Back to measurements"
               >
                 <Text style={styles.backButtonText}>Back to measurements</Text>
               </Pressable>

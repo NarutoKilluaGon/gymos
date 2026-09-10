@@ -112,6 +112,8 @@ export function WeightSheet({
           <Pressable
             onPress={handleSave}
             style={styles.saveButton}
+            accessibilityRole="button"
+            accessibilityLabel="Save weight"
           >
             <Text style={styles.saveText}>
               Save weight
