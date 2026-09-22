@@ -51,9 +51,12 @@ describe("getStreak", () => {
     getAllDailyActivities.mockReset();
   });
 
-  it("returns 0 when there is no activity today", async () => {
+  it("returns 0 and todayActive false when nothing has ever been logged", async () => {
     getAllDailyActivities.mockResolvedValue({});
-    await expect(getStreak()).resolves.toBe(0);
+    await expect(getStreak()).resolves.toEqual({
+      days: 0,
+      todayActive: false,
+    });
   });
 
   it("counts consecutive active days back from today", async () => {
@@ -66,19 +69,40 @@ describe("getStreak", () => {
 
     getAllDailyActivities.mockResolvedValue(data);
 
-    await expect(getStreak()).resolves.toBe(3);
+    await expect(getStreak()).resolves.toEqual({
+      days: 3,
+      todayActive: true,
+    });
   });
 
-  it("breaks the streak at the first inactive day", async () => {
+  it("preserves the streak through an empty today instead of resetting", async () => {
     const data: Record<string, DailyActivity> = {
-      [keyAtOffset(0)]: activeActivity(keyAtOffset(0)),
+      [keyAtOffset(0)]: emptyActivity(keyAtOffset(0)),
+      [keyAtOffset(1)]: activeActivity(keyAtOffset(1)),
+      [keyAtOffset(2)]: activeActivity(keyAtOffset(2)),
+    };
+
+    getAllDailyActivities.mockResolvedValue(data);
+
+    await expect(getStreak()).resolves.toEqual({
+      days: 2,
+      todayActive: false,
+    });
+  });
+
+  it("breaks the streak at the first inactive completed day", async () => {
+    const data: Record<string, DailyActivity> = {
+      [keyAtOffset(0)]: emptyActivity(keyAtOffset(0)),
       [keyAtOffset(1)]: emptyActivity(keyAtOffset(1)),
       [keyAtOffset(2)]: activeActivity(keyAtOffset(2)),
     };
 
     getAllDailyActivities.mockResolvedValue(data);
 
-    await expect(getStreak()).resolves.toBe(1);
+    await expect(getStreak()).resolves.toEqual({
+      days: 0,
+      todayActive: false,
+    });
   });
 
   it("a day with a logged meal still counts as active", async () => {
@@ -97,6 +121,9 @@ describe("getStreak", () => {
 
     getAllDailyActivities.mockResolvedValue({ [day0]: activity });
 
-    await expect(getStreak()).resolves.toBe(1);
+    await expect(getStreak()).resolves.toEqual({
+      days: 1,
+      todayActive: true,
+    });
   });
 });

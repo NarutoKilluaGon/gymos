@@ -35,7 +35,7 @@ import {
   startWorkout,
 } from "@/storage/repositories/workouts";
 import { pickAndSavePhotoFromLibrary } from "@/services/progress-photos";
-import { getStreak } from "@/services/streak";
+import { getStreak, type Streak } from "@/services/streak";
 import type {
   JournalEntry,
   Meal,
@@ -170,7 +170,7 @@ export default function HomeScreen() {
 
   const [sleep, setSleep] = useState<SleepSession[]>([]);
 
-  const [streak, setStreak] = useState(0);
+  const [streak, setStreak] = useState<Streak>({ days: 0, todayActive: false });
 
   useFocusEffect(
     useCallback(() => {
@@ -333,7 +333,7 @@ export default function HomeScreen() {
     steps,
     8000,
     sleep,
-    streak,
+    streak.days,
     enabled.nutrition,
   );
 
@@ -346,7 +346,10 @@ export default function HomeScreen() {
       <FadeIn delay={20}>
         <View style={styles.streakWorkoutRow}>
           <View style={styles.halfCard}>
-            <StreakCard streak={streak} />
+            <StreakCard
+              streak={streak.days}
+              todayActive={streak.todayActive}
+            />
           </View>
           {enabled.workouts && (
             <View style={styles.halfCard}>

@@ -1,7 +1,14 @@
 import { getAllDailyActivities } from "@/storage/daily";
 import type { DailyActivity } from "@/types/gymos";
 
-function isActive(activity: DailyActivity): boolean {
+export type Streak = {
+  days: number;
+  todayActive: boolean;
+};
+
+function isActive(activity: DailyActivity | undefined): boolean {
+  if (!activity) return false;
+
   return (
     activity.water.length > 0 ||
     activity.workouts.length > 0 ||
@@ -23,16 +30,16 @@ function dateKeyAtOffset(offsetDays: number): string {
   return `${year}-${month}-${day}`;
 }
 
-export async function getStreak(): Promise<number> {
-  const all = await getAllDailyActivities();
-
+function countBackFrom(
+  all: Record<string, DailyActivity>,
+  startOffset: number,
+): number {
   let streak = 0;
 
-  for (let offset = 0; offset < 365; offset++) {
-    const key = dateKeyAtOffset(offset);
-    const activity = all[key];
+  for (let offset = startOffset; offset < 365; offset++) {
+    const activity = all[dateKeyAtOffset(offset)];
 
-    if (activity && isActive(activity)) {
+    if (isActive(activity)) {
       streak++;
     } else {
       break;
@@ -40,4 +47,18 @@ export async function getStreak(): Promise<number> {
   }
 
   return streak;
+}
+
+export async function getStreak(): Promise<Streak> {
+  const all = await getAllDailyActivities();
+
+  const todayActive = isActive(all[dateKeyAtOffset(0)]);
+
+  if (todayActive) {
+    return { days: countBackFrom(all, 0), todayActive: true };
+  }
+
+  // Today isn't logged yet — the streak is preserved through
+  // yesterday until the day ends, so count back from there.
+  return { days: countBackFrom(all, 1), todayActive: false };
 }

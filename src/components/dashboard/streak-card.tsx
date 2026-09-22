@@ -5,9 +5,10 @@ import { GymColors, Spacing, Typography } from "@/constants/theme";
 
 type StreakCardProps = {
   streak: number;
+  todayActive?: boolean;
 };
 
-export function StreakCard({ streak }: StreakCardProps) {
+export function StreakCard({ streak, todayActive = true }: StreakCardProps) {
   if (streak === 0) {
     return (
       <GymCard style={styles.card}>
@@ -19,6 +20,26 @@ export function StreakCard({ streak }: StreakCardProps) {
 
             <Text style={styles.hint}>
               Log any activity today to start one.
+            </Text>
+          </View>
+        </View>
+      </GymCard>
+    );
+  }
+
+  if (!todayActive) {
+    return (
+      <GymCard style={styles.card}>
+        <View style={styles.row}>
+          <Text style={styles.emoji}>🔥</Text>
+
+          <View style={styles.textBlock}>
+            <Text style={styles.count}>
+              {streak} {streak === 1 ? "day" : "days"}
+            </Text>
+
+            <Text style={styles.label}>
+              At risk — log today to keep it
             </Text>
           </View>
         </View>
