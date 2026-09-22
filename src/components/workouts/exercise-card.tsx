@@ -1,3 +1,4 @@
+import { Trash2, X } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { GymCard } from "@/components/ui/gym-card";
@@ -7,9 +8,16 @@ import type { WorkoutExercise } from "@/types/gymos";
 type ExerciseCardProps = {
   exercise: WorkoutExercise;
   onAddSet: () => void;
+  onRemoveSet: (setId: string) => void;
+  onRemoveExercise: () => void;
 };
 
-export function ExerciseCard({ exercise, onAddSet }: ExerciseCardProps) {
+export function ExerciseCard({
+  exercise,
+  onAddSet,
+  onRemoveSet,
+  onRemoveExercise,
+}: ExerciseCardProps) {
   return (
     <GymCard style={styles.card}>
       <View style={styles.top}>
@@ -22,14 +30,25 @@ export function ExerciseCard({ exercise, onAddSet }: ExerciseCardProps) {
           </Text>
         </View>
 
-        <Pressable
-          onPress={onAddSet}
-          style={styles.setButton}
-          accessibilityRole="button"
-          accessibilityLabel={`Add set to ${exercise.name}`}
-        >
-          <Text style={styles.setButtonText}>+ Set</Text>
-        </Pressable>
+        <View style={styles.actions}>
+          <Pressable
+            onPress={onRemoveExercise}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${exercise.name} from workout`}
+          >
+            <Trash2 size={18} color={GymColors.text.secondary} />
+          </Pressable>
+
+          <Pressable
+            onPress={onAddSet}
+            style={styles.setButton}
+            accessibilityRole="button"
+            accessibilityLabel={`Add set to ${exercise.name}`}
+          >
+            <Text style={styles.setButtonText}>+ Set</Text>
+          </Pressable>
+        </View>
       </View>
 
       {exercise.sets.length > 0 && (
@@ -43,6 +62,15 @@ export function ExerciseCard({ exercise, onAddSet }: ExerciseCardProps) {
               </Text>
 
               <Text style={styles.setValue}>{set.reps} reps</Text>
+
+              <Pressable
+                onPress={() => onRemoveSet(set.id)}
+                style={styles.removeSetButton}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete set ${index + 1}`}
+              >
+                <X size={16} color={GymColors.text.tertiary} />
+              </Pressable>
 
               <Text style={styles.completed}>✓</Text>
             </View>
@@ -68,6 +96,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+
   name: {
     color: GymColors.text.primary,
     fontSize: Typography.body,
@@ -78,6 +112,15 @@ const styles = StyleSheet.create({
     color: GymColors.text.tertiary,
     fontSize: Typography.caption,
     marginTop: Spacing.one,
+  },
+
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.medium,
+    backgroundColor: GymColors.background.surface,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   setButton: {
@@ -116,6 +159,13 @@ const styles = StyleSheet.create({
     flex: 1,
     color: GymColors.text.secondary,
     fontSize: Typography.caption,
+  },
+
+  removeSetButton: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   completed: {
