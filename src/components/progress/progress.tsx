@@ -25,7 +25,7 @@ import {
   Spacing,
   Typography,
 } from "@/constants/theme";
-import { getMeasurementHistory } from "@/storage/repositories/measurements";
+import { deleteMeasurement, getMeasurementHistory } from "@/storage/repositories/measurements";
 import {
   deleteProgressPhoto,
   getProgressPhotos,
@@ -276,6 +276,36 @@ export default function ProgressScreen() {
     );
   }
 
+  function handleMeasurementDelete(
+    item: MeasurementConfig,
+  ) {
+    const latest =
+      measurements[item.type]?.[0];
+
+    if (!latest) return;
+
+    Alert.alert(
+      "Delete latest measurement?",
+      `Remove the most recent ${item.label} reading (${latest.value} ${latest.unit})? This can't be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteMeasurement(latest.id)
+              .then(loadProgress)
+              .catch(() => {
+                showToast(
+                  "Couldn't delete measurement",
+                );
+              });
+          },
+        },
+      ],
+    );
+  }
+
   const filteredMeasurements = useMemo(() => {
     const result: Record<
       string,
@@ -494,21 +524,26 @@ export default function ProgressScreen() {
               .length > 0;
 
           return (
-            <GymCard
+            <Pressable
               key={item.type}
-              style={styles.card}
+              onLongPress={() =>
+                handleMeasurementDelete(item)
+              }
+              accessibilityHint="Long press to delete the latest measurement"
             >
-              <Text style={styles.label}>
-                {item.label}
-              </Text>
+              <GymCard style={styles.card}>
+                <Text style={styles.label}>
+                  {item.label}
+                </Text>
 
-              <MeasurementChart
-                measurements={history}
-                hasHistoricalData={
-                  hasHistoricalData
-                }
-              />
-            </GymCard>
+                <MeasurementChart
+                  measurements={history}
+                  hasHistoricalData={
+                    hasHistoricalData
+                  }
+                />
+              </GymCard>
+            </Pressable>
           );
         })}
       </View>
