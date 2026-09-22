@@ -372,6 +372,7 @@ export default function WorkoutsScreen() {
       await finishWorkout(activeWorkout.id, notesText || undefined);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setActiveWorkout(null);
+      setWorkoutNotes("");
     } catch {
       showToast("Couldn't finish workout");
     } finally {
