@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { ActiveWorkoutCard } from "@/components/workouts/active-workout-card";
 import { CardioCard } from "@/components/workouts/cardio-card";
@@ -26,6 +26,8 @@ import {
   finishWorkout,
   getTodayWorkouts,
   removeCardioFromWorkout,
+  removeExerciseFromWorkout,
+  removeSetFromWorkoutExercise,
   startWorkout,
 } from "@/storage/repositories/workouts";
 import type {
@@ -38,9 +40,11 @@ import type {
   WorkoutSet,
 } from "@/types/gymos";
 import { showToast } from "@/utils/toast";
+import { useWeightUnit } from "@/hooks/use-weight-unit";
 
 export default function WorkoutsScreen() {
   const { enabled } = useModules();
+  const { unit: weightUnit } = useWeightUnit();
 
   const [activeWorkout, setActiveWorkout] = useState<WorkoutSession | null>(null);
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
@@ -168,7 +172,7 @@ export default function WorkoutsScreen() {
       const savedSet = await addSetToWorkoutExercise(activeWorkout.id, setExercise.id, {
         reps: repsValue,
         weight: weightValue,
-        unit: "kg",
+        unit: weightUnit,
         completed: true,
       });
       if (!savedSet) return;
@@ -185,12 +189,12 @@ export default function WorkoutsScreen() {
             exerciseId: setExercise.exerciseId,
             weight: prWeight,
             reps: savedSet.reps,
-            unit: savedSet.unit ?? "kg",
+            unit: savedSet.unit ?? weightUnit,
             timestamp: new Date().toISOString(),
           });
 
           showToast(
-            `New PR! ${prWeight} kg × ${savedSet.reps} reps`,
+            `New PR! ${prWeight} ${weightUnit} × ${savedSet.reps} reps`,
             "success",
           );
         }
@@ -290,6 +294,76 @@ export default function WorkoutsScreen() {
     }
   }
 
+  async function handleRemoveSet(exercise: WorkoutExercise, setId: string) {
+    if (!activeWorkout) return;
+
+    try {
+      await removeSetFromWorkoutExercise(
+        activeWorkout.id,
+        exercise.id,
+        setId,
+      );
+
+      setActiveWorkout((current) =>
+        current
+          ? {
+              ...current,
+              exercises: current.exercises.map((ex) =>
+                ex.id === exercise.id
+                  ? { ...ex, sets: ex.sets.filter((s) => s.id !== setId) }
+                  : ex,
+              ),
+            }
+          : current,
+      );
+    } catch {
+      showToast("Couldn't remove set");
+    }
+  }
+
+  function handleRemoveExercise(exercise: WorkoutExercise) {
+    if (!activeWorkout) return;
+
+    const setCount = exercise.sets.length;
+
+    Alert.alert(
+      "Remove exercise",
+      setCount > 0
+        ? `Remove ${exercise.name} and its ${setCount} ${
+            setCount === 1 ? "set" : "sets"
+          } from this workout?`
+        : `Remove ${exercise.name} from this workout?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            void removeExerciseFromWorkout(
+              activeWorkout.id,
+              exercise.id,
+            )
+              .then(() => {
+                setActiveWorkout((current) =>
+                  current
+                    ? {
+                        ...current,
+                        exercises: current.exercises.filter(
+                          (ex) => ex.id !== exercise.id,
+                        ),
+                      }
+                    : current,
+                );
+              })
+              .catch(() => {
+                showToast("Couldn't remove exercise");
+              });
+          },
+        },
+      ],
+    );
+  }
+
   async function handleFinishWorkout() {
     if (!activeWorkout || finishing) return;
     setFinishing(true);
@@ -352,6 +426,12 @@ export default function WorkoutsScreen() {
                     key={exercise.id}
                     exercise={exercise}
                     onAddSet={() => openSetSheet(exercise)}
+                    onRemoveSet={(setId) =>
+                      handleRemoveSet(exercise, setId)
+                    }
+                    onRemoveExercise={() =>
+                      handleRemoveExercise(exercise)
+                    }
                   />
                 ))}
               </View>
@@ -443,6 +523,7 @@ export default function WorkoutsScreen() {
               exercise={setExercise}
               weight={weight}
               reps={reps}
+              unit={weightUnit}
               saving={savingSet}
               reference={setReference}
               onWeightChange={setWeight}
