@@ -64,10 +64,10 @@ export async function deleteProgressPhoto(
   const photo = current.find((item) => item.id === id);
 
   if (photo) {
-    try {
-      new File(photo.uri).delete();
-    } catch {
-      // The file may already be gone — the metadata removal is what matters.
+    const file = new File(photo.uri);
+
+    if (file.exists) {
+      file.delete();
     }
   }
 
