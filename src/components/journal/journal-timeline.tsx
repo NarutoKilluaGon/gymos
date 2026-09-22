@@ -1,6 +1,7 @@
 import { BookOpenText, Plus } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ import { getTimeline } from "@/services/timeline";
 import { showToast } from "@/utils/toast";
 import {
   addJournalEntry,
+  deleteJournalEntry,
 } from "@/storage/repositories/journal";
 import type { JournalEntry } from "@/types/gymos";
 import type { TimelineItem as TimelineItemType } from "@/types/timeline";
@@ -133,6 +135,29 @@ export function JournalTimeline({
     }
   }
 
+  function handleDelete(item: TimelineItemType) {
+    if (item.kind !== "journal") return;
+
+    Alert.alert(
+      "Delete this entry?",
+      "This removes the journal note and can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteJournalEntry(item.id)
+              .then(loadTimeline)
+              .catch(() => {
+                showToast("Couldn't delete entry");
+              });
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <View style={styles.sheet}>
       <View style={styles.header}>
@@ -199,6 +224,11 @@ export function JournalTimeline({
                   <TimelineItem
                     key={`${item.kind}-${item.id}`}
                     item={item}
+                    onDelete={
+                      item.kind === "journal"
+                        ? handleDelete
+                        : undefined
+                    }
                   />
                 ))}
               </View>

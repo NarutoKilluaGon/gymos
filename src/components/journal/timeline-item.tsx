@@ -11,7 +11,7 @@ import {
   Utensils,
   type LucideIcon,
 } from "lucide-react-native";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   GymColors,
@@ -183,16 +183,20 @@ function getConfig(
 
 type TimelineItemProps = {
   item: TimelineItemData;
+  onDelete?: (item: TimelineItemData) => void;
 };
 
 export function TimelineItem({
   item,
+  onDelete,
 }: TimelineItemProps) {
   const { Icon, title, caption } =
     getConfig(item);
 
-  return (
-    <View style={styles.row}>
+  const supportDelete = onDelete !== undefined;
+
+  const row = (
+    <>
       <View style={styles.iconContainer}>
         <Icon
           size={18}
@@ -220,8 +224,23 @@ export function TimelineItem({
           </Text>
         ) : null}
       </View>
-    </View>
+    </>
   );
+
+  if (supportDelete) {
+    return (
+      <Pressable
+        style={styles.row}
+        onLongPress={() => onDelete(item)}
+        accessibilityRole="button"
+        accessibilityHint="Long press to delete this entry"
+      >
+        {row}
+      </Pressable>
+    );
+  }
+
+  return <View style={styles.row}>{row}</View>;
 }
 
 const styles = StyleSheet.create({
