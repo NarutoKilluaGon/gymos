@@ -8,6 +8,7 @@ import {
   Typography,
 } from "@/constants/theme";
 import { buildInsightLines } from "@/services/insights";
+import { convertWeight, type WeightUnit } from "@/storage/repositories/preferences";
 import type { WeekInsights } from "@/types/insights";
 
 type SummaryCardProps = {
@@ -64,13 +65,25 @@ function deltaText(
 function weightDelta(
   current: number | null,
   previous: number | null,
+  previousUnit: string,
   unit: string,
 ): string {
   if (current === null || previous === null) {
     return "no comparison";
   }
 
-  const delta = current - previous;
+  // Weeks may be logged in different units — convert the previous week's
+  // reading into the current unit before subtracting.
+  const normalizedPrevious =
+    previousUnit === unit
+      ? previous
+      : convertWeight(
+          previous,
+          previousUnit as WeightUnit,
+          unit as WeightUnit,
+        );
+
+  const delta = current - normalizedPrevious;
   const sign = delta > 0 ? "+" : "";
 
   return `${sign}${delta.toFixed(1)} ${unit} vs last week`;
@@ -191,6 +204,7 @@ export function SummaryCard({
                   text: weightDelta(
                     current.weightLatest,
                     previous.weightLatest,
+                    previous.weightUnit ?? "kg",
                     weightUnit,
                   ),
                   color: GymColors.text.secondary,

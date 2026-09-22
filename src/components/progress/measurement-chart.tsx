@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { convertWeight, type WeightUnit } from "@/storage/repositories/preferences";
 import type { Measurement } from "@/types/gymos";
 
 type MeasurementChartProps = {
@@ -27,7 +28,20 @@ export function MeasurementChart({
       return null;
     }
 
-    const values = measurements.map((measurement) => measurement.value);
+    // Mixed kg/lb history: plot every reading in the latest reading's
+    // unit (the one shown next to CURRENT) so the line and the CHANGE
+    // are coherent. Stored values are never modified. Non-weight charts
+    // share one unit across the series, so convertWeight is an identity.
+    const referenceUnit =
+      measurements[measurements.length - 1].unit;
+
+    const values = measurements.map((measurement) =>
+      convertWeight(
+        measurement.value,
+        measurement.unit as WeightUnit,
+        referenceUnit as WeightUnit,
+      ),
+    );
 
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
@@ -49,14 +63,14 @@ export function MeasurementChart({
           ? PADDING_LEFT + chartWidth / 2
           : PADDING_LEFT + (index / (measurements.length - 1)) * chartWidth;
 
-      const normalized = (measurement.value - minY) / (maxY - minY);
+      const normalized = (values[index] - minY) / (maxY - minY);
 
       const y = PADDING_TOP + chartHeight - normalized * chartHeight;
 
       return {
         x,
         y,
-        value: measurement.value,
+        value: values[index],
       };
     });
 
@@ -93,7 +107,9 @@ export function MeasurementChart({
   const firstMeasurement = measurements[0];
   const lastMeasurement = measurements[measurements.length - 1];
 
-  const change = lastMeasurement.value - firstMeasurement.value;
+  const change =
+    chart.points[chart.points.length - 1].value -
+    chart.points[0].value;
 
   return (
     <View style={styles.container}>

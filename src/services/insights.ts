@@ -4,6 +4,10 @@ import {
   getMeasurementHistory,
 } from "@/storage/repositories/measurements";
 import { getNorthStar } from "@/storage/repositories/north-star";
+import {
+  convertWeight,
+  type WeightUnit,
+} from "@/storage/repositories/preferences";
 import type {
   GoalProgress,
   HeatmapWeek,
@@ -210,9 +214,15 @@ export async function getWeekInsights(): Promise<WeekInsights> {
         inWeek[inWeek.length - 1].unit;
 
       if (inWeek.length >= 2) {
+        // Mixed kg/lb weeks: convert the earlier reading into the latest
+        // reading's unit (the unit this delta is displayed in).
         bucket.weightChange =
           inWeek[inWeek.length - 1].value -
-          inWeek[0].value;
+          convertWeight(
+            inWeek[0].value,
+            inWeek[0].unit as WeightUnit,
+            inWeek[inWeek.length - 1].unit as WeightUnit,
+          );
       }
     }
   }
@@ -357,9 +367,16 @@ export async function getMonthlySummaries(
     });
 
     if (inMonth.length >= 2) {
+      // Mixed kg/lb months: convert the first reading into the latest
+      // reading's unit (the unit this change is displayed in).
       weightChangeByMonth.set(monthKey, {
         change:
-          inMonth[inMonth.length - 1].value - inMonth[0].value,
+          inMonth[inMonth.length - 1].value -
+          convertWeight(
+            inMonth[0].value,
+            inMonth[0].unit as WeightUnit,
+            inMonth[inMonth.length - 1].unit as WeightUnit,
+          ),
         unit: inMonth[inMonth.length - 1].unit,
       });
     }
@@ -488,8 +505,17 @@ export async function getNorthStarProgress(): Promise<GoalProgress | null> {
     : undefined;
 
   const current = latest?.value ?? null;
-  const target = northStar.targetValue!;
+  const storedTarget = northStar.targetValue!;
   const unit = latest?.unit ?? northStar.unit!;
+  // current and target are rendered under a single unit label — convert
+  // the stored target into that unit for the math and display. The stored
+  // target itself is never rewritten here.
+  const target =
+    northStar.unit !== unit &&
+    (northStar.unit === "kg" || northStar.unit === "lb") &&
+    (unit === "kg" || unit === "lb")
+      ? convertWeight(storedTarget, northStar.unit, unit)
+      : storedTarget;
 
   let percent = 0;
 

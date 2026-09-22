@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import type { PersonalRecord, WorkoutSet, WorkoutExercise } from "@/types/gymos";
+import type { WeightUnit } from "@/storage/repositories/preferences";
 
 type ReferenceData = {
   previousSet?: WorkoutSet;
@@ -12,6 +13,7 @@ type SetInputSheetProps = {
   exercise: WorkoutExercise;
   weight: string;
   reps: string;
+  unit: WeightUnit;
   saving: boolean;
   reference?: ReferenceData;
   onWeightChange: (value: string) => void;
@@ -24,6 +26,7 @@ export function SetInputSheet({
   exercise,
   weight,
   reps,
+  unit,
   saving,
   reference,
   onWeightChange,
@@ -57,7 +60,7 @@ export function SetInputSheet({
         <View style={styles.reference}>
           {prevSet ? (
             <Text style={styles.referenceText}>
-              Last: {prevSet.weight ?? "?"} kg × {prevSet.reps} reps
+              Last: {prevSet.weight ?? "?"} {prevSet.unit ?? "kg"} × {prevSet.reps} reps
             </Text>
           ) : (
             <Text style={styles.referenceEmpty}>First set for this exercise</Text>
@@ -65,7 +68,7 @@ export function SetInputSheet({
 
           {pr ? (
             <Text style={styles.referencePr}>
-              PR: {pr.weight} kg × {pr.reps} reps
+              PR: {pr.weight} {pr.unit} × {pr.reps} reps
             </Text>
           ) : (
             !prevSet && <Text style={styles.referenceEmpty}>No PR yet</Text>
@@ -86,7 +89,7 @@ export function SetInputSheet({
             style={styles.input}
           />
 
-          <Text style={styles.inputUnit}>kg</Text>
+          <Text style={styles.inputUnit}>{unit}</Text>
         </View>
       </View>
 

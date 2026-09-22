@@ -15,6 +15,7 @@ import { ModuleDisabled } from "@/components/ui/module-disabled";
 import { useModules } from "@/contexts/modules-context";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import { Dumbbell } from "lucide-react-native";
+import { convertWeight } from "@/storage/repositories/preferences";
 import {
   getPR,
   setPR,
@@ -179,10 +180,16 @@ export default function WorkoutsScreen() {
 
       try {
         const prWeight = savedSet.weight ?? 0;
+        const savedUnit = savedSet.unit ?? weightUnit;
         const currentPR = await getPR(setExercise.exerciseId);
+        // PR records keep their own stored unit — convert the stored PR
+        // weight into this set's unit before comparing volume.
+        const prWeightComparable = currentPR
+          ? convertWeight(currentPR.weight, currentPR.unit, savedUnit)
+          : 0;
         const isNewPR =
           !currentPR ||
-          prWeight * savedSet.reps > currentPR.weight * currentPR.reps;
+          prWeight * savedSet.reps > prWeightComparable * currentPR.reps;
 
         if (isNewPR) {
           await setPR({

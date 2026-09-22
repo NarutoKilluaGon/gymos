@@ -10,6 +10,7 @@ import {
   Spacing,
   Typography,
 } from "@/constants/theme";
+import { convertWeight } from "@/storage/repositories/preferences";
 import type { ExercisePerformance } from "@/storage/repositories/workout-progress";
 
 type ExerciseProgressChartProps = {
@@ -22,16 +23,29 @@ export function ExerciseProgressChart({
   history,
 }: ExerciseProgressChartProps) {
   const points = useMemo(() => {
-    return history
-      .filter(
-        (item) =>
-          item.completed &&
-          typeof item.weight === "number",
-      )
-      .map((item) => ({
-        value: item.weight!,
-        timestamp: item.timestamp,
-      }));
+    const completed = history.filter(
+      (item) =>
+        item.completed &&
+        typeof item.weight === "number",
+    );
+
+    // Mixed kg/lb history: plot every set in the latest set's unit — the
+    // same unit used for the stats and axis labels. Stored values are
+    // never modified.
+    const referenceUnit =
+      completed.length === 0
+        ? "kg"
+        : completed[completed.length - 1].unit ?? "kg";
+
+    return completed.map((item) => ({
+      value: convertWeight(
+        item.weight!,
+        item.unit ?? "kg",
+        referenceUnit,
+      ),
+      unit: referenceUnit,
+      timestamp: item.timestamp,
+    }));
   }, [history]);
 
   if (points.length === 0) {
@@ -61,6 +75,8 @@ export function ExerciseProgressChart({
   const latest =
     points[points.length - 1];
 
+  const unit = latest.unit;
+
   const best = Math.max(...values);
 
   return (
@@ -72,7 +88,7 @@ export function ExerciseProgressChart({
           </Text>
 
           <Text style={styles.statValue}>
-            {latest.value} kg
+            {latest.value} {unit}
           </Text>
         </View>
 
@@ -82,7 +98,7 @@ export function ExerciseProgressChart({
           </Text>
 
           <Text style={styles.statValue}>
-            {best} kg
+            {best} {unit}
           </Text>
         </View>
       </View>

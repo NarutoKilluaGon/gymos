@@ -13,7 +13,9 @@ import {
 
 import { GymCard } from "@/components/ui/gym-card";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
+import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { saveNorthStar } from "@/storage/repositories/north-star";
+import { convertWeight } from "@/storage/repositories/preferences";
 import { showToast } from "@/utils/toast";
 import type {
   GoalType,
@@ -40,8 +42,11 @@ const GOAL_METRICS: { value: MeasurementType; label: string }[] = [
   { value: "thigh", label: "Thigh" },
 ];
 
-function unitForMetric(metric: MeasurementType): MeasurementUnit {
-  return metric === "weight" ? "kg" : "in";
+function unitForMetric(
+  metric: MeasurementType,
+  weightUnit: MeasurementUnit,
+): MeasurementUnit {
+  return metric === "weight" ? weightUnit : "in";
 }
 
 function goalDraftValid(
@@ -72,6 +77,7 @@ export function NorthStarCard({
   northStar,
   onNorthStarChange,
 }: NorthStarCardProps) {
+  const { unit: weightUnit } = useWeightUnit();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirmingChange, setConfirmingChange] = useState(false);
@@ -93,11 +99,24 @@ export function NorthStarCard({
     setGoalEnabled(hasGoal);
     setGoalType(northStar.goalType ?? null);
     setMetric(northStar.metric ?? null);
-    setTargetValue(
-      northStar.targetValue !== undefined
-        ? String(northStar.targetValue)
-        : "",
-    );
+    if (northStar.targetValue !== undefined) {
+      // Weight goals: seed the editor with the stored target converted
+      // into the selected unit so the value agrees with the form's unit
+      // label. Non-weight goals (inches, %) are unit-stable passthroughs.
+      // The stored target itself is only rewritten on save.
+      const asSelected =
+        northStar.unit === "kg" || northStar.unit === "lb"
+          ? convertWeight(northStar.targetValue, northStar.unit, weightUnit)
+          : northStar.targetValue;
+
+      setTargetValue(
+        asSelected === northStar.targetValue
+          ? String(northStar.targetValue)
+          : String(Math.round(asSelected * 10) / 10),
+      );
+    } else {
+      setTargetValue("");
+    }
   }
 
   function openEditor() {
@@ -139,7 +158,7 @@ export function NorthStarCard({
       updatedNorthStar.goalType = goalType;
       updatedNorthStar.metric = metric;
       updatedNorthStar.targetValue = Number(targetValue);
-      updatedNorthStar.unit = unitForMetric(metric);
+      updatedNorthStar.unit = unitForMetric(metric, weightUnit);
     } else {
       delete updatedNorthStar.goalType;
       delete updatedNorthStar.metric;
@@ -392,7 +411,7 @@ export function NorthStarCard({
                   <View style={styles.unitContainer}>
                     <Text style={styles.unitText}>
                       {metric !== null
-                        ? unitForMetric(metric)
+                        ? unitForMetric(metric, weightUnit)
                         : "—"}
                     </Text>
                   </View>
