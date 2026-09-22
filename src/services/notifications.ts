@@ -1,15 +1,11 @@
 /**
  * Local notification reminders, fully offline (no remote push).
  *
- * Three daily-at-time reminders (workout / meals / streak) plus a repeating
- * water reminder. Schedule/cancel is idempotent per kind via a stable
- * identifier, so applying prefs is always safe to re-run at startup.
- *
- * Cross-platform daily trigger: Android uses the DAILY trigger type; iOS can't
- * schedule DAILY natively and uses a repeating CALENDAR trigger instead.
+ * Uses lazy dynamic import of expo-notifications so the entire module
+ * degrades gracefully on Expo Go (SDK 53+ removed push support there).
+ * All exported functions are safe no-ops when the module can't load.
  */
 
-import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 import type {
@@ -51,13 +47,27 @@ const CONTENT: Record<ReminderKind, { title: string; body: string }> = {
   },
 };
 
+let Notifications: any = null;
+let loadAttempted = false;
+
+async function loadModule(): Promise<boolean> {
+  if (loadAttempted) return Notifications !== null;
+  loadAttempted = true;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Notifications = require("expo-notifications");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 let handlerSet = false;
 
 /** Show banners while the app is foregrounded, no sound. */
 function setForegroundHandler(): void {
-  if (handlerSet) {
-    return;
-  }
+  if (handlerSet || !Notifications) return;
   handlerSet = true;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -71,6 +81,8 @@ function setForegroundHandler(): void {
 
 /** Ensure the Android notification channel exists (required on Android 13+). */
 export async function setupNotifications(): Promise<void> {
+  if (!(await loadModule())) return;
+
   setForegroundHandler();
 
   if (Platform.OS === "android") {
@@ -85,6 +97,8 @@ export async function setupNotifications(): Promise<void> {
 
 /** Request notification permission; returns true when granted. */
 export async function requestNotificationPermission(): Promise<boolean> {
+  if (!(await loadModule())) return false;
+
   const current = await Notifications.getPermissionsAsync();
   let status = current.status;
 
@@ -100,7 +114,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 function dailyTrigger(
   hour: number,
   minute: number,
-): Notifications.NotificationTriggerInput {
+): any {
   if (Platform.OS === "android") {
     return {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -122,9 +136,7 @@ async function scheduleDaily(
   kind: "workout" | "meals" | "streak",
   config: ReminderConfig,
 ): Promise<void> {
-  if (!config.enabled) {
-    return;
-  }
+  if (!config.enabled || !Notifications) return;
 
   await Notifications.scheduleNotificationAsync({
     identifier: NOTIFICATION_ID(kind),
@@ -136,9 +148,7 @@ async function scheduleDaily(
 async function scheduleWater(
   config: WaterReminderConfig,
 ): Promise<void> {
-  if (!config.enabled) {
-    return;
-  }
+  if (!config.enabled || !Notifications) return;
 
   await Notifications.scheduleNotificationAsync({
     identifier: NOTIFICATION_ID("water"),
@@ -154,6 +164,8 @@ async function scheduleWater(
 
 /** Cancel a single reminder (safe if it was never scheduled). */
 export async function cancelReminder(kind: ReminderKind): Promise<void> {
+  if (!Notifications) return;
+
   try {
     await Notifications.cancelScheduledNotificationAsync(
       NOTIFICATION_ID(kind),
@@ -170,6 +182,8 @@ export async function cancelReminder(kind: ReminderKind): Promise<void> {
 export async function applyReminders(
   prefs: ReminderPrefs,
 ): Promise<void> {
+  if (!(await loadModule())) return;
+
   for (const kind of REMINDER_KINDS) {
     await cancelReminder(kind);
   }
@@ -184,6 +198,8 @@ export async function applyReminders(
 
 /** Cancel every scheduled reminder (e.g. all prefs turned off). */
 export async function cancelAllReminders(): Promise<void> {
+  if (!(await loadModule())) return;
+
   for (const kind of REMINDER_KINDS) {
     await cancelReminder(kind);
   }
