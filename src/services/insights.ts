@@ -347,7 +347,7 @@ export async function getMonthlySummaries(
       const start = new Date(
         `${monthKey}-01T00:00:00`,
       ).getTime();
-      const end = new Date(monthKey);
+      const end = new Date(`${monthKey}-01T00:00:00`);
 
       end.setMonth(end.getMonth() + 1);
 
