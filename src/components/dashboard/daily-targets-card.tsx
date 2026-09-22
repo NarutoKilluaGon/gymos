@@ -17,6 +17,7 @@ type DailyTargetsCardProps = {
   nutritionEnabled?: boolean;
   onEditTargets?: () => void;
   onSupplementsPress?: () => void;
+  onSleepDeleteLongPress?: () => void;
   compact?: boolean;
 };
 
@@ -33,6 +34,7 @@ export function DailyTargetsCard({
   nutritionEnabled = true,
   onEditTargets,
   onSupplementsPress,
+  onSleepDeleteLongPress,
   compact = false,
 }: DailyTargetsCardProps) {
   const hasProteinTarget =
@@ -85,13 +87,29 @@ export function DailyTargetsCard({
   }
 
   // Sleep
-  items.push(
+  const sleepRow = (
     <TargetRow
       key="sleep"
       label="Sleep"
       value={sleep ?? "—"}
       compact={compact}
     />
+  );
+
+  items.push(
+    onSleepDeleteLongPress && sleep ? (
+      <Pressable
+        key="sleep"
+        onLongPress={onSleepDeleteLongPress}
+        style={styles.sleepRow}
+        accessibilityRole="button"
+        accessibilityHint="Long press to delete today's sleep log"
+      >
+        {sleepRow}
+      </Pressable>
+    ) : (
+      sleepRow
+    ),
   );
 
   // Steps
@@ -271,6 +289,11 @@ const styles = StyleSheet.create({
   },
 
   supplementRow: {
+    paddingVertical: Spacing.one,
+    width: "100%",
+  },
+
+  sleepRow: {
     paddingVertical: Spacing.one,
     width: "100%",
   },

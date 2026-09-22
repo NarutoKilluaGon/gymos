@@ -27,7 +27,11 @@ import {
   type SupplementProgress,
 } from "@/storage/repositories/supplement-logs";
 import { getRoutines } from "@/storage/repositories/routines";
-import { getTodaySleep, logSleepDuration } from "@/storage/repositories/sleep";
+import {
+  deleteSleepSession,
+  getTodaySleep,
+  logSleepDuration,
+} from "@/storage/repositories/sleep";
 import { getTodaySteps } from "@/storage/repositories/steps";
 import { addWater, getTodayWater } from "@/storage/repositories/water";
 import {
@@ -45,7 +49,7 @@ import type {
   WorkoutSession,
 } from "@/types/gymos";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { getTodayKey } from "@/utils/date";
 import { showToast } from "@/utils/toast";
 
@@ -293,9 +297,37 @@ export default function HomeScreen() {
   async function handleSleepAdd(sleep: SleepInput) {
     try {
       await logSleepDuration(sleep.hours, sleep.minutes);
+      setSleep(await getTodaySleep());
     } catch {
       showToast("Couldn't save sleep");
     }
+  }
+
+  function handleSleepDeleteLongPress() {
+    const latest = sleep.find((s) => s.endedAt) ?? sleep[0];
+
+    if (!latest) return;
+
+    Alert.alert(
+      "Delete today's sleep log?",
+      "This removes the logged sleep and can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteSleepSession(latest.id)
+              .then(async () => {
+                setSleep(await getTodaySleep());
+              })
+              .catch(() => {
+                showToast("Couldn't delete sleep");
+              });
+          },
+        },
+      ],
+    );
   }
 
   async function handleWorkoutStart() {
@@ -387,6 +419,7 @@ export default function HomeScreen() {
           nutritionEnabled={enabled.nutrition}
           onEditTargets={() => setTargetsSheetOpen(true)}
           onSupplementsPress={() => setSupplementSheetOpen(true)}
+          onSleepDeleteLongPress={handleSleepDeleteLongPress}
           compact
         />
       </FadeIn>
