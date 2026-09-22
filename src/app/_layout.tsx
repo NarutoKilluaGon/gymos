@@ -27,7 +27,9 @@ export default function TabLayout() {
 
   // Initialize mock vision provider for development (replace with real provider in production)
   useEffect(() => {
-    setVisionProvider(mockVisionProvider);
+    if (__DEV__) {
+      setVisionProvider(mockVisionProvider);
+    }
   }, []);
 
   // Restore scheduled reminders on every launch (idempotent re-apply).
