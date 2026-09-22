@@ -1,4 +1,4 @@
-import { getAllDailyActivities, getDailyActivity, saveDailyActivity } from "@/storage/daily";
+import { getAllDailyActivities, readAllDailyActivitiesUnlocked, readDailyActivityUnlocked, withDailyLock, writeDailyActivityUnlocked } from "@/storage/daily";
 import { appendEvent } from "@/storage/events";
 import type {
   Measurement,
@@ -13,23 +13,29 @@ export async function addMeasurement(
   value: number,
   unit: MeasurementUnit,
 ): Promise<Measurement> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(
+      getTodayKey(),
+    );
 
-  const measurement: Measurement = {
-    id: createId(),
-    type,
-    value,
-    unit,
-    timestamp: new Date().toISOString(),
-  };
+    const measurement: Measurement = {
+      id: createId(),
+      type,
+      value,
+      unit,
+      timestamp: new Date().toISOString(),
+    };
 
-  if (!Array.isArray(activity.measurements)) {
-    activity.measurements = [];
-  }
+    if (!Array.isArray(activity.measurements)) {
+      activity.measurements = [];
+    }
 
-  activity.measurements.push(measurement);
+    activity.measurements.push(measurement);
 
-  await saveDailyActivity(activity);
+    await writeDailyActivityUnlocked(activity);
+
+    return measurement;
+  });
 
   if (type === "weight") {
     await appendEvent("weight.logged", {
@@ -38,14 +44,14 @@ export async function addMeasurement(
     });
   } else {
     await appendEvent("measurement.logged", {
-      measurementId: measurement.id,
+      measurementId: saved.id,
       type,
       value,
       unit,
     });
   }
 
-  return measurement;
+  return saved;
 }
 
 export async function getMeasurements(
@@ -75,6 +81,31 @@ export async function getLatestMeasurement(
   const measurements = await getMeasurements(type);
 
   return measurements[0];
+}
+
+export async function deleteMeasurement(
+  measurementId: string,
+): Promise<void> {
+  await withDailyLock(async () => {
+    const data = await readAllDailyActivitiesUnlocked();
+
+    for (const [dayKey, activity] of Object.entries(data)) {
+      if (!Array.isArray(activity.measurements)) {
+        continue;
+      }
+
+      if (!activity.measurements.some((m) => m.id === measurementId)) {
+        continue;
+      }
+
+      activity.measurements = activity.measurements.filter(
+        (measurement) => measurement.id !== measurementId,
+      );
+
+      await writeDailyActivityUnlocked(activity);
+      return;
+    }
+  });
 }
 
 export async function getMeasurementHistory(

@@ -1,4 +1,4 @@
-import { getAllDailyActivities, getDailyActivity, saveDailyActivity } from "@/storage/daily";
+import { getAllDailyActivities, getDailyActivity, readDailyActivityUnlocked, withDailyLock, writeDailyActivityUnlocked } from "@/storage/daily";
 import { appendEvent } from "@/storage/events";
 import type {
   CardioEntry,
@@ -13,31 +13,35 @@ export async function startWorkout(
   name: string,
   routineId?: string,
 ): Promise<WorkoutSession> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
 
-  if (!Array.isArray(activity.workouts)) {
-    activity.workouts = [];
-  }
+    if (!Array.isArray(activity.workouts)) {
+      activity.workouts = [];
+    }
 
-  const workout: WorkoutSession = {
-    id: createId(),
-    name,
-    startedAt: new Date().toISOString(),
-    exercises: [],
-    ...(routineId ? { routineId } : {}),
-  };
+    const workout: WorkoutSession = {
+      id: createId(),
+      name,
+      startedAt: new Date().toISOString(),
+      exercises: [],
+      ...(routineId ? { routineId } : {}),
+    };
 
-  activity.workouts.push(workout);
+    activity.workouts.push(workout);
 
-  await saveDailyActivity(activity);
+    await writeDailyActivityUnlocked(activity);
+
+    return workout;
+  });
 
   await appendEvent("workout.started", {
-    workoutId: workout.id,
+    workoutId: saved.id,
     name,
     ...(routineId ? { routineId } : {}),
   });
 
-  return workout;
+  return saved;
 }
 
 export async function addExerciseToWorkout(
@@ -45,24 +49,32 @@ export async function addExerciseToWorkout(
   exerciseId: string,
   name: string,
 ): Promise<WorkoutExercise | undefined> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
 
-  const workout = activity.workouts.find((item) => item.id === workoutId);
+    const workout = activity.workouts.find((item) => item.id === workoutId);
 
-  if (!workout) {
+    if (!workout) {
+      return undefined;
+    }
+
+    const exercise: WorkoutExercise = {
+      id: createId(),
+      exerciseId,
+      name,
+      sets: [],
+    };
+
+    workout.exercises.push(exercise);
+
+    await writeDailyActivityUnlocked(activity);
+
+    return exercise;
+  });
+
+  if (!saved) {
     return undefined;
   }
-
-  const exercise: WorkoutExercise = {
-    id: createId(),
-    exerciseId,
-    name,
-    sets: [],
-  };
-
-  workout.exercises.push(exercise);
-
-  await saveDailyActivity(activity);
 
   await appendEvent("workout.exercise.added", {
     workoutId,
@@ -70,7 +82,7 @@ export async function addExerciseToWorkout(
     name,
   });
 
-  return exercise;
+  return saved;
 }
 
 export async function addSetToWorkoutExercise(
@@ -78,128 +90,202 @@ export async function addSetToWorkoutExercise(
   exerciseId: string,
   set: Omit<WorkoutSet, "id">,
 ): Promise<WorkoutSet | undefined> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
 
-  const workout = activity.workouts.find((item) => item.id === workoutId);
+    const workout = activity.workouts.find((item) => item.id === workoutId);
 
-  if (!workout) {
+    if (!workout) {
+      return undefined;
+    }
+
+    const exercise = workout.exercises.find((item) => item.id === exerciseId);
+
+    if (!exercise) {
+      return undefined;
+    }
+
+    const workoutSet: WorkoutSet = {
+      id: createId(),
+      ...set,
+    };
+
+    exercise.sets.push(workoutSet);
+
+    await writeDailyActivityUnlocked(activity);
+
+    return workoutSet;
+  });
+
+  if (!saved) {
     return undefined;
   }
-
-  const exercise = workout.exercises.find((item) => item.id === exerciseId);
-
-  if (!exercise) {
-    return undefined;
-  }
-
-  const workoutSet: WorkoutSet = {
-    id: createId(),
-    ...set,
-  };
-
-  exercise.sets.push(workoutSet);
-
-  await saveDailyActivity(activity);
 
   await appendEvent("workout.set.logged", {
     workoutId,
     exerciseId,
-    setId: workoutSet.id,
-    weight: workoutSet.weight,
-    reps: workoutSet.reps,
-    unit: workoutSet.unit,
+    setId: saved.id,
+    weight: saved.weight,
+    reps: saved.reps,
+    unit: saved.unit,
   });
 
-  return workoutSet;
+  return saved;
 }
 
 export async function addCardioToWorkout(
   workoutId: string,
   input: Omit<CardioEntry, "id" | "loggedAt">,
 ): Promise<CardioEntry | undefined> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
 
-  const workout = activity.workouts.find((item) => item.id === workoutId);
+    const workout = activity.workouts.find((item) => item.id === workoutId);
 
-  if (!workout) {
+    if (!workout) {
+      return undefined;
+    }
+
+    const entry: CardioEntry = {
+      id: createId(),
+      ...input,
+      loggedAt: new Date().toISOString(),
+    };
+
+    if (!Array.isArray(workout.cardio)) {
+      workout.cardio = [];
+    }
+
+    workout.cardio.push(entry);
+
+    await writeDailyActivityUnlocked(activity);
+
+    return entry;
+  });
+
+  if (!saved) {
     return undefined;
   }
 
-  const entry: CardioEntry = {
-    id: createId(),
-    ...input,
-    loggedAt: new Date().toISOString(),
-  };
-
-  if (!Array.isArray(workout.cardio)) {
-    workout.cardio = [];
-  }
-
-  workout.cardio.push(entry);
-
-  await saveDailyActivity(activity);
-
   await appendEvent("workout.cardio.logged", {
     workoutId,
-    cardioId: entry.id,
-    activity: entry.activity,
-    durationMin: entry.durationMin,
-    ...(entry.distanceKm !== undefined
-      ? { distanceKm: entry.distanceKm }
+    cardioId: saved.id,
+    activity: saved.activity,
+    durationMin: saved.durationMin,
+    ...(saved.distanceKm !== undefined
+      ? { distanceKm: saved.distanceKm }
       : {}),
-    ...(entry.calories !== undefined ? { calories: entry.calories } : {}),
+    ...(saved.calories !== undefined ? { calories: saved.calories } : {}),
   });
 
-  return entry;
+  return saved;
+}
+
+export async function removeSetFromWorkoutExercise(
+  workoutId: string,
+  exerciseId: string,
+  setId: string,
+): Promise<void> {
+  await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
+
+    const workout = activity.workouts.find((item) => item.id === workoutId);
+
+    const exercise = workout?.exercises.find(
+      (item) => item.id === exerciseId,
+    );
+
+    if (!exercise) {
+      return;
+    }
+
+    exercise.sets = exercise.sets.filter((set) => set.id !== setId);
+
+    await writeDailyActivityUnlocked(activity);
+  });
+}
+
+export async function removeExerciseFromWorkout(
+  workoutId: string,
+  exerciseId: string,
+): Promise<void> {
+  await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
+
+    const workout = activity.workouts.find((item) => item.id === workoutId);
+
+    if (!workout) {
+      return;
+    }
+
+    workout.exercises = workout.exercises.filter(
+      (item) => item.id !== exerciseId,
+    );
+
+    await writeDailyActivityUnlocked(activity);
+  });
 }
 
 export async function removeCardioFromWorkout(
   workoutId: string,
   cardioId: string,
 ): Promise<void> {
-  const activity = await getDailyActivity(getTodayKey());
+  await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
 
-  const workout = activity.workouts.find((item) => item.id === workoutId);
+    const workout = activity.workouts.find((item) => item.id === workoutId);
 
-  if (!workout || !Array.isArray(workout.cardio)) {
-    return;
-  }
+    if (!workout || !Array.isArray(workout.cardio)) {
+      return;
+    }
 
-  workout.cardio = workout.cardio.filter((entry) => entry.id !== cardioId);
+    workout.cardio = workout.cardio.filter((entry) => entry.id !== cardioId);
 
-  await saveDailyActivity(activity);
+    await writeDailyActivityUnlocked(activity);
+  });
 }
 
 export async function finishWorkout(
   workoutId: string,
   notes?: string,
 ): Promise<WorkoutSession | undefined> {
-  const activity = await getDailyActivity(getTodayKey());
+  const finished = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
 
-  const workout = activity.workouts.find((item) => item.id === workoutId);
+    const workout = activity.workouts.find((item) => item.id === workoutId);
 
-  if (!workout) {
+    if (!workout) {
+      return undefined;
+    }
+
+    workout.endedAt = new Date().toISOString();
+
+    if (notes) {
+      workout.notes = notes;
+    }
+
+    await writeDailyActivityUnlocked(activity);
+
+    return {
+      workout,
+      durationMs:
+        new Date(workout.endedAt).getTime() -
+        new Date(workout.startedAt).getTime(),
+    };
+  });
+
+  if (!finished) {
     return undefined;
   }
 
-  workout.endedAt = new Date().toISOString();
-
-  if (notes) {
-    workout.notes = notes;
-  }
-
-  await saveDailyActivity(activity);
-
   await appendEvent("workout.finished", {
     workoutId,
-    durationMs:
-      new Date(workout.endedAt).getTime() -
-      new Date(workout.startedAt).getTime(),
-    exerciseCount: workout.exercises.length,
+    durationMs: finished.durationMs,
+    exerciseCount: finished.workout.exercises.length,
     ...(notes ? { notes } : {}),
   });
 
-  return workout;
+  return finished.workout;
 }
 
 export async function getTodayWorkouts(): Promise<WorkoutSession[]> {

@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { File } from "expo-file-system";
 
 import type { ExportBundle } from "@/services/export";
+import { withDailyLock } from "@/storage/daily";
 
 const KEY_PREFIX = "@gymos/";
 
@@ -59,7 +60,13 @@ export async function importFromUri(uri: string): Promise<number> {
   }
 
   try {
-    await AsyncStorage.multiSet(entries);
+    // Hold the daily mutex across the whole batch write: a concurrent
+    // @gymos/daily transaction snapshots the store, then writes it back,
+    // so without this lock an in-flight transaction whose snapshot predates
+    // the import would clobber the imported data on its next write (and
+    // vice versa). All other keys ride along under the same critical
+    // section — imports are rare, user-initiated operations.
+    await withDailyLock(() => AsyncStorage.multiSet(entries));
   } catch {
     throw new Error("Couldn't save imported data");
   }

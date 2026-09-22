@@ -1,7 +1,10 @@
 import {
   getAllDailyActivities,
   getDailyActivity,
-  saveDailyActivity,
+  readAllDailyActivitiesUnlocked,
+  readDailyActivityUnlocked,
+  withDailyLock,
+  writeDailyActivityUnlocked,
 } from "@/storage/daily";
 import { appendEvent } from "@/storage/events";
 import type { SleepSession } from "@/types/gymos";
@@ -9,56 +12,75 @@ import { getTodayKey } from "@/utils/date";
 import { createId } from "@/utils/id";
 
 export async function startSleep(): Promise<SleepSession> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(
+      getTodayKey(),
+    );
 
-  const startedAt = new Date().toISOString();
+    const startedAt = new Date().toISOString();
 
-  const session: SleepSession = {
-    id: createId(),
-    startedAt,
-  };
+    const session: SleepSession = {
+      id: createId(),
+      startedAt,
+    };
 
-  if (!Array.isArray(activity.sleep)) {
-    activity.sleep = [];
-  }
+    if (!Array.isArray(activity.sleep)) {
+      activity.sleep = [];
+    }
 
-  activity.sleep.push(session);
+    activity.sleep.push(session);
 
-  await saveDailyActivity(activity);
+    await writeDailyActivityUnlocked(activity);
 
-  await appendEvent("sleep.started", {
-    sleepId: session.id,
-    startedAt,
+    return session;
   });
 
-  return session;
+  await appendEvent("sleep.started", {
+    sleepId: saved.id,
+    startedAt: saved.startedAt,
+  });
+
+  return saved;
 }
 
 export async function endSleep(
   sleepId: string,
 ): Promise<SleepSession | undefined> {
-  const activity = await getDailyActivity(getTodayKey());
+  const ended = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(
+      getTodayKey(),
+    );
 
-  const session = activity.sleep.find(
-    (item) => item.id === sleepId,
-  );
+    const session = activity.sleep.find(
+      (item) => item.id === sleepId,
+    );
 
-  if (!session || session.endedAt) {
+    if (!session || session.endedAt) {
+      return undefined;
+    }
+
+    session.endedAt = new Date().toISOString();
+
+    await writeDailyActivityUnlocked(activity);
+
+    return {
+      session,
+      durationMs:
+        new Date(session.endedAt).getTime() -
+        new Date(session.startedAt).getTime(),
+    };
+  });
+
+  if (!ended) {
     return undefined;
   }
 
-  session.endedAt = new Date().toISOString();
-
-  await saveDailyActivity(activity);
-
   await appendEvent("sleep.ended", {
     sleepId,
-    durationMs:
-      new Date(session.endedAt).getTime() -
-      new Date(session.startedAt).getTime(),
+    durationMs: ended.durationMs,
   });
 
-  return session;
+  return ended.session;
 }
 
 /**
@@ -77,28 +99,59 @@ export async function logSleepDuration(
     endedAt.getTime() - durationMs,
   );
 
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const store = await readDailyActivityUnlocked(
+      getTodayKey(),
+    );
 
-  const session: SleepSession = {
-    id: createId(),
-    startedAt: startedAt.toISOString(),
-    endedAt: endedAt.toISOString(),
-  };
+    const session: SleepSession = {
+      id: createId(),
+      startedAt: startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+    };
 
-  if (!Array.isArray(activity.sleep)) {
-    activity.sleep = [];
-  }
+    if (!Array.isArray(store.sleep)) {
+      store.sleep = [];
+    }
 
-  activity.sleep.push(session);
+    store.sleep.push(session);
 
-  await saveDailyActivity(activity);
+    await writeDailyActivityUnlocked(store);
+
+    return session;
+  });
 
   await appendEvent("sleep.ended", {
-    sleepId: session.id,
+    sleepId: saved.id,
     durationMs,
   });
 
-  return session;
+  return saved;
+}
+
+export async function deleteSleepSession(
+  sleepId: string,
+): Promise<void> {
+  await withDailyLock(async () => {
+    const data = await readAllDailyActivitiesUnlocked();
+
+    for (const activity of Object.values(data)) {
+      if (!Array.isArray(activity.sleep)) {
+        continue;
+      }
+
+      if (!activity.sleep.some((item) => item.id === sleepId)) {
+        continue;
+      }
+
+      activity.sleep = activity.sleep.filter(
+        (item) => item.id !== sleepId,
+      );
+
+      await writeDailyActivityUnlocked(activity);
+      return;
+    }
+  });
 }
 
 export async function getTodaySleep(): Promise<SleepSession[]> {

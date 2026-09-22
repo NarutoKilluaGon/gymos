@@ -1,4 +1,5 @@
 import { DAILY_STORAGE_KEY, type DailyData } from "@/storage/constants";
+import { createMutex } from "@/storage/mutex";
 import { getStorage, setStorage } from "@/storage/storage";
 import type { DailyActivity, WaterEntry } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
@@ -16,6 +17,33 @@ type StoredDailyData = Record<
   string,
   DailyActivity | LegacyDailyRecord
 >;
+
+/**
+ * Serializes every read → modify → write transaction against the
+ * `@gymos/daily` key. Each operation snapshots the whole store, so
+ * without this lock two overlapping operations would each persist
+ * their own stale snapshot and silently drop the other's changes.
+ */
+const dailyMutex = createMutex();
+
+/**
+ * Run `task` with exclusive access to the daily store.
+ *
+ * The lock is held for the task's entire lifetime — its reads, its
+ * mutations and its write all happen before any other transaction
+ * can start. The task's result or error is passed through to the
+ * caller unchanged, and the lock is always released before that
+ * outcome is delivered, so a failed operation never blocks the next.
+ *
+ * NOT re-entrant: never call `getDailyActivity`, `saveDailyActivity`
+ * or `getAllDailyActivities` from inside `task` — use the
+ * `...Unlocked` helpers instead, or the queue deadlocks on itself.
+ */
+export function withDailyLock<T>(
+  task: () => Promise<T>,
+): Promise<T> {
+  return dailyMutex.runExclusive(task);
+}
 
 function createEmptyDailyActivity(
   date: string,
@@ -63,8 +91,14 @@ function migrateRecord(
   return activity;
 }
 
-export async function getDailyActivity(
-  dateKey: string = getTodayKey(),
+/**
+ * Read one day's activity, migrating a legacy record in place and
+ * persisting the migration.
+ *
+ * Caller must already hold the daily lock (see `withDailyLock`).
+ */
+export async function readDailyActivityUnlocked(
+  dateKey: string,
 ): Promise<DailyActivity> {
   const stored =
     (await getStorage<StoredDailyData>(
@@ -96,7 +130,12 @@ export async function getDailyActivity(
   return activity;
 }
 
-export async function saveDailyActivity(
+/**
+ * Persist a single day's activity.
+ *
+ * Caller must already hold the daily lock (see `withDailyLock`).
+ */
+export async function writeDailyActivityUnlocked(
   activity: DailyActivity,
 ): Promise<void> {
   const data =
@@ -116,9 +155,12 @@ export async function saveDailyActivity(
  * Load the full daily store, migrating any legacy records
  * in place. Repositories that query across days should use
  * this instead of reading raw storage so migration logic
- * is never bypassed.
+ * is never bypassed. Migration is applied in memory only —
+ * nothing is written back.
+ *
+ * Caller must already hold the daily lock (see `withDailyLock`).
  */
-export async function getAllDailyActivities(): Promise<DailyData> {
+export async function readAllDailyActivitiesUnlocked(): Promise<DailyData> {
   const stored =
     (await getStorage<StoredDailyData>(
       DAILY_STORAGE_KEY,
@@ -136,5 +178,27 @@ export async function getAllDailyActivities(): Promise<DailyData> {
   }
 
   return data;
+}
+
+export async function getDailyActivity(
+  dateKey: string = getTodayKey(),
+): Promise<DailyActivity> {
+  return withDailyLock(() =>
+    readDailyActivityUnlocked(dateKey),
+  );
+}
+
+export async function saveDailyActivity(
+  activity: DailyActivity,
+): Promise<void> {
+  return withDailyLock(() =>
+    writeDailyActivityUnlocked(activity),
+  );
+}
+
+export async function getAllDailyActivities(): Promise<DailyData> {
+  return withDailyLock(() =>
+    readAllDailyActivitiesUnlocked(),
+  );
 }
 

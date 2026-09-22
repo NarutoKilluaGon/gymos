@@ -2,7 +2,9 @@ import { appendEvent } from "@/storage/events";
 import {
   getAllDailyActivities,
   getDailyActivity,
-  saveDailyActivity,
+  readDailyActivityUnlocked,
+  withDailyLock,
+  writeDailyActivityUnlocked,
 } from "@/storage/daily";
 import type { Meal } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
@@ -31,33 +33,39 @@ export async function addMeal(
     >
   >,
 ): Promise<Meal> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(
+      getTodayKey(),
+    );
 
-  const meal: Meal = {
-    id: createId(),
-    name,
-    timestamp: new Date().toISOString(),
-    ...macros,
-  };
+    const meal: Meal = {
+      id: createId(),
+      name,
+      timestamp: new Date().toISOString(),
+      ...macros,
+    };
 
-  if (!Array.isArray(activity.meals)) {
-    activity.meals = [];
-  }
+    if (!Array.isArray(activity.meals)) {
+      activity.meals = [];
+    }
 
-  activity.meals.push(meal);
+    activity.meals.push(meal);
 
-  await saveDailyActivity(activity);
+    await writeDailyActivityUnlocked(activity);
 
-  await appendEvent("meal.logged", {
-    mealId: meal.id,
-    name,
-    calories: meal.calories,
-    protein: meal.protein,
-    carbs: meal.carbs,
-    fat: meal.fat,
+    return meal;
   });
 
-  return meal;
+  await appendEvent("meal.logged", {
+    mealId: saved.id,
+    name,
+    calories: saved.calories,
+    protein: saved.protein,
+    carbs: saved.carbs,
+    fat: saved.fat,
+  });
+
+  return saved;
 }
 
 export async function getMealsForDate(
@@ -78,13 +86,18 @@ export async function deleteMeal(
   mealId: string,
 ): Promise<void> {
   const todayKey = getTodayKey();
-  const activity = await getDailyActivity(todayKey);
 
-  activity.meals = activity.meals.filter(
-    (m) => m.id !== mealId,
-  );
+  await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(
+      todayKey,
+    );
 
-  await saveDailyActivity(activity);
+    activity.meals = activity.meals.filter(
+      (m) => m.id !== mealId,
+    );
+
+    await writeDailyActivityUnlocked(activity);
+  });
 }
 
 export async function getDailyMacroTotals(

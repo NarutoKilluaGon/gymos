@@ -1,7 +1,10 @@
 import {
   getAllDailyActivities,
   getDailyActivity,
-  saveDailyActivity,
+  readAllDailyActivitiesUnlocked,
+  readDailyActivityUnlocked,
+  withDailyLock,
+  writeDailyActivityUnlocked,
 } from "@/storage/daily";
 import { appendEvent } from "@/storage/events";
 import type { JournalEntry } from "@/types/gymos";
@@ -12,30 +15,61 @@ export async function addJournalEntry(
   text: string,
   mood?: JournalEntry["mood"],
 ): Promise<JournalEntry> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(
+      getTodayKey(),
+    );
 
-  const entry: JournalEntry = {
-    id: createId(),
-    text,
-    mood,
-    timestamp: new Date().toISOString(),
-  };
+    const entry: JournalEntry = {
+      id: createId(),
+      text,
+      mood,
+      timestamp: new Date().toISOString(),
+    };
 
-  if (!Array.isArray(activity.journal)) {
-    activity.journal = [];
-  }
+    if (!Array.isArray(activity.journal)) {
+      activity.journal = [];
+    }
 
-  activity.journal.push(entry);
+    activity.journal.push(entry);
 
-  await saveDailyActivity(activity);
+    await writeDailyActivityUnlocked(activity);
+
+    return entry;
+  });
 
   await appendEvent("journal.logged", {
-    journalId: entry.id,
+    journalId: saved.id,
     textLength: text.length,
     ...(mood ? { mood } : {}),
   });
 
-  return entry;
+  return saved;
+}
+
+export async function deleteJournalEntry(
+  journalId: string,
+): Promise<void> {
+  await withDailyLock(async () => {
+    const data = await readAllDailyActivitiesUnlocked();
+
+    for (const activity of Object.values(data)) {
+      if (!Array.isArray(activity.journal)) {
+        continue;
+      }
+
+      if (!activity.journal.some((item) => item.id === journalId)) {
+        continue;
+      }
+
+      activity.journal = activity.journal.filter(
+        (item) => item.id !== journalId,
+      );
+
+      await writeDailyActivityUnlocked(activity);
+      return;
+    }
+  });
 }
 
 export async function getTodayJournal(): Promise<JournalEntry[]> {

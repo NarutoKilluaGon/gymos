@@ -1,7 +1,9 @@
 import { appendEvent } from "@/storage/events";
 import {
   getDailyActivity,
-  saveDailyActivity,
+  readDailyActivityUnlocked,
+  withDailyLock,
+  writeDailyActivityUnlocked,
 } from "@/storage/daily";
 import type { WaterEntry } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
@@ -10,21 +12,27 @@ import { createId } from "@/utils/id";
 export async function addWater(
   amountMl: number,
 ): Promise<WaterEntry> {
-  const activity = await getDailyActivity(getTodayKey());
+  const saved = await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(
+      getTodayKey(),
+    );
 
-  const entry: WaterEntry = {
-    id: createId(),
-    amountMl,
-    timestamp: new Date().toISOString(),
-  };
+    const entry: WaterEntry = {
+      id: createId(),
+      amountMl,
+      timestamp: new Date().toISOString(),
+    };
 
-  activity.water.push(entry);
+    activity.water.push(entry);
 
-  await saveDailyActivity(activity);
+    await writeDailyActivityUnlocked(activity);
+
+    return entry;
+  });
 
   await appendEvent("water.logged", { amountMl });
 
-  return entry;
+  return saved;
 }
 
 export async function getTodayWater(): Promise<number> {
