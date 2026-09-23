@@ -9,13 +9,22 @@ export type Streak = {
 function isActive(activity: DailyActivity | undefined): boolean {
   if (!activity) return false;
 
+  // A malformed record (corrupt write, partial migration) may miss an
+  // array field: guard each one so the day reads as inactive instead
+  // of throwing on `.length` and failing the whole streak read.
   return (
-    activity.water.length > 0 ||
-    activity.workouts.length > 0 ||
-    activity.meals.length > 0 ||
-    activity.sleep.length > 0 ||
-    activity.measurements.length > 0 ||
-    activity.journal.length > 0
+    (Array.isArray(activity.water) &&
+      activity.water.length > 0) ||
+    (Array.isArray(activity.workouts) &&
+      activity.workouts.length > 0) ||
+    (Array.isArray(activity.meals) &&
+      activity.meals.length > 0) ||
+    (Array.isArray(activity.sleep) &&
+      activity.sleep.length > 0) ||
+    (Array.isArray(activity.measurements) &&
+      activity.measurements.length > 0) ||
+    (Array.isArray(activity.journal) &&
+      activity.journal.length > 0)
   );
 }
 
