@@ -5,6 +5,7 @@ import * as Sharing from "expo-sharing";
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 const KEY_PREFIX = "@gymos/";
+const PHOTOS_KEY = "@gymos/progress-photos";
 
 /**
  * Lossless JSON snapshot of every `@gymos/*` storage key.
@@ -16,7 +17,45 @@ export type ExportBundle = {
   version: string;
   exportedAt: string;
   data: Record<string, unknown>;
+  /** Progress photo bytes keyed by photo ID (base64). Only present when
+   *  at least one photo file was collected; older exports without the
+   *  field still import unchanged. */
+  files?: Record<string, string>;
 };
+
+/** Best-effort base64 snapshot of every progress photo file. Missing or
+ *  unreadable files are skipped so one bad photo can't fail the export —
+ *  its metadata still ships and the import leaves that uri untouched. */
+async function collectPhotoFiles(
+  photos: unknown,
+): Promise<Record<string, string>> {
+  const files: Record<string, string> = {};
+
+  if (!Array.isArray(photos)) {
+    return files;
+  }
+
+  for (const photo of photos) {
+    if (typeof photo !== "object" || photo === null) continue;
+
+    const id = (photo as { id?: unknown }).id;
+    const uri = (photo as { uri?: unknown }).uri;
+
+    if (typeof id !== "string" || typeof uri !== "string") continue;
+
+    try {
+      const file = new File(uri);
+
+      if (!file.exists) continue;
+
+      files[id] = await file.base64();
+    } catch {
+      // Skip unreadable photo files; their metadata still exports.
+    }
+  }
+
+  return files;
+}
 
 export async function buildExport(): Promise<ExportBundle> {
   const keys = (await AsyncStorage.getAllKeys()).filter(
@@ -38,13 +77,23 @@ export async function buildExport(): Promise<ExportBundle> {
     }
   }
 
-  return {
+  const files = await collectPhotoFiles(data[PHOTOS_KEY]);
+
+  const bundle: ExportBundle = {
     app: "gymos",
     format: 1,
     version: APP_VERSION,
     exportedAt: new Date().toISOString(),
     data,
   };
+
+  // Only carry `files` when at least one blob was collected, so
+  // photoless exports keep the original minimal shape.
+  if (Object.keys(files).length > 0) {
+    bundle.files = files;
+  }
+
+  return bundle;
 }
 
 export async function exportToFile(): Promise<string> {
