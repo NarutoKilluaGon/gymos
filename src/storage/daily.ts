@@ -88,7 +88,12 @@ function migrateRecord(
     activity.water.push(waterEntry);
   }
 
-  return activity;
+  const migratedWater = activity.water;
+
+  // Preserve every legacy field (sleep, steps, weight, journal) instead of
+  // dropping it; `record.water` is a bare number, so re-apply the migrated
+  // WaterEntry[] captured above.
+  return Object.assign(activity, record, { water: migratedWater });
 }
 
 /**
