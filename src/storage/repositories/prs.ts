@@ -29,3 +29,17 @@ export async function setPR(
 
   await setStorage(PRS_KEY, prs);
 }
+
+export async function clearPR(
+  exerciseId: string,
+): Promise<void> {
+  const prs = (await getStorage<PrMap>(PRS_KEY)) ?? {};
+
+  if (!(exerciseId in prs)) {
+    return;
+  }
+
+  delete prs[exerciseId];
+
+  await setStorage(PRS_KEY, prs);
+}

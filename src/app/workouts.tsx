@@ -17,6 +17,7 @@ import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import { Dumbbell } from "lucide-react-native";
 import { convertWeight } from "@/storage/repositories/preferences";
 import {
+  clearPR,
   getPR,
   setPR,
 } from "@/storage/repositories/prs";
@@ -301,8 +302,29 @@ export default function WorkoutsScreen() {
     }
   }
 
+  // Mirror of handleSaveSet's PR comparison read as an equality: a set
+  // sourced the PR when its unit-normalized volume and reps match the
+  // stored record (which holds the establishing set's exact values).
+  function setMatchesPR(set: WorkoutSet, pr: PersonalRecord): boolean {
+    const setUnit = set.unit ?? weightUnit;
+    // PR records keep their own stored unit — convert it into this
+    // set's unit before comparing, exactly as handleSaveSet does.
+    const prWeightComparable = convertWeight(pr.weight, pr.unit, setUnit);
+
+    return (
+      set.reps === pr.reps &&
+      (set.weight ?? 0) * set.reps === prWeightComparable * pr.reps
+    );
+  }
+
   async function handleRemoveSet(exercise: WorkoutExercise, setId: string) {
     if (!activeWorkout) return;
+
+    // Read the PR before the removal — the stored record is what the
+    // removed set is matched against. Best-effort: a failed read only
+    // skips the invalidation and never blocks the deletion.
+    const pr = await getPR(exercise.exerciseId).catch(() => null);
+    const removedSet = exercise.sets.find((set) => set.id === setId);
 
     try {
       await removeSetFromWorkoutExercise(
@@ -325,6 +347,19 @@ export default function WorkoutsScreen() {
       );
     } catch {
       showToast("Couldn't remove set");
+      return;
+    }
+
+    // The repository call released the daily lock above, so this runs
+    // outside the critical section — the same post-lock ordering the
+    // event log uses after its own read-modify-write.
+    if (pr && removedSet && setMatchesPR(removedSet, pr)) {
+      try {
+        await clearPR(exercise.exerciseId);
+      } catch (error) {
+        // PR bookkeeping is best-effort — never fail the set removal.
+        console.error("Failed to clear personal record", error);
+      }
     }
   }
 
@@ -346,11 +381,19 @@ export default function WorkoutsScreen() {
           text: "Remove",
           style: "destructive",
           onPress: () => {
-            void removeExerciseFromWorkout(
-              activeWorkout.id,
-              exercise.id,
-            )
-              .then(() => {
+            void (async () => {
+              // Read the PR before the removal — the stored record is
+              // what the exercise's sets are matched against.
+              // Best-effort: a failed read only skips the invalidation
+              // and never blocks the deletion.
+              const pr = await getPR(exercise.exerciseId).catch(() => null);
+
+              try {
+                await removeExerciseFromWorkout(
+                  activeWorkout.id,
+                  exercise.id,
+                );
+
                 setActiveWorkout((current) =>
                   current
                     ? {
@@ -361,10 +404,27 @@ export default function WorkoutsScreen() {
                       }
                     : current,
                 );
-              })
-              .catch(() => {
+              } catch {
                 showToast("Couldn't remove exercise");
-              });
+                return;
+              }
+
+              // The repository call released the daily lock above, so
+              // this runs outside the critical section. Clear the
+              // record when any removed set was its source.
+              if (
+                pr &&
+                exercise.sets.some((set) => setMatchesPR(set, pr))
+              ) {
+                try {
+                  await clearPR(exercise.exerciseId);
+                } catch (error) {
+                  // PR bookkeeping is best-effort — never fail the
+                  // exercise removal.
+                  console.error("Failed to clear personal record", error);
+                }
+              }
+            })();
           },
         },
       ],
