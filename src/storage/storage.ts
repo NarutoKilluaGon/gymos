@@ -26,7 +26,11 @@ export async function getStorage<T>(
     value = await AsyncStorage.getItem(key);
   } catch (error) {
     console.error(`Failed to read storage: ${key}`, error);
-    return null;
+    throw new StorageError(
+      `Failed to read ${key}`,
+      key,
+      "read",
+    );
   }
 
   if (value === null) {
