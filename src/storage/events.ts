@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { createMutex } from "@/storage/mutex";
 import type {
   AppEvent,
   EventPayload,
@@ -19,6 +20,16 @@ const MAX_EVENTS = 10_000;
 type StoredEvents = AppEvent[];
 
 /**
+ * Serializes every read → modify → write against `@gymos/events`:
+ * each append snapshots the whole log, so without this lock two
+ * overlapping appends would each persist their own stale snapshot
+ * and silently drop the other's event (a lost update). Leaf lock —
+ * its task never acquires another mutex, so it is safe to call from
+ * inside a daily-locked transaction.
+ */
+const eventsMutex = createMutex();
+
+/**
  * Append an event to the log. Events are permanent by design —
  * there is no delete or update operation.
  */
@@ -36,25 +47,27 @@ export async function appendEvent<
   };
 
   try {
-    const existing =
-      await AsyncStorage.getItem(
+    await eventsMutex.runExclusive(async () => {
+      const existing =
+        await AsyncStorage.getItem(
+          EVENTS_STORAGE_KEY,
+        );
+
+      const events: StoredEvents = existing
+        ? (JSON.parse(existing) as StoredEvents)
+        : [];
+
+      events.push(event);
+
+      if (events.length > MAX_EVENTS) {
+        events.splice(0, events.length - MAX_EVENTS);
+      }
+
+      await AsyncStorage.setItem(
         EVENTS_STORAGE_KEY,
+        JSON.stringify(events),
       );
-
-    const events: StoredEvents = existing
-      ? (JSON.parse(existing) as StoredEvents)
-      : [];
-
-    events.push(event);
-
-    if (events.length > MAX_EVENTS) {
-      events.splice(0, events.length - MAX_EVENTS);
-    }
-
-    await AsyncStorage.setItem(
-      EVENTS_STORAGE_KEY,
-      JSON.stringify(events),
-    );
+    });
   } catch (error) {
     // The event log is best-effort (derived from the primary stores and
     // bounded by MAX_EVENTS). Never let a failed append reject: the caller's
