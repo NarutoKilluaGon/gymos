@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -43,6 +43,7 @@ import { showToast } from "@/utils/toast";
 import {
   estimateMealFromPhoto,
   getVisionProvider,
+  mealInputFromEstimate,
   type MealEstimate,
 } from "@/services/meal-estimator";
 
@@ -70,7 +71,18 @@ export default function NutritionScreen() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [quickPickOpen, setQuickPickOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [estimatedMeal, setEstimatedMeal] = useState<MealInput | null>(null);
+  const [estimatedMeal, setEstimatedMeal] =
+    useState<MealEstimate | null>(null);
+
+  // Reference-stable per estimate so the sheet's reseed guard only fires
+  // when a new estimate arrives (not on unrelated re-renders).
+  const estimatedMealInput = useMemo(
+    () =>
+      estimatedMeal
+        ? mealInputFromEstimate(estimatedMeal)
+        : undefined,
+    [estimatedMeal],
+  );
 
   useEffect(() => {
     async function loadNutrition() {
@@ -317,7 +329,8 @@ export default function NutritionScreen() {
       <MealSheet
         visible={mealSheetOpen}
         allowFavorite
-        initialMeal={estimatedMeal ?? undefined}
+        initialMeal={estimatedMealInput}
+        initialFoods={estimatedMeal?.foods}
         onSave={handleAddMeal}
         onClose={handleMealSheetClose}
       />

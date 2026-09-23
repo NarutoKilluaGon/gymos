@@ -11,13 +11,17 @@ describe("searchQuickMeals", () => {
     expect(results.length).toBeGreaterThan(0);
 
     for (const meal of results) {
-      expect(meal.name.toLowerCase()).toContain("chicken");
+      expect(meal.foods[0].name.toLowerCase()).toContain(
+        "chicken",
+      );
     }
   });
 
   it("returns every catalog meal containing the query", () => {
     const chicken = searchQuickMeals("chicken");
-    const names = chicken.map((meal) => meal.name.toLowerCase());
+    const names = chicken.map((meal) =>
+      meal.foods[0].name.toLowerCase(),
+    );
 
     expect(names).toContain("chicken breast (150g)");
     expect(names).toContain("chicken burrito bowl");
@@ -29,7 +33,7 @@ describe("searchQuickMeals", () => {
 
   it("exposes estimated macros on results", () => {
     const eggs = searchQuickMeals("eggs")[0];
-    expect(typeof eggs.calories).toBe("number");
-    expect(typeof eggs.protein).toBe("number");
+    expect(typeof eggs.totals.calories).toBe("number");
+    expect(typeof eggs.totals.protein).toBe("number");
   });
 });

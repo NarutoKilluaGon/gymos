@@ -20,6 +20,7 @@ import {
   Typography,
 } from "@/constants/theme";
 import { addSavedFood } from "@/storage/repositories/saved-foods";
+import { createId } from "@/utils/id";
 import { showToast } from "@/utils/toast";
 
 export type MealInput = {
@@ -30,12 +31,56 @@ export type MealInput = {
   fat?: number;
 };
 
+/** A single detected/estimated food item within a photo-scan result. */
+export type EstimatedFood = {
+  name: string;
+  estimatedAmount: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
+
+/** Editable review row for one detected food (all fields are text). */
+type FoodRow = {
+  key: string;
+  name: string;
+  amount: string;
+  unit: string;
+  calories: string;
+  protein: string;
+  carbs: string;
+  fat: string;
+};
+
+const FOOD_MACROS = [
+  "calories",
+  "protein",
+  "carbs",
+  "fat",
+] as const;
+
+function toFoodRow(food: EstimatedFood): FoodRow {
+  return {
+    key: createId(),
+    name: food.name,
+    amount: String(food.estimatedAmount),
+    unit: food.unit,
+    calories: String(food.calories),
+    protein: String(food.protein),
+    carbs: String(food.carbs),
+    fat: String(food.fat),
+  };
+}
+
 type MealSheetProps = {
   visible: boolean;
   onClose: () => void;
   onSave: (meal: MealInput) => void;
   allowFavorite?: boolean;
   initialMeal?: MealInput;
+  initialFoods?: EstimatedFood[];
 };
 
 export function MealSheet({
@@ -44,6 +89,7 @@ export function MealSheet({
   onSave,
   allowFavorite = false,
   initialMeal,
+  initialFoods,
 }: MealSheetProps) {
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
@@ -54,6 +100,10 @@ export function MealSheet({
     useState(false);
   const [lastInitial, setLastInitial] = useState<
     MealInput | undefined
+  >();
+  const [foods, setFoods] = useState<FoodRow[]>([]);
+  const [lastInitialFoods, setLastInitialFoods] = useState<
+    EstimatedFood[] | undefined
   >();
 
   // Seed fields when an estimated meal arrives (e.g. after a photo scan).
@@ -82,6 +132,12 @@ export function MealSheet({
     );
   }
 
+  // Seed the detected-food list when a new estimate arrives.
+  if (visible && initialFoods && initialFoods !== lastInitialFoods) {
+    setLastInitialFoods(initialFoods);
+    setFoods(initialFoods.map(toFoodRow));
+  }
+
   function parseOptional(value: string): number | undefined {
     if (!value.trim()) {
       return undefined;
@@ -92,6 +148,65 @@ export function MealSheet({
     return Number.isFinite(parsed) && parsed > 0
       ? parsed
       : undefined;
+  }
+
+  /** Food-row numbers feed recalculation only; blank/invalid count as 0. */
+  function parseFoodNumber(value: string): number {
+    const parsed = Number(value.trim());
+
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : 0;
+  }
+
+  function updateFood(
+    key: string,
+    patch: Partial<FoodRow>,
+  ) {
+    setFoods((rows) =>
+      rows.map((row) =>
+        row.key === key ? { ...row, ...patch } : row,
+      ),
+    );
+  }
+
+  function removeFood(key: string) {
+    setFoods((rows) =>
+      rows.filter((row) => row.key !== key),
+    );
+  }
+
+  function addFood() {
+    setFoods((rows) => [
+      ...rows,
+      {
+        key: createId(),
+        name: "",
+        amount: "",
+        unit: "",
+        calories: "",
+        protein: "",
+        carbs: "",
+        fat: "",
+      },
+    ]);
+  }
+
+  // Totals stay editable; this re-derives them from the displayed foods.
+  function recalcTotalsFromFoods() {
+    const sum = (pick: (row: FoodRow) => string) =>
+      Math.round(
+        foods.reduce(
+          (total, row) =>
+            total + parseFoodNumber(pick(row)),
+          0,
+        ) * 100,
+      ) / 100;
+
+    setCalories(String(sum((row) => row.calories)));
+    setProtein(String(sum((row) => row.protein)));
+    setCarbs(String(sum((row) => row.carbs)));
+    setFat(String(sum((row) => row.fat)));
   }
 
   async function handleSave() {
@@ -135,6 +250,8 @@ export function MealSheet({
     setCarbs("");
     setFat("");
     setSaveAsFavorite(false);
+    setFoods([]);
+    setLastInitialFoods(undefined);
   }
 
   function handleClose() {
@@ -144,7 +261,9 @@ export function MealSheet({
     setCarbs("");
     setFat("");
     setSaveAsFavorite(false);
+    setFoods([]);
     setLastInitial(undefined);
+    setLastInitialFoods(undefined);
     onClose();
   }
 
@@ -189,6 +308,153 @@ export function MealSheet({
             showsVerticalScrollIndicator={false}
             style={styles.fields}
           >
+            {lastInitialFoods !== undefined && (
+              <View style={styles.foodsSection}>
+                <Text style={styles.label}>
+                  Detected foods
+                </Text>
+
+                {foods.map((row) => (
+                  <View
+                    key={row.key}
+                    style={styles.foodCard}
+                  >
+                    <View style={styles.foodHeader}>
+                      <TextInput
+                        value={row.name}
+                        onChangeText={(text) =>
+                          updateFood(row.key, {
+                            name: text,
+                          })
+                        }
+                        placeholder="Food name"
+                        placeholderTextColor={
+                          GymColors.text.tertiary
+                        }
+                        style={styles.foodName}
+                        accessibilityLabel="Food name"
+                      />
+
+                      <Pressable
+                        onPress={() =>
+                          removeFood(row.key)
+                        }
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${
+                          row.name || "food"
+                        }`}
+                        style={
+                          styles.foodRemoveButton
+                        }
+                      >
+                        <X
+                          size={18}
+                          color={
+                            GymColors.text.secondary
+                          }
+                        />
+                      </Pressable>
+                    </View>
+
+                    <View style={styles.foodDetailRow}>
+                      <TextInput
+                        value={row.amount}
+                        onChangeText={(text) =>
+                          updateFood(row.key, {
+                            amount: text,
+                          })
+                        }
+                        placeholder="Amount"
+                        placeholderTextColor={
+                          GymColors.text.tertiary
+                        }
+                        keyboardType="decimal-pad"
+                        style={styles.foodDetailInput}
+                        accessibilityLabel="Estimated amount"
+                      />
+
+                      <TextInput
+                        value={row.unit}
+                        onChangeText={(text) =>
+                          updateFood(row.key, {
+                            unit: text,
+                          })
+                        }
+                        placeholder="Unit"
+                        placeholderTextColor={
+                          GymColors.text.tertiary
+                        }
+                        style={styles.foodDetailInput}
+                        accessibilityLabel="Unit"
+                      />
+                    </View>
+
+                    <View style={styles.foodMacroRow}>
+                      {FOOD_MACROS.map((macro) => (
+                        <View
+                          key={macro}
+                          style={styles.foodMacroBox}
+                        >
+                          <Text
+                            style={styles.foodMacroLabel}
+                          >
+                            {macro === "calories"
+                              ? "kcal"
+                              : macro
+                                  .charAt(0)
+                                  .toUpperCase() +
+                                macro.slice(1)}
+                          </Text>
+
+                          <TextInput
+                            value={row[macro]}
+                            onChangeText={(text) =>
+                              updateFood(row.key, {
+                                [macro]: text,
+                              } as Partial<FoodRow>)
+                            }
+                            placeholder="0"
+                            placeholderTextColor={
+                              GymColors.text.tertiary
+                            }
+                            keyboardType="number-pad"
+                            style={
+                              styles.foodMacroInput
+                            }
+                            accessibilityLabel={macro}
+                          />
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+
+                <View style={styles.foodActionRow}>
+                  <Pressable
+                    onPress={addFood}
+                    style={styles.foodActionButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add food"
+                  >
+                    <Text style={styles.foodActionText}>
+                      + Add food
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={recalcTotalsFromFoods}
+                    style={styles.foodActionButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Recalculate totals from foods"
+                  >
+                    <Text style={styles.foodActionText}>
+                      Recalc totals
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
             <Text style={styles.label}>Meal</Text>
 
             <TextInput
@@ -472,6 +738,103 @@ const styles = StyleSheet.create({
   saveText: {
     color: GymColors.text.primary,
     fontSize: Typography.body,
+    fontWeight: "600",
+  },
+
+  foodsSection: {
+    marginBottom: Spacing.three,
+  },
+
+  foodCard: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: Spacing.two,
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+
+  foodHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+    width: "100%",
+  },
+
+  foodName: {
+    flex: 1,
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+    paddingVertical: Spacing.one,
+  },
+
+  foodRemoveButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  foodDetailRow: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    width: "48%",
+  },
+
+  foodDetailInput: {
+    flex: 1,
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+    backgroundColor: GymColors.background.surface,
+    borderRadius: Radius.medium,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
+
+  foodMacroRow: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    width: "48%",
+  },
+
+  foodMacroBox: {
+    flex: 1,
+  },
+
+  foodMacroLabel: {
+    color: GymColors.text.tertiary,
+    fontSize: Typography.caption,
+    marginBottom: Spacing.half,
+  },
+
+  foodMacroInput: {
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+    backgroundColor: GymColors.background.surface,
+    borderRadius: Radius.medium,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
+
+  foodActionRow: {
+    flexDirection: "row",
+    gap: Spacing.two,
+  },
+
+  foodActionButton: {
+    flex: 1,
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
+    paddingVertical: Spacing.two,
+    alignItems: "center",
+  },
+
+  foodActionText: {
+    color: GymColors.text.primary,
+    fontSize: Typography.caption,
     fontWeight: "600",
   },
 });

@@ -15,6 +15,7 @@ import {
   Typography,
 } from "@/constants/theme";
 import {
+  mealInputFromEstimate,
   searchQuickMeals,
   type MealEstimate,
 } from "@/services/meal-estimator";
@@ -71,27 +72,33 @@ export function QuickMealPickerSheet({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {results.map((meal) => (
-          <Pressable
-            key={meal.name}
-            onPress={() => onSelect(meal)}
-            accessibilityRole="button"
-            accessibilityLabel={`Pick ${meal.name}`}
-            style={styles.row}
-          >
-            <View style={styles.rowTextBlock}>
-              <Text style={styles.rowName}>{meal.name}</Text>
+        {results.map((meal) => {
+          const input = mealInputFromEstimate(meal);
 
-              <Text style={styles.rowMacros}>
-                {meal.calories} kcal · {meal.protein}g protein
-                {meal.carbs ? ` · ${meal.carbs}g carbs` : ""}
-                {meal.fat ? ` · ${meal.fat}g fat` : ""}
-              </Text>
-            </View>
+          return (
+            <Pressable
+              key={input.name}
+              onPress={() => onSelect(meal)}
+              accessibilityRole="button"
+              accessibilityLabel={`Pick ${input.name}`}
+              style={styles.row}
+            >
+              <View style={styles.rowTextBlock}>
+                <Text style={styles.rowName}>
+                  {input.name}
+                </Text>
 
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
-        ))}
+                <Text style={styles.rowMacros}>
+                  {input.calories} kcal · {input.protein}g protein
+                  {input.carbs ? ` · ${input.carbs}g carbs` : ""}
+                  {input.fat ? ` · ${input.fat}g fat` : ""}
+                </Text>
+              </View>
+
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
     </View>
   );

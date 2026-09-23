@@ -2,8 +2,9 @@
  * Quick meal estimates from a curated catalog + AI vision provider.
  *
  * V1: curated list of common meals with estimated macros (QUICK_MEALS).
- * The user taps one → it pre-fills the MealSheet (name + macros) → they can
- * edit before saving. No manual macro entry needed for the most common foods.
+ * The user taps one → it pre-fills the MealSheet (detected foods + totals)
+ * → they can edit before saving. No manual macro entry needed for the most
+ * common foods.
  *
  * A vision provider (photo → AI macros) plugs in behind `estimateMealFromPhoto`,
  * which stays as the scan entry point. Without a provider configured it falls
@@ -13,13 +14,67 @@
 
 import * as ImagePicker from "expo-image-picker";
 
-import type { MealInput } from "@/components/quick-add/meal-sheet";
+import type {
+  EstimatedFood,
+  MealInput,
+} from "@/components/quick-add/meal-sheet";
+import type { MacroTotals } from "@/storage/repositories/meals";
 import { showToast } from "@/utils/toast";
 
-export type MealEstimate = MealInput;
+/**
+ * AI food-scan estimate: every detected food plus editable totals.
+ * Totals are an estimate of the sum of `foods` (kept for quick review);
+ * `mealInputFromEstimate` flattens to the save path (MealInput).
+ */
+export type MealEstimate = {
+  foods: EstimatedFood[];
+  totals: MacroTotals;
+};
+
+/** Wrap one meal as a single-food estimate (quick-pick catalog + mock). */
+function singleFoodEstimate(meal: MealInput): MealEstimate {
+  const food: EstimatedFood = {
+    name: meal.name,
+    estimatedAmount: 1,
+    unit: "serving",
+    calories: meal.calories ?? 0,
+    protein: meal.protein ?? 0,
+    carbs: meal.carbs ?? 0,
+    fat: meal.fat ?? 0,
+  };
+
+  return {
+    foods: [food],
+    totals: {
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      fat: food.fat,
+    },
+  };
+}
+
+/**
+ * Flatten an estimate into the MealSheet's manual-entry shape:
+ * meal name = joined food names, meal macros = totals (both editable
+ * in the sheet before saving).
+ */
+export function mealInputFromEstimate(
+  estimate: MealEstimate,
+): MealInput {
+  return {
+    name: estimate.foods
+      .map((food) => food.name)
+      .join(", "),
+    calories: estimate.totals.calories,
+    protein: estimate.totals.protein,
+    carbs: estimate.totals.carbs,
+    fat: estimate.totals.fat,
+  };
+}
 
 /** Curated common meals with estimated macros, searchable by name. */
-export const QUICK_MEALS: MealEstimate[] = [
+export const QUICK_MEALS: MealInput[] = [
   { name: "Chicken breast (150g)", calories: 250, protein: 46, carbs: 0, fat: 5 },
   { name: "Grilled salmon (150g)", calories: 280, protein: 31, carbs: 0, fat: 17 },
   { name: "Ground beef (150g)", calories: 330, protein: 27, carbs: 0, fat: 24 },
@@ -41,13 +96,13 @@ export const QUICK_MEALS: MealEstimate[] = [
 export function searchQuickMeals(query: string): MealEstimate[] {
   const q = query.trim().toLowerCase();
 
-  if (!q) {
-    return QUICK_MEALS;
-  }
+  const matches = q
+    ? QUICK_MEALS.filter((meal) =>
+        meal.name.toLowerCase().includes(q),
+      )
+    : QUICK_MEALS;
 
-  return QUICK_MEALS.filter((meal) =>
-    meal.name.toLowerCase().includes(q),
-  );
+  return matches.map(singleFoodEstimate);
 }
 
 /**
@@ -95,13 +150,13 @@ export const mockVisionProvider: VisionProvider = {
     const base = QUICK_MEALS[seed % QUICK_MEALS.length];
     const variance = 0.85 + (seed % 30) / 100; // 0.85–1.14
 
-    return {
+    return singleFoodEstimate({
       name: `AI: ${base.name}`,
       calories: Math.round((base.calories ?? 0) * variance),
       protein: Math.round((base.protein ?? 0) * variance),
       carbs: Math.round((base.carbs ?? 0) * variance),
       fat: Math.round((base.fat ?? 0) * variance),
-    };
+    });
   },
 };
 
