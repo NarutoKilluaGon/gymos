@@ -107,18 +107,30 @@ export function JournalTimeline({
     useState(false);
 
   const loadTimeline = useCallback(async () => {
-    setItems(await getTimeline());
-    setLoading(false);
+    try {
+      const data = await getTimeline();
+      setItems(data);
+      setLoading(false);
+    } catch {
+      setLoading(false);
+      showToast("Couldn't load timeline");
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const data = await getTimeline();
-      if (cancelled) return;
-      setItems(data);
-      setLoading(false);
+      try {
+        const data = await getTimeline();
+        if (cancelled) return;
+        setItems(data);
+        setLoading(false);
+      } catch {
+        if (cancelled) return;
+        setLoading(false);
+        showToast("Couldn't load timeline");
+      }
     }
 
     load();
