@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { LucideIcon } from "lucide-react-native";
 
@@ -6,8 +7,9 @@ import { GymColors, Spacing, Typography } from "@/constants/theme";
 type HubSectionRowProps = {
   icon: LucideIcon;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   onPress: () => void;
+  trailing?: ReactNode;
 };
 
 export function HubSectionRow({
@@ -15,6 +17,7 @@ export function HubSectionRow({
   title,
   subtitle,
   onPress,
+  trailing,
 }: HubSectionRowProps) {
   return (
     <Pressable
@@ -29,12 +32,14 @@ export function HubSectionRow({
       <View style={styles.textBlock}>
         <Text style={styles.title}>{title}</Text>
 
-        <Text style={styles.subtitle} numberOfLines={1}>
-          {subtitle}
-        </Text>
+        {subtitle ? (
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
 
-      <Text style={styles.chevron}>›</Text>
+      {trailing ?? <Text style={styles.chevron}>›</Text>}
     </Pressable>
   );
 }

@@ -28,9 +28,11 @@ import { WeightSheet } from "@/components/quick-add/weight-sheet";
 import { useModules } from "@/contexts/modules-context";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import type { ModuleId } from "@/storage/repositories/modules";
+import type { WeightUnit } from "@/storage/repositories/preferences";
 import type { JournalEntry } from "@/types/gymos";
 
 type GymFABProps = {
+  weightUnit?: WeightUnit;
   onWaterAdd?: (amount: number) => void;
   onWeightAdd?: (weight: number) => void;
   onMealAdd?: (meal: MealInput) => void;
@@ -58,6 +60,7 @@ const actions: FABAction[] = [
 ];
 
 export function GymFAB({
+  weightUnit = "kg",
   onWaterAdd,
   onWeightAdd,
   onMealAdd,
@@ -280,6 +283,7 @@ export function GymFAB({
       {/* Weight Sheet */}
       <WeightSheet
         visible={weightSheetOpen}
+        unit={weightUnit}
         onClose={() => setWeightSheetOpen(false)}
         onSave={handleWeightSave}
       />

@@ -18,15 +18,18 @@ import {
   Spacing,
   Typography,
 } from "@/constants/theme";
+import type { WeightUnit } from "@/storage/repositories/preferences";
 
 type WeightSheetProps = {
   visible: boolean;
+  unit: WeightUnit;
   onClose: () => void;
   onSave: (weight: number) => void;
 };
 
 export function WeightSheet({
   visible,
+  unit,
   onClose,
   onSave,
 }: WeightSheetProps) {
@@ -106,7 +109,7 @@ export function WeightSheet({
               autoFocus
             />
 
-            <Text style={styles.unit}>kg</Text>
+            <Text style={styles.unit}>{unit}</Text>
           </View>
 
           <Pressable

@@ -1,4 +1,4 @@
-import { BarChart3, Bell, BookOpen, Dumbbell, FileDown, FolderInput, History, Info, Pill, SlidersHorizontal, Trophy, Utensils } from "lucide-react-native";
+import { BarChart3, Bell, BookOpen, Dumbbell, FileDown, FolderInput, History, Info, Pill, Scale, SlidersHorizontal, Trophy, Utensils } from "lucide-react-native";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -16,11 +16,13 @@ import { SupplementsSheet } from "@/components/hub/supplements-sheet";
 import { InsightsSheet } from "@/components/insights/insights-sheet";
 import { JournalTimeline } from "@/components/journal/journal-timeline";
 import { GymCard } from "@/components/ui/gym-card";
-import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
+import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { applyReminders } from "@/services/notifications";
 import type { ReminderPrefs } from "@/storage/repositories/reminders";
 
 export default function HubScreen() {
+  const { unit: weightUnit, toggle: toggleWeightUnit } = useWeightUnit();
   const [modulesOpen, setModulesOpen] = useState(false);
   const [remindersOpen, setRemindersOpen] = useState(false);
   const [savedFoodsOpen, setSavedFoodsOpen] = useState(false);
@@ -58,6 +60,20 @@ export default function HubScreen() {
             title="Modules"
             subtitle="Turn features on or off"
             onPress={() => setModulesOpen(true)}
+          />
+
+          <View style={styles.divider} />
+
+          <HubSectionRow
+            icon={Scale}
+            title="Weight unit"
+            subtitle="Tap to switch kg / lb"
+            onPress={toggleWeightUnit}
+            trailing={
+              <View style={styles.unitBadge}>
+                <Text style={styles.unitBadgeText}>{weightUnit}</Text>
+              </View>
+            }
           />
 
           <View style={styles.divider} />
@@ -380,6 +396,19 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: GymColors.background.surface,
     marginVertical: Spacing.one,
+  },
+
+  unitBadge: {
+    backgroundColor: GymColors.background.surface,
+    borderRadius: Radius.medium,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
+
+  unitBadgeText: {
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+    fontWeight: "700",
   },
 
   modal: {

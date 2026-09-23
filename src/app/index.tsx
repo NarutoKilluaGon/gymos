@@ -13,6 +13,7 @@ import { useModules } from "@/contexts/modules-context";
 import type { MealInput } from "@/components/quick-add/meal-sheet";
 import type { SleepInput } from "@/components/quick-add/sleep-sheet";
 import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { addJournalEntry } from "@/storage/repositories/journal";
 import { addMeasurement } from "@/storage/repositories/measurements";
 import {
@@ -146,6 +147,7 @@ function getSuggestion(
 
 export default function HomeScreen() {
   const { enabled } = useModules();
+  const { unit: weightUnit } = useWeightUnit();
 
   const [water, setWater] = useState(DEFAULT_WATER);
 
@@ -249,7 +251,7 @@ export default function HomeScreen() {
 
   async function handleWeightAdd(weight: number) {
     try {
-      await addMeasurement("weight", weight, "kg");
+      await addMeasurement("weight", weight, weightUnit);
     } catch {
       showToast("Couldn't save weight");
     }
@@ -432,6 +434,7 @@ export default function HomeScreen() {
       </FadeIn>
 
       <GymFAB
+        weightUnit={weightUnit}
         onWaterAdd={handleWaterAdd}
         onWeightAdd={handleWeightAdd}
         onMealAdd={handleMealAdd}
