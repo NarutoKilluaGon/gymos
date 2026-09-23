@@ -376,7 +376,19 @@ export default function WorkoutsScreen() {
     setFinishing(true);
     try {
       const notesText = workoutNotes.trim();
-      await finishWorkout(activeWorkout.id, notesText || undefined);
+      const finished = await finishWorkout(
+        activeWorkout.id,
+        notesText || undefined,
+      );
+
+      // finishWorkout returns undefined when the session isn't in today's
+      // store (e.g. it crossed midnight) — treat that as a failure rather
+      // than report success for a workout that never actually ended.
+      if (!finished) {
+        showToast("Couldn't finish workout");
+        return;
+      }
+
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setActiveWorkout(null);
       setWorkoutNotes("");
