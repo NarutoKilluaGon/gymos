@@ -2,7 +2,9 @@ import type { ID, Timestamp } from "@/types/gymos";
 
 /**
  * Every user action is recorded as an append-only event.
- * Events are permanent by design — there is no "deleted" type.
+ * Events are never edited or removed — record deletions are
+ * appended as tombstone events so derived views (the Journal
+ * timeline) can hide the removed record.
  */
 export type EventType =
   | "water.logged"
@@ -16,9 +18,12 @@ export type EventType =
   | "routine.deleted"
   | "routine.duplicated"
   | "meal.logged"
+  | "meal.deleted"
   | "sleep.started"
   | "sleep.ended"
+  | "sleep.deleted"
   | "measurement.logged"
+  | "measurement.deleted"
   | "journal.logged"
   | "weight.logged"
   | "northstar.changed";
@@ -87,16 +92,23 @@ export type EventPayload = {
     carbs?: number;
     fat?: number;
   };
+  "meal.deleted": { mealId: ID };
   "sleep.started": { sleepId: ID; startedAt: Timestamp };
   "sleep.ended": { sleepId: ID; durationMs: number };
+  "sleep.deleted": { sleepId: ID };
   "measurement.logged": {
     measurementId: ID;
     type: string;
     value: number;
     unit: string;
   };
+  "measurement.deleted": { measurementId: ID };
   "journal.logged": { journalId: ID; textLength: number };
-  "weight.logged": { weight: number; unit: string };
+  "weight.logged": {
+    weight: number;
+    unit: string;
+    measurementId?: ID;
+  };
   "northstar.changed": {
     previousTitle?: string;
     newTitle: string;

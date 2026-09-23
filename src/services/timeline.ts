@@ -132,8 +132,64 @@ function isTimelineEvent(
   );
 }
 
+type DeletedIds = {
+  meals: Set<string>;
+  measurements: Set<string>;
+  sleep: Set<string>;
+};
+
+function isTombstoned(
+  event: TimelineEvent,
+  deleted: DeletedIds,
+): boolean {
+  switch (event.type) {
+    case "meal.logged":
+      return deleted.meals.has(event.payload.mealId);
+    case "measurement.logged":
+      return deleted.measurements.has(
+        event.payload.measurementId,
+      );
+    case "weight.logged":
+      return (
+        event.payload.measurementId !== undefined &&
+        deleted.measurements.has(
+          event.payload.measurementId,
+        )
+      );
+    case "sleep.ended":
+      return deleted.sleep.has(event.payload.sleepId);
+    default:
+      return false;
+  }
+}
+
 export async function getTimeline(): Promise<TimelineItem[]> {
   const events = await getEvents();
+
+  const deletedIds: DeletedIds = {
+    meals: new Set(),
+    measurements: new Set(),
+    sleep: new Set(),
+  };
+
+  for (const event of events) {
+    if (event.type === "meal.deleted") {
+      const tombstone = event as AppEvent<"meal.deleted">;
+
+      deletedIds.meals.add(tombstone.payload.mealId);
+    } else if (event.type === "measurement.deleted") {
+      const tombstone =
+        event as AppEvent<"measurement.deleted">;
+
+      deletedIds.measurements.add(
+        tombstone.payload.measurementId,
+      );
+    } else if (event.type === "sleep.deleted") {
+      const tombstone = event as AppEvent<"sleep.deleted">;
+
+      deletedIds.sleep.add(tombstone.payload.sleepId);
+    }
+  }
 
   const workoutNames = new Map<string, string>();
 
@@ -150,6 +206,7 @@ export async function getTimeline(): Promise<TimelineItem[]> {
 
   const timelineEvents = events
     .filter(isTimelineEvent)
+    .filter((event) => !isTombstoned(event, deletedIds))
     .map((event) =>
       toTimelineItem(event, workoutNames),
     );

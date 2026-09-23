@@ -41,6 +41,7 @@ export async function addMeasurement(
     await appendEvent("weight.logged", {
       weight: value,
       unit,
+      measurementId: saved.id,
     });
   } else {
     await appendEvent("measurement.logged", {
@@ -86,7 +87,7 @@ export async function getLatestMeasurement(
 export async function deleteMeasurement(
   measurementId: string,
 ): Promise<void> {
-  await withDailyLock(async () => {
+  const deleted = await withDailyLock(async () => {
     const data = await readAllDailyActivitiesUnlocked();
 
     for (const [dayKey, activity] of Object.entries(data)) {
@@ -103,9 +104,15 @@ export async function deleteMeasurement(
       );
 
       await writeDailyActivityUnlocked(activity);
-      return;
+      return true;
     }
+
+    return false;
   });
+
+  if (deleted) {
+    await appendEvent("measurement.deleted", { measurementId });
+  }
 }
 
 export async function getMeasurementHistory(

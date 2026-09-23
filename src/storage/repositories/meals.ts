@@ -87,17 +87,25 @@ export async function deleteMeal(
 ): Promise<void> {
   const todayKey = getTodayKey();
 
-  await withDailyLock(async () => {
+  const deleted = await withDailyLock(async () => {
     const activity = await readDailyActivityUnlocked(
       todayKey,
     );
+
+    const countBefore = activity.meals.length;
 
     activity.meals = activity.meals.filter(
       (m) => m.id !== mealId,
     );
 
     await writeDailyActivityUnlocked(activity);
+
+    return activity.meals.length !== countBefore;
   });
+
+  if (deleted) {
+    await appendEvent("meal.deleted", { mealId });
+  }
 }
 
 export async function getDailyMacroTotals(

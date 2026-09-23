@@ -132,7 +132,7 @@ export async function logSleepDuration(
 export async function deleteSleepSession(
   sleepId: string,
 ): Promise<void> {
-  await withDailyLock(async () => {
+  const deleted = await withDailyLock(async () => {
     const data = await readAllDailyActivitiesUnlocked();
 
     for (const activity of Object.values(data)) {
@@ -149,9 +149,15 @@ export async function deleteSleepSession(
       );
 
       await writeDailyActivityUnlocked(activity);
-      return;
+      return true;
     }
+
+    return false;
   });
+
+  if (deleted) {
+    await appendEvent("sleep.deleted", { sleepId });
+  }
 }
 
 export async function getTodaySleep(): Promise<SleepSession[]> {
