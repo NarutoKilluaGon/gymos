@@ -35,25 +35,33 @@ export async function appendEvent<
     payload,
   };
 
-  const existing =
-    await AsyncStorage.getItem(
+  try {
+    const existing =
+      await AsyncStorage.getItem(
+        EVENTS_STORAGE_KEY,
+      );
+
+    const events: StoredEvents = existing
+      ? (JSON.parse(existing) as StoredEvents)
+      : [];
+
+    events.push(event);
+
+    if (events.length > MAX_EVENTS) {
+      events.splice(0, events.length - MAX_EVENTS);
+    }
+
+    await AsyncStorage.setItem(
       EVENTS_STORAGE_KEY,
+      JSON.stringify(events),
     );
-
-  const events: StoredEvents = existing
-    ? (JSON.parse(existing) as StoredEvents)
-    : [];
-
-  events.push(event);
-
-  if (events.length > MAX_EVENTS) {
-    events.splice(0, events.length - MAX_EVENTS);
+  } catch (error) {
+    // The event log is best-effort (derived from the primary stores and
+    // bounded by MAX_EVENTS). Never let a failed append reject: the caller's
+    // save/delete already committed, and surfacing this as an error makes
+    // the user retry and duplicate the record.
+    console.error(`Failed to append event: ${type}`, error);
   }
-
-  await AsyncStorage.setItem(
-    EVENTS_STORAGE_KEY,
-    JSON.stringify(events),
-  );
 
   return event;
 }
