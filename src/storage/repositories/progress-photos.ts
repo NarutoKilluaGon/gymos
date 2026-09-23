@@ -63,16 +63,30 @@ export async function deleteProgressPhoto(
 
   const photo = current.find((item) => item.id === id);
 
-  if (photo) {
-    const file = new File(photo.uri);
-
-    if (file.exists) {
-      file.delete();
-    }
-  }
-
+  // Commit the metadata removal before touching the file: the record is
+  // the source of truth, so a failed write must leave record and file
+  // both intact (retryable) — never a record pointing at a deleted file.
   await setStorage(
     PHOTOS_KEY,
     current.filter((item) => item.id !== id),
   );
+
+  if (photo) {
+    const file = new File(photo.uri);
+
+    try {
+      if (file.exists) {
+        file.delete();
+      }
+    } catch (error) {
+      // Best-effort cleanup: the record is already gone, so a leftover
+      // file is an orphan no view or export can reach (exports iterate
+      // records, not the directory). Failing here would report an error
+      // for a delete that already succeeded.
+      console.error(
+        "Couldn't delete progress photo file",
+        error,
+      );
+    }
+  }
 }
