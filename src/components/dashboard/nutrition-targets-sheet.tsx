@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,8 +15,19 @@ import { X } from "lucide-react-native";
 
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import {
+  ACTIVITY_LEVELS,
+  estimateMaintenanceCalories,
+} from "@/services/calorie-target";
+import {
+  getNutritionProfile,
+  saveNutritionProfile,
+  type ActivityLevel,
+  type ProfileSex,
+} from "@/storage/repositories/nutrition-profile";
+import {
   getNutritionTargets,
   saveNutritionTargets,
+  type CalorieGoal,
 } from "@/storage/repositories/nutrition-targets";
 import { showToast } from "@/utils/toast";
 
@@ -34,6 +46,19 @@ export function NutritionTargetsSheet({
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+  // S7: maintenance + goal drive the calculated daily target. Empty
+  // maintenance keeps the static Calories target behavior unchanged.
+  const [maintenance, setMaintenance] = useState("");
+  const [goal, setGoal] = useState<CalorieGoal>("maintain");
+  const [adjustment, setAdjustment] = useState("");
+  // Maintenance-calculator inputs. Persisted alongside the targets so a
+  // later edit recalculates from the same profile.
+  const [age, setAge] = useState("");
+  const [sex, setSex] = useState<ProfileSex | null>(null);
+  const [heightCm, setHeightCm] = useState("");
+  const [weightKg, setWeightKg] = useState("");
+  const [activityLevel, setActivityLevel] =
+    useState<ActivityLevel | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -43,6 +68,31 @@ export function NutritionTargetsSheet({
       setProtein(targets.protein !== undefined ? String(targets.protein) : "");
       setCarbs(targets.carbs !== undefined ? String(targets.carbs) : "");
       setFat(targets.fat !== undefined ? String(targets.fat) : "");
+      setMaintenance(
+        targets.maintenanceCalories !== undefined
+          ? String(targets.maintenanceCalories)
+          : "",
+      );
+      setGoal(targets.calorieGoal ?? "maintain");
+      setAdjustment(
+        targets.goalAdjustmentKcal !== undefined
+          ? String(targets.goalAdjustmentKcal)
+          : "",
+      );
+    });
+
+    getNutritionProfile().then((profile) => {
+      setAge(
+        profile.ageYears !== undefined ? String(profile.ageYears) : "",
+      );
+      setSex(profile.sex ?? null);
+      setHeightCm(
+        profile.heightCm !== undefined ? String(profile.heightCm) : "",
+      );
+      setWeightKg(
+        profile.weightKg !== undefined ? String(profile.weightKg) : "",
+      );
+      setActivityLevel(profile.activityLevel ?? null);
     });
   }, [visible]);
 
@@ -66,18 +116,57 @@ export function NutritionTargetsSheet({
     }
   }
 
+  function parseProfileNumber(value: string): number | undefined {
+    if (!value.trim()) return undefined;
+
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  }
+
+  /** Fill the Maintenance field from the calculator profile. The value
+   *  only applies once the sheet is saved, like every other field. */
+  async function handleCalculateMaintenance() {
+    const estimated = estimateMaintenanceCalories({
+      ageYears: parseProfileNumber(age),
+      sex,
+      heightCm: parseProfileNumber(heightCm),
+      weightKg: parseProfileNumber(weightKg),
+      activityLevel,
+    });
+
+    if (estimated === null) {
+      showToast("Enter age, sex, height, weight, and activity first");
+      return;
+    }
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setMaintenance(String(estimated));
+    showToast(`Estimated maintenance ~${estimated} kcal — save to apply`);
+  }
+
   async function handleSave() {
     const targets = {
       calories: parseOptional(calories),
       protein: parseOptional(protein),
       carbs: parseOptional(carbs),
       fat: parseOptional(fat),
+      maintenanceCalories: parseOptional(maintenance),
+      calorieGoal: goal,
+      goalAdjustmentKcal: parseOptional(adjustment),
     };
 
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
       await saveNutritionTargets(targets);
+      await saveNutritionProfile({
+        ageYears: parseProfileNumber(age),
+        sex: sex ?? undefined,
+        heightCm: parseProfileNumber(heightCm),
+        weightKg: parseProfileNumber(weightKg),
+        activityLevel: activityLevel ?? undefined,
+      });
       onSaved();
       onClose();
     } catch {
@@ -118,12 +207,251 @@ export function NutritionTargetsSheet({
             </Pressable>
           </View>
 
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={styles.scroll}
+          >
           <TargetField
             label="Calories"
             value={calories}
             onChange={setCalories}
             unit="kcal"
             placeholder="2200"
+          />
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Maintenance</Text>
+
+            <View style={styles.inputRow}>
+              <TextInput
+                value={maintenance}
+                onChangeText={setMaintenance}
+                placeholder="2200"
+                placeholderTextColor={GymColors.text.tertiary}
+                keyboardType="number-pad"
+                style={styles.input}
+              />
+
+              <Text style={styles.inputUnit}>kcal</Text>
+            </View>
+
+            <Text style={styles.fieldHint}>
+              Base daily burn. Set it to switch the Nutrition target from
+              the fixed Calories value above to a calculated one.
+            </Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>
+              Maintenance calculator
+            </Text>
+
+            <View style={styles.calcRow}>
+              <View style={styles.calcField}>
+                <Text style={styles.fieldLabel}>Age</Text>
+
+                <View style={styles.inputRow}>
+                  <TextInput
+                    value={age}
+                    onChangeText={setAge}
+                    placeholder="30"
+                    placeholderTextColor={
+                      GymColors.text.tertiary
+                    }
+                    keyboardType="number-pad"
+                    style={styles.input}
+                    accessibilityLabel="Age in years"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.calcField}>
+                <Text style={styles.fieldLabel}>Sex</Text>
+
+                <View style={styles.goalRow}>
+                  {(
+                    [
+                      { value: "male", label: "Male" },
+                      { value: "female", label: "Female" },
+                    ] as const
+                  ).map((option) => (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => setSex(option.value)}
+                      style={[
+                        styles.goalOption,
+                        sex === option.value &&
+                          styles.goalOptionSelected,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        selected: sex === option.value,
+                      }}
+                      accessibilityLabel={`${option.label}`}
+                    >
+                      <Text
+                        style={[
+                          styles.goalOptionText,
+                          sex === option.value &&
+                            styles.goalOptionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.calcRow}>
+              <View style={styles.calcField}>
+                <Text style={styles.fieldLabel}>Height (cm)</Text>
+
+                <View style={styles.inputRow}>
+                  <TextInput
+                    value={heightCm}
+                    onChangeText={setHeightCm}
+                    placeholder="175"
+                    placeholderTextColor={
+                      GymColors.text.tertiary
+                    }
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                    accessibilityLabel="Height in centimeters"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.calcField}>
+                <Text style={styles.fieldLabel}>Weight (kg)</Text>
+
+                <View style={styles.inputRow}>
+                  <TextInput
+                    value={weightKg}
+                    onChangeText={setWeightKg}
+                    placeholder="70"
+                    placeholderTextColor={
+                      GymColors.text.tertiary
+                    }
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                    accessibilityLabel="Weight in kilograms"
+                  />
+                </View>
+              </View>
+            </View>
+
+            <Text style={styles.fieldLabel}>Daily activity</Text>
+
+            <View style={styles.activityGrid}>
+              {ACTIVITY_LEVELS.map((option) => (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setActivityLevel(option.value)}
+                  style={[
+                    styles.activityOption,
+                    activityLevel === option.value &&
+                      styles.goalOptionSelected,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    selected: activityLevel === option.value,
+                  }}
+                  accessibilityLabel={option.label}
+                >
+                  <Text
+                    style={[
+                      styles.goalOptionText,
+                      activityLevel === option.value &&
+                        styles.goalOptionTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.activityBlurb,
+                      activityLevel === option.value &&
+                        styles.goalOptionTextSelected,
+                    ]}
+                  >
+                    {option.blurb}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              onPress={handleCalculateMaintenance}
+              style={styles.calcButton}
+              accessibilityRole="button"
+              accessibilityLabel="Calculate maintenance from profile"
+            >
+              <Text style={styles.calcButtonText}>
+                Calculate maintenance
+              </Text>
+            </Pressable>
+
+            <Text style={styles.fieldHint}>
+              Maintenance is an estimate, not a measurement. Activity
+              covers everyday life outside logged training — logged
+              workouts and cardio are added on top.
+            </Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Goal</Text>
+
+            <View style={styles.goalRow}>
+              {(
+                [
+                  { value: "deficit", label: "Deficit" },
+                  { value: "maintain", label: "Maintain" },
+                  { value: "surplus", label: "Surplus" },
+                ] as const
+              ).map((option) => (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setGoal(option.value)}
+                  style={[
+                    styles.goalOption,
+                    goal === option.value &&
+                      styles.goalOptionSelected,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    selected: goal === option.value,
+                  }}
+                  accessibilityLabel={`${option.label} goal`}
+                >
+                  <Text
+                    style={[
+                      styles.goalOptionText,
+                      goal === option.value &&
+                        styles.goalOptionTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.fieldHint}>
+              Today&apos;s target = maintenance + training estimate ±
+              goal.
+            </Text>
+          </View>
+
+          <TargetField
+            label="Adjustment"
+            value={adjustment}
+            onChange={setAdjustment}
+            unit="kcal"
+            placeholder="500"
+            hint="Above maintenance on Surplus, below it on Deficit. Maintain ignores it."
           />
 
           <TargetField
@@ -167,6 +495,7 @@ export function NutritionTargetsSheet({
           >
             <Text style={styles.clearText}>Clear all targets</Text>
           </Pressable>
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -179,6 +508,7 @@ type TargetFieldProps = {
   onChange: (value: string) => void;
   unit: string;
   placeholder: string;
+  hint?: string;
 };
 
 function TargetField({
@@ -187,6 +517,7 @@ function TargetField({
   onChange,
   unit,
   placeholder,
+  hint,
 }: TargetFieldProps) {
   return (
     <View style={styles.field}>
@@ -204,6 +535,10 @@ function TargetField({
 
         <Text style={styles.inputUnit}>{unit}</Text>
       </View>
+
+      {hint ? (
+        <Text style={styles.fieldHint}>{hint}</Text>
+      ) : null}
     </View>
   );
 }
@@ -226,6 +561,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
     paddingBottom: Spacing.five,
+  },
+
+  scroll: {
+    flexGrow: 0,
   },
 
   header: {
@@ -283,6 +622,86 @@ const styles = StyleSheet.create({
   inputUnit: {
     color: GymColors.text.secondary,
     fontSize: Typography.caption,
+  },
+
+  fieldHint: {
+    color: GymColors.text.tertiary,
+    fontSize: Typography.caption,
+    marginTop: Spacing.one,
+  },
+
+  goalRow: {
+    flexDirection: "row",
+    gap: Spacing.two,
+  },
+
+  goalOption: {
+    flex: 1,
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
+    paddingVertical: Spacing.two,
+    alignItems: "center",
+  },
+
+  goalOptionSelected: {
+    backgroundColor: GymColors.semantic.accent,
+  },
+
+  goalOptionText: {
+    color: GymColors.text.secondary,
+    fontSize: Typography.body,
+    fontWeight: "600",
+  },
+
+  goalOptionTextSelected: {
+    color: GymColors.background.primary,
+  },
+
+  calcRow: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+
+  calcField: {
+    flex: 1,
+  },
+
+  activityGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.two,
+  },
+
+  activityOption: {
+    width: "48%",
+    flexGrow: 1,
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+    alignItems: "center",
+    gap: Spacing.half,
+  },
+
+  activityBlurb: {
+    color: GymColors.text.secondary,
+    fontSize: Typography.caption,
+    textAlign: "center",
+  },
+
+  calcButton: {
+    marginTop: Spacing.two,
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
+    paddingVertical: Spacing.two,
+    alignItems: "center",
+  },
+
+  calcButtonText: {
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+    fontWeight: "600",
   },
 
   saveButton: {

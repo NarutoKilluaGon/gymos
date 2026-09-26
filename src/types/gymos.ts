@@ -81,6 +81,110 @@ export type Routine = {
   updatedAt: Timestamp;
 };
 
+/** Canonical macro keys (energy + macros). */
+export const MACRO_KEYS = [
+  "calories",
+  "protein",
+  "carbs",
+  "fat",
+] as const;
+export type MacroKey = (typeof MACRO_KEYS)[number];
+
+/** Canonical micronutrient keys (11 tracked micros). Units, documented
+ *  once for the whole pipeline (client, DB, and S2 proxy contract):
+ *  fiber g; sodium/potassium/calcium/iron/magnesium/zinc/vitaminC mg;
+ *  vitaminA/vitaminD/vitaminB12/folate built from µg amounts. */
+export const MICRONUTRIENT_KEYS = [
+  "fiber",
+  "sodium",
+  "potassium",
+  "calcium",
+  "iron",
+  "magnesium",
+  "zinc",
+  "vitaminA",
+  "vitaminC",
+  "vitaminD",
+  "vitaminB12",
+  "folate",
+] as const;
+export type MicronutrientKey = (typeof MICRONUTRIENT_KEYS)[number];
+
+/** All micronutrient values are optional so persisted records saved before
+ *  micros existed keep loading unchanged (absent reads as untracked). */
+export type Micronutrients = {
+  [K in MicronutrientKey]?: number;
+};
+
+/**
+ * Transient provenance for a review food row. This is intentionally not
+ * persisted on MealFood/Meal records yet: the stored nutrition remains the
+ * source of truth, while review can distinguish catalog values from AI or
+ * manual values without a storage migration.
+ */
+export type NutritionSource = "food-db" | "ai" | "manual";
+
+/** Canonical nutrient key list, macros first: the single enumerator every
+ *  summation/scaling helper iterates. Extend here, never per call-site. */
+export const NUTRIENT_KEYS: readonly (MacroKey | MicronutrientKey)[] = [
+  ...MACRO_KEYS,
+  ...MICRONUTRIENT_KEYS,
+];
+
+/** Defined micro values carried forward (skips missing/garbage). */
+export function pickMicronutrients(source: {
+  [K in MicronutrientKey]?: unknown;
+}): Micronutrients {
+  const out: Micronutrients = {};
+
+  for (const key of MICRONUTRIENT_KEYS) {
+    const value = source[key];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      out[key] = value;
+    }
+  }
+
+  return out;
+}
+
+/** One extra nested under a single food (e.g. ghee on a dosa).
+ *  LEGACY (pre-S6A): the meal editor no longer creates or edits these —
+ *  the type stays so persisted records remain readable, and their
+ *  nutrition is still summed (computeMealTotals) / folded on reopen
+ *  (mealToEstimate). */
+export type FoodAdditional = {
+  id: ID;
+  /** Food database entry id, when the additional came from the catalog. */
+  entryId?: string;
+  name: string;
+  amount: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+} & Micronutrients;
+
+/** One food within a logged or saved meal (S6A: a meal simply contains
+ *  foods — no additionals are ever created anymore). */
+export type MealFood = {
+  name: string;
+  amount?: number;
+  unit?: string;
+  /** Offline food-database entry id when the nutrition came from the
+   *  catalog — lets a later amount/unit edit rescale this row from the
+   *  catalog portion. Absent for manually-entered or pre-S6A foods. */
+  entryId?: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  /** Legacy per-food extras (pre-S6A). Never created; still summed on
+   *  read and folded on review so stored nutrition is never lost. */
+  additionals?: FoodAdditional[];
+} & Micronutrients;
+
 export type Meal = {
   id: ID;
   name: string;
@@ -89,7 +193,12 @@ export type Meal = {
   protein?: number;
   carbs?: number;
   fat?: number;
-};
+  /** Optional per-food breakdown. Totals on this record stay
+   *  authoritative — every existing reader (summary cards, insights,
+   *  streak, export) only reads the flat totals, so meals saved before
+   *  this field existed keep working unchanged. */
+  foods?: MealFood[];
+} & Micronutrients;
 
 export type SleepSession = {
   id: ID;

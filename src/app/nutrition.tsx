@@ -1,6 +1,14 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  AppState,
   Modal,
   Pressable,
   ScrollView,
@@ -10,10 +18,12 @@ import {
 } from "react-native";
 
 import { EmptyMeals } from "@/components/nutrition/empty-meals";
-import { MealCard } from "@/components/nutrition/meal-card";
+import { AddMealSheet } from "@/components/nutrition/add-meal-sheet";
+import { DayTimeline } from "@/components/nutrition/day-timeline";
 import { NutritionSummaryCard } from "@/components/nutrition/nutrition-summary-card";
+import { PendingDescriptionSection } from "@/components/nutrition/pending-description-section";
 import { QuickMealPickerSheet } from "@/components/nutrition/quick-meal-picker-sheet";
-import { SavedFoodsSheet } from "@/components/nutrition/saved-foods-sheet";
+import { NutritionTargetsSheet } from "@/components/dashboard/nutrition-targets-sheet";
 import {
   MealSheet,
   type MealInput,
@@ -22,11 +32,12 @@ import { FadeIn } from "@/components/ui/fade-in";
 import { ModuleDisabled } from "@/components/ui/module-disabled";
 import { useModules } from "@/contexts/modules-context";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
-import { Utensils } from "lucide-react-native";
+import { Plus, Utensils } from "lucide-react-native";
 import {
   addMeal,
   deleteMeal,
   getTodayMeals,
+  updateMeal,
   type MacroTotals,
 } from "@/storage/repositories/meals";
 import {
@@ -34,27 +45,52 @@ import {
   type NutritionTargets,
 } from "@/storage/repositories/nutrition-targets";
 import {
-  deleteSavedFood,
   getSavedFoods,
   type SavedFood,
 } from "@/storage/repositories/saved-foods";
+import {
+  getPendingDescriptionAnalyses,
+  type PendingDescriptionAnalysis,
+} from "@/storage/repositories/description-ai-queue";
+import { getTodaySteps } from "@/storage/repositories/steps";
+import { getTimeline } from "@/services/timeline";
+import { buildDayTimeline } from "@/services/day-timeline";
+import { calculateCalorieTarget } from "@/services/calorie-target";
 import type { Meal } from "@/types/gymos";
+import type { TimelineItem } from "@/types/timeline";
+import { getTodayKey } from "@/utils/date";
+import { NUTRIENT_KEYS } from "@/types/gymos";
 import { showToast } from "@/utils/toast";
 import {
-  estimateMealFromPhoto,
-  getVisionProvider,
   mealInputFromEstimate,
+  mealToEstimate,
+  recentFoodsFromMeals,
+  savedFoodToEstimate,
+  toCanonicalMealNutrition,
   type MealEstimate,
 } from "@/services/meal-estimator";
+import {
+  acknowledgePendingDescriptionReview,
+  acknowledgePendingDescriptionReviewByDescription,
+  canPresentPendingDescriptionReview,
+  OFFLINE_DESCRIPTION_MESSAGE,
+  retryPendingDescription,
+  retryPendingDescriptions,
+  type PendingDescriptionReviewAvailability,
+} from "@/services/description-ai-queue";
+import { subscribeToDescriptionAiRetryTriggers } from "@/services/description-ai-retry-triggers";
 
 function sumMacros(meals: Meal[]): MacroTotals {
   return meals.reduce<MacroTotals>(
-    (totals, meal) => ({
-      calories: totals.calories + (meal.calories ?? 0),
-      protein: totals.protein + (meal.protein ?? 0),
-      carbs: totals.carbs + (meal.carbs ?? 0),
-      fat: totals.fat + (meal.fat ?? 0),
-    }),
+    (totals, meal) => {
+      const next = { ...totals };
+
+      for (const key of NUTRIENT_KEYS) {
+        next[key] = (next[key] ?? 0) + (meal[key] ?? 0);
+      }
+
+      return next;
+    },
     { calories: 0, protein: 0, carbs: 0, fat: 0 },
   );
 }
@@ -66,65 +102,452 @@ export default function NutritionScreen() {
   const [targets, setTargets] = useState<NutritionTargets>({});
   const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
   const [mealSheetOpen, setMealSheetOpen] = useState(false);
-  const [savedFoodsSheetOpen, setSavedFoodsSheetOpen] =
-    useState(false);
+  const [addMealOpen, setAddMealOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [quickPickOpen, setQuickPickOpen] = useState(false);
-  const [scanning, setScanning] = useState(false);
+  // S7 targets sheet, exposed directly from Nutrition (§10): same sheet
+  // the home tab uses — one implementation, one stored record.
+  const [targetsSheetOpen, setTargetsSheetOpen] = useState(false);
+  // S6: the rest of today's activity for the unified day timeline —
+  // event-log items (workouts, cardio, …) plus the separate step count.
+  const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
+  const [steps, setSteps] = useState(0);
   const [estimatedMeal, setEstimatedMeal] =
     useState<MealEstimate | null>(null);
+  /** Which saved template seeded the open sheet (S4) — keeps its stored
+   *  title instead of the joined food names. */
+  const [selectedSavedMeal, setSelectedSavedMeal] =
+    useState<SavedFood | null>(null);
+  const [editingMeal, setEditingMeal] =
+    useState<Meal | null>(null);
+  const [pendingDescriptions, setPendingDescriptions] = useState<
+    PendingDescriptionAnalysis[]
+  >([]);
+  const [retryingPendingId, setRetryingPendingId] =
+    useState<string | null>(null);
+  /** A retry is acknowledged only after the existing review sheet renders. */
+  const [pendingReviewId, setPendingReviewId] = useState<
+    string | null
+  >(null);
+  /** Direct description success may reconcile a matching queue item. */
+  const [pendingReviewDescription, setPendingReviewDescription] =
+    useState<string | null>(null);
+
+  // Async retries can finish after the user opens/closes another surface.
+  // Keep the handoff checks live rather than relying on a stale callback
+  // closure from the render that started the request.
+  const reviewAvailabilityRef =
+    useRef<PendingDescriptionReviewAvailability>({
+      screenMounted: true,
+      screenFocused: false,
+      nutritionEnabled: enabled.nutrition,
+      addMealOpen,
+      mealSheetOpen,
+    });
+  reviewAvailabilityRef.current = {
+    screenMounted: reviewAvailabilityRef.current.screenMounted,
+    screenFocused: reviewAvailabilityRef.current.screenFocused,
+    nutritionEnabled: enabled.nutrition,
+    addMealOpen,
+    mealSheetOpen,
+  };
+  const pendingReviewHandoffRef = useRef(false);
+  pendingReviewHandoffRef.current =
+    pendingReviewId !== null || pendingReviewDescription !== null;
+
+  useEffect(() => {
+    reviewAvailabilityRef.current.screenMounted = true;
+    return () => {
+      reviewAvailabilityRef.current.screenMounted = false;
+    };
+  }, []);
 
   // Reference-stable per estimate so the sheet's reseed guard only fires
   // when a new estimate arrives (not on unrelated re-renders).
   const estimatedMealInput = useMemo(
     () =>
       estimatedMeal
-        ? mealInputFromEstimate(estimatedMeal)
+        ? {
+            ...mealInputFromEstimate(estimatedMeal),
+            // A selected saved meal keeps its stored title — the joined
+            // food names are only a fallback for nameless estimates.
+            ...(selectedSavedMeal
+              ? { name: selectedSavedMeal.name }
+              : {}),
+          }
         : undefined,
-    [estimatedMeal],
+    [estimatedMeal, selectedSavedMeal],
   );
 
-  useEffect(() => {
-    async function loadNutrition() {
-      try {
-        setMeals(await getTodayMeals());
-        setTargets(await getNutritionTargets());
-        setSavedFoods(await getSavedFoods());
-      } catch {
-        showToast("Couldn't load nutrition");
+  // Edit flow: the saved meal converts back to an estimate so the sheet
+  // seeds exactly like the resolved/quick-pick flows (new identities per
+  // meal, so the sheet's reseed guard fires).
+  const editingEstimate = useMemo(
+    () => (editingMeal ? mealToEstimate(editingMeal) : null),
+    [editingMeal],
+  );
+
+  const editingMealInput = useMemo(() => {
+    if (!editingEstimate || !editingMeal) {
+      return undefined;
+    }
+
+    const base = mealInputFromEstimate(editingEstimate);
+
+    return {
+      ...base,
+      // The persisted title is authoritative — the joined food names are
+      // only a fallback for nameless records, never a silent rename.
+      name: String(editingMeal.name ?? "").trim() || base.name,
+    };
+  }, [editingEstimate, editingMeal]);
+
+  // One-tap repeat: today's logged meals, deduped by name (latest first).
+  const recentMeals = useMemo(() => {
+    const seen = new Set<string>();
+    const recents: Meal[] = [];
+
+    const ordered = [...meals].sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() -
+        new Date(a.timestamp).getTime(),
+    );
+
+    for (const meal of ordered) {
+      // Defensive: meal names come from unvalidated persisted records —
+      // coerce so one malformed record can't crash the diary render.
+      const key = String(meal.name ?? "")
+        .trim()
+        .toLowerCase();
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      recents.push(meal);
+      if (recents.length >= 5) {
+        break;
       }
     }
-    loadNutrition();
+
+    return recents;
+  }, [meals]);
+
+  // One-tap repeat for individual foods: breakdown foods across today's
+  // logged meals, latest first, deduped — stored nutrition (incl. the
+  // catalog link for rescaling) rides along on quick-log.
+  const recentFoods = useMemo(
+    () => recentFoodsFromMeals(meals),
+    [meals],
+  );
+
+  // S6: one chronological day view — full meal records (S6A cards and
+  // editing intact) merged with today's event-timeline items and steps.
+  const dayEntries = useMemo(
+    () =>
+      buildDayTimeline({
+        meals,
+        timelineItems,
+        steps,
+        todayKey: getTodayKey(),
+      }),
+    [meals, timelineItems, steps],
+  );
+
+  // S7: today's calorie target, recalculated from configuration +
+  // today's activity on every render — never persisted, so a changing
+  // target is never stored as a record and history stays untouched.
+  const calorieTarget = useMemo(
+    () =>
+      calculateCalorieTarget({
+        maintenanceCalories: targets.maintenanceCalories,
+        goal: targets.calorieGoal,
+        goalAdjustmentKcal: targets.goalAdjustmentKcal,
+        timelineItems,
+        todayKey: getTodayKey(),
+      }),
+    [targets, timelineItems],
+  );
+
+  const refreshPendingDescriptions = useCallback(async () => {
+    try {
+      setPendingDescriptions(await getPendingDescriptionAnalyses());
+    } catch {
+      // A queue read failure must not hide the normal Nutrition screen.
+      setPendingDescriptions([]);
+    }
   }, []);
 
-  async function handleAddMeal(meal: MealInput) {
+  const handleResolvedFoods = useCallback(
+    (
+      estimate: MealEstimate,
+      pendingId?: string,
+      description?: string,
+    ) => {
+      const availability = reviewAvailabilityRef.current;
+
+      if (
+        !availability.screenMounted ||
+        !availability.nutritionEnabled ||
+        availability.mealSheetOpen ||
+        pendingReviewHandoffRef.current
+      ) {
+        return;
+      }
+
+      if (
+        pendingId &&
+        !canPresentPendingDescriptionReview(availability)
+      ) {
+        return;
+      }
+
+      setEstimatedMeal(estimate);
+      setPendingReviewId(pendingId ?? null);
+      setPendingReviewDescription(
+        pendingId ? null : description?.trim() || null,
+      );
+      setAddMealOpen(false);
+      setMealSheetOpen(true);
+    },
+    [],
+  );
+
+  const runPendingDescriptionRetries = useCallback(async () => {
+    // Never replace an already-open review sheet or race its queue
+    // acknowledgement with another retry pass.
+    if (
+      !canPresentPendingDescriptionReview(
+        reviewAvailabilityRef.current,
+      ) ||
+      pendingReviewHandoffRef.current
+    ) {
+      return;
+    }
+
     try {
-      const saved = await addMeal(meal.name, {
-        calories: meal.calories,
-        protein: meal.protein,
-        carbs: meal.carbs,
-        fat: meal.fat,
+      const batch = await retryPendingDescriptions();
+      await refreshPendingDescriptions();
+
+      const review = batch.results.find(
+        (result) => result.status === "review",
+      );
+
+      if (review?.status === "review") {
+        // This only hands the estimate to the existing review flow. The
+        // pending ID is acknowledged after that sheet has rendered.
+        handleResolvedFoods(review.estimate, review.item.id);
+      }
+    } catch {
+      // Pending work remains durable; the next focus/resume trigger retries.
+    }
+  }, [
+    handleResolvedFoods,
+    refreshPendingDescriptions,
+  ]);
+
+  const handleRetryPending = useCallback(
+    async (item: PendingDescriptionAnalysis) => {
+      if (
+        retryingPendingId !== null ||
+        !canPresentPendingDescriptionReview(
+          reviewAvailabilityRef.current,
+        ) ||
+        pendingReviewHandoffRef.current
+      ) {
+        return;
+      }
+
+      setRetryingPendingId(item.id);
+
+      try {
+        const result = await retryPendingDescription(item.id);
+
+        if (result.status === "review") {
+          handleResolvedFoods(result.estimate, result.item.id);
+        } else if (result.status === "pending") {
+          showToast(OFFLINE_DESCRIPTION_MESSAGE);
+        } else if (result.status === "needs-attention") {
+          showToast(result.error.userMessage);
+        } else if (result.status === "no-provider") {
+          showToast("AI analysis isn't configured yet");
+        }
+      } catch {
+        showToast("Couldn't retry pending analysis");
+      } finally {
+        setRetryingPendingId(null);
+        await refreshPendingDescriptions();
+      }
+    },
+    [
+      handleResolvedFoods,
+      refreshPendingDescriptions,
+      retryingPendingId,
+    ],
+  );
+
+  // Reload on focus (same pattern as the home tab): a workout or steps
+  // logged elsewhere show up as soon as the user returns here.
+  useFocusEffect(
+    useCallback(() => {
+      reviewAvailabilityRef.current.screenFocused = true;
+      let cancelled = false;
+
+      async function loadNutrition() {
+        try {
+          setMeals(await getTodayMeals());
+          setTargets(await getNutritionTargets());
+          setSavedFoods(await getSavedFoods());
+        } catch {
+          if (!cancelled) {
+            showToast("Couldn't load nutrition");
+          }
+        }
+
+        // Day-timeline extras are best-effort: meals still display
+        // normally when activity/steps fail to load (S6 req 7).
+        try {
+          const [timeline, todaySteps] = await Promise.all([
+            getTimeline(),
+            getTodaySteps(),
+          ]);
+          if (cancelled) {
+            return;
+          }
+          setTimelineItems(timeline);
+          setSteps(todaySteps);
+        } catch {
+          if (!cancelled) {
+            setTimelineItems([]);
+            setSteps(0);
+          }
+        }
+      }
+      loadNutrition();
+
+      return () => {
+        reviewAvailabilityRef.current.screenFocused = false;
+        cancelled = true;
+      };
+    }, []),
+  );
+
+  // Nutrition focus is a retry trigger in addition to app resume and the
+  // optional native/web online event.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshPendingDescriptions();
+      void runPendingDescriptionRetries();
+    }, [refreshPendingDescriptions, runPendingDescriptionRetries]),
+  );
+
+  // AppState/online events use existing platform APIs; no connectivity
+  // dependency or polling timer is introduced.
+  useEffect(
+    () =>
+      subscribeToDescriptionAiRetryTriggers(() => {
+        void runPendingDescriptionRetries();
+      }),
+    [runPendingDescriptionRetries],
+  );
+
+  // After a review closes, safely continue with the next pending item.
+  useEffect(() => {
+    if (
+      !mealSheetOpen &&
+      pendingReviewId === null &&
+      pendingReviewDescription === null
+    ) {
+      void runPendingDescriptionRetries();
+    }
+  }, [
+    mealSheetOpen,
+    pendingReviewDescription,
+    pendingReviewId,
+    runPendingDescriptionRetries,
+  ]);
+
+  // MealSheet invokes this only after its review surface has rendered.
+  // A retry therefore cannot acknowledge itself while Nutrition is
+  // disabled, unmounted, or unable to present the review.
+  const handleReviewPresented = useCallback(() => {
+    const id = pendingReviewId;
+    const description = pendingReviewDescription;
+
+    if (!id && !description) {
+      return;
+    }
+
+    const acknowledgement = id
+      ? acknowledgePendingDescriptionReview(id).then(() => undefined)
+      : acknowledgePendingDescriptionReviewByDescription(
+          description as string,
+        ).then(() => undefined);
+
+    void acknowledgement
+      .then(() => {
+        setPendingReviewId(null);
+        setPendingReviewDescription(null);
+        void refreshPendingDescriptions();
+      })
+      .catch(() => {
+        showToast("Couldn't update pending analysis");
       });
-      setMeals((current) => [...current, saved]);
+  }, [
+    pendingReviewDescription,
+    pendingReviewId,
+    refreshPendingDescriptions,
+  ]);
+
+  async function handleSaveMeal(meal: MealInput): Promise<boolean> {
+    try {
+      const nutrition = toCanonicalMealNutrition(meal);
+
+      if (editingMeal) {
+        // Edit flow: update in place, never duplicate.
+        const updated = await updateMeal(
+          editingMeal.id,
+          meal.name,
+          nutrition,
+          meal.foods,
+        );
+        if (!updated) {
+          showToast("Couldn't save meal");
+          return false;
+        }
+        setMeals((current) =>
+          current.map((m) => (m.id === updated.id ? updated : m)),
+        );
+      } else {
+        const saved = await addMeal(
+          meal.name,
+          nutrition,
+          meal.foods,
+        );
+        setMeals((current) => [...current, saved]);
+      }
       setMealSheetOpen(false);
       setEstimatedMeal(null);
+      setSelectedSavedMeal(null);
+      setEditingMeal(null);
+      return true;
     } catch {
       showToast("Couldn't save meal");
+      return false;
     }
   }
 
-  async function handleQuickAdd(food: SavedFood) {
+  /** Instant log from Add Food (DB / saved / recent rows). The sheet stays
+   *  open for multi-add; the toast confirms each tap. */
+  async function handleQuickLog(meal: MealInput) {
     try {
-      await addMeal(food.name, {
-        calories: food.calories,
-        protein: food.protein,
-        carbs: food.carbs,
-        fat: food.fat,
-      });
-      const savedFoodsLatest = await getSavedFoods();
-      setSavedFoods(savedFoodsLatest);
-      setMeals(await getTodayMeals());
+      const saved = await addMeal(
+        meal.name,
+        toCanonicalMealNutrition(meal),
+        meal.foods,
+      );
+      setMeals((current) => [...current, saved]);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      showToast(`Logged ${meal.name}`, "success");
     } catch {
       showToast("Couldn't log meal");
     }
@@ -145,45 +568,60 @@ export default function NutritionScreen() {
     }
   }
 
-  async function handleDeleteSavedFood(id: string) {
-    try {
-      await deleteSavedFood(id);
-      setSavedFoods((current) =>
-        current.filter((f) => f.id !== id),
-      );
-    } catch {
-      showToast("Couldn't delete saved food");
-    }
-  }
-
   function handleQuickPickSelect(meal: MealEstimate) {
     setEstimatedMeal(meal);
     setQuickPickOpen(false);
+    setAddMealOpen(false);
+    setMealSheetOpen(true);
+  }
+
+  /** S4: a saved MEAL opens the existing review pipeline seeded from its
+   *  stored nutrition (fully offline). Logging then creates a
+   *  normal Meal with its own timestamp; the template is never mutated. */
+  function handleSelectSavedMeal(saved: SavedFood) {
+    setSelectedSavedMeal(saved);
+    setEstimatedMeal(savedFoodToEstimate(saved));
+    setAddMealOpen(false);
+    setMealSheetOpen(true);
+  }
+
+  /** A template stored from the sheet must show up immediately — the
+   *  saved list otherwise only loads on mount. */
+  async function handleSavedForReuse() {
+    try {
+      setSavedFoods(await getSavedFoods());
+    } catch {
+      // Non-fatal: the template is already stored; the list catches up
+      // on the next full load.
+    }
+  }
+
+  function handleManualMeal() {
+    setAddMealOpen(false);
+    setMealSheetOpen(true);
+  }
+
+  /** S7 targets saved from the sheet — reload so the summary's
+   *  calculated target updates immediately. */
+  async function handleTargetsSaved() {
+    try {
+      setTargets(await getNutritionTargets());
+    } catch {
+      showToast("Couldn't load nutrition targets");
+    }
+  }
+
+  function handleEditMeal(meal: Meal) {
+    setEstimatedMeal(null);
+    setEditingMeal(meal);
     setMealSheetOpen(true);
   }
 
   function handleMealSheetClose() {
     setMealSheetOpen(false);
     setEstimatedMeal(null);
-  }
-
-  async function handleScanPhoto() {
-    if (scanning) return;
-    setScanning(true);
-    try {
-      const estimate = await estimateMealFromPhoto();
-      if (estimate) {
-        // AI estimate returned — pre-fill meal sheet
-        setEstimatedMeal(estimate);
-        setMealSheetOpen(true);
-      } else if (getVisionProvider() === null) {
-        // No AI provider configured → open quick-pick catalog
-        setQuickPickOpen(true);
-      }
-      // If provider exists but returned null (error/cancel), do nothing
-    } finally {
-      setScanning(false);
-    }
+    setSelectedSavedMeal(null);
+    setEditingMeal(null);
   }
 
   if (!enabled.nutrition) {
@@ -212,101 +650,62 @@ export default function NutritionScreen() {
           <NutritionSummaryCard
             totals={sumMacros(meals)}
             targets={targets}
+            calorieTarget={
+              calorieTarget.hasMaintenance
+                ? {
+                    value: calorieTarget.targetKcal,
+                    activityKcal: calorieTarget.activityKcal,
+                    adjustmentKcal: calorieTarget.adjustmentKcal,
+                  }
+                : null
+            }
           />
         </FadeIn>
 
-        <View style={styles.mealsHeader}>
-          <Text style={styles.sectionTitle}>Meals</Text>
+        <Pressable
+          onPress={() => setTargetsSheetOpen(true)}
+          style={styles.targetsRow}
+          accessibilityRole="button"
+          accessibilityLabel="Edit nutrition targets"
+        >
+          <Text style={styles.targetsLabel}>
+            {calorieTarget.hasMaintenance
+              ? `Daily target · ${calorieTarget.targetKcal} kcal`
+              : "Nutrition targets"}
+          </Text>
 
-          <View style={styles.actions}>
-            <Pressable
-              onPress={() => setSavedFoodsSheetOpen(true)}
-              style={styles.addButton}
-              accessibilityRole="button"
-              accessibilityLabel="Open saved foods"
-            >
-              <Text style={styles.addButtonText}>Saved</Text>
-            </Pressable>
+          <Text style={styles.targetsEdit}>Adjust</Text>
+        </Pressable>
 
-            <Pressable
-              onPress={() => setMealSheetOpen(true)}
-              style={styles.addButton}
-              accessibilityRole="button"
-              accessibilityLabel="Add meal"
-            >
-              <Text style={styles.addButtonText}>+ Add</Text>
-            </Pressable>
+        <PendingDescriptionSection
+          items={pendingDescriptions}
+          retryingId={retryingPendingId}
+          onRetry={(item) => {
+            void handleRetryPending(item);
+          }}
+        />
 
-            <Pressable
-              onPress={() => setQuickPickOpen(true)}
-              style={styles.addButton}
-              accessibilityRole="button"
-              accessibilityLabel="Quick pick a meal with estimated macros"
-            >
-              <Text style={styles.addButtonText}>Quick</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={handleScanPhoto}
-              disabled={scanning}
-              style={[
-                styles.addButton,
-                scanning && styles.addButtonDisabled,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={scanning ? "Analyzing photo…" : "Scan food photo for macros"}
-            >
-              <Text style={styles.addButtonText}>
-                {scanning ? "Scan…" : "Scan"}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {meals.length === 0 ? (
-          <EmptyMeals
-            onAddMeal={() => setMealSheetOpen(true)}
-          />
+        {dayEntries.length === 0 ? (
+          <EmptyMeals />
         ) : (
-          <View style={styles.mealList}>
-            {[...meals]
-              .sort(
-                (a, b) =>
-                  new Date(a.timestamp).getTime() -
-                  new Date(b.timestamp).getTime(),
-              )
-              .map((meal) => (
-                <MealCard
-                  key={meal.id}
-                  meal={meal}
-                  deleting={deleting === meal.id}
-                  onDelete={() => handleDeleteMeal(meal.id)}
-                />
-              ))}
-          </View>
+          <DayTimeline
+            entries={dayEntries}
+            deletingId={deleting}
+            onDeleteMeal={handleDeleteMeal}
+            onEditMeal={handleEditMeal}
+            onOpenWorkouts={() => router.navigate("/workouts")}
+          />
         )}
       </ScrollView>
 
-      <Modal
-        visible={savedFoodsSheetOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSavedFoodsSheetOpen(false)}
+      <Pressable
+        onPress={() => setAddMealOpen(true)}
+        style={styles.fab}
+        accessibilityRole="button"
+        accessibilityLabel="Log meal"
       >
-        <View style={styles.modal}>
-          <Pressable
-            style={styles.backdrop}
-            onPress={() => setSavedFoodsSheetOpen(false)}
-          />
-          <SavedFoodsSheet
-            foods={savedFoods}
-            adding={deleting !== null}
-            onSelect={handleQuickAdd}
-            onDelete={handleDeleteSavedFood}
-            onClose={() => setSavedFoodsSheetOpen(false)}
-          />
-        </View>
-      </Modal>
+        <Plus size={28} color={GymColors.semantic.accent} />
+      </Pressable>
 
       <Modal
         visible={quickPickOpen}
@@ -326,13 +725,49 @@ export default function NutritionScreen() {
         </View>
       </Modal>
 
+      <Modal
+        visible={addMealOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAddMealOpen(false)}
+      >
+        <View style={styles.modal}>
+          <Pressable
+            style={styles.backdrop}
+            onPress={() => setAddMealOpen(false)}
+          />
+          <AddMealSheet
+            savedFoods={savedFoods}
+            recentMeals={recentMeals}
+            recentFoods={recentFoods}
+            onQuickLog={handleQuickLog}
+            onManual={handleManualMeal}
+            onQuickMeals={() => setQuickPickOpen(true)}
+            onResolved={handleResolvedFoods}
+            onPendingChanged={refreshPendingDescriptions}
+            onSelectSavedMeal={handleSelectSavedMeal}
+            onClose={() => setAddMealOpen(false)}
+          />
+        </View>
+      </Modal>
+
       <MealSheet
         visible={mealSheetOpen}
-        allowFavorite
-        initialMeal={estimatedMealInput}
-        initialFoods={estimatedMeal?.foods}
-        onSave={handleAddMeal}
+        allowSaveForReuse
+        onReviewPresented={handleReviewPresented}
+        onSavedForReuse={handleSavedForReuse}
+        editMode={editingMeal !== null}
+        initialMeal={estimatedMealInput ?? editingMealInput}
+        initialFoods={estimatedMeal?.foods ?? editingEstimate?.foods}
+        savedFoods={savedFoods}
+        onSave={handleSaveMeal}
         onClose={handleMealSheetClose}
+      />
+
+      <NutritionTargetsSheet
+        visible={targetsSheetOpen}
+        onClose={() => setTargetsSheetOpen(false)}
+        onSaved={handleTargetsSaved}
       />
     </View>
   );
@@ -347,7 +782,8 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.five,
-    paddingBottom: Spacing.six,
+    // Clears the floating + action (bottom 24 + 56 size + 24 breathing).
+    paddingBottom: 104,
   },
 
   eyebrow: {
@@ -363,43 +799,39 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.four,
   },
 
-  mealsHeader: {
+  targetsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: Spacing.two,
-  },
-
-  sectionTitle: {
-    color: GymColors.text.primary,
-    fontSize: Typography.h2,
-    fontWeight: "700",
-  },
-
-  actions: {
-    flexDirection: "row",
-    gap: Spacing.two,
-  },
-
-  addButton: {
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    borderRadius: Radius.medium,
-    backgroundColor: GymColors.background.surface,
+    marginBottom: Spacing.four,
   },
 
-  addButtonText: {
+  targetsLabel: {
     color: GymColors.text.primary,
-    fontSize: Typography.caption,
+    fontSize: Typography.body,
     fontWeight: "600",
   },
 
-  addButtonDisabled: {
-    opacity: 0.5,
+  targetsEdit: {
+    color: GymColors.semantic.accent,
+    fontSize: Typography.body,
+    fontWeight: "600",
   },
 
-  mealList: {
-    gap: Spacing.two,
+  fab: {
+    position: "absolute",
+    right: Spacing.four,
+    bottom: Spacing.four,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: GymColors.background.surface,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   modal: {

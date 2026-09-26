@@ -6,7 +6,8 @@ import {
   withDailyLock,
   writeDailyActivityUnlocked,
 } from "@/storage/daily";
-import type { Meal } from "@/types/gymos";
+import type { Meal, MealFood, Micronutrients } from "@/types/gymos";
+import { NUTRIENT_KEYS } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
 import { createId } from "@/utils/id";
 
@@ -15,7 +16,7 @@ export type MacroTotals = {
   protein: number;
   carbs: number;
   fat: number;
-};
+} & Micronutrients;
 
 const EMPTY_MACROS: MacroTotals = {
   calories: 0,
@@ -26,12 +27,8 @@ const EMPTY_MACROS: MacroTotals = {
 
 export async function addMeal(
   name: string,
-  macros?: Partial<
-    Pick<
-      Meal,
-      "calories" | "protein" | "carbs" | "fat"
-    >
-  >,
+  macros?: Partial<MacroTotals>,
+  foods?: MealFood[],
 ): Promise<Meal> {
   const saved = await withDailyLock(async () => {
     const activity = await readDailyActivityUnlocked(
@@ -43,6 +40,11 @@ export async function addMeal(
       name,
       timestamp: new Date().toISOString(),
       ...macros,
+      // Optional per-food breakdown (incl. additionals) rides in the same
+      // record under the same lock — no second storage key, no second
+      // source of truth. Omitted when empty so old totals-only meals and
+      // new ones share one shape.
+      ...(foods && foods.length > 0 ? { foods } : {}),
     };
 
     if (!Array.isArray(activity.meals)) {
@@ -66,6 +68,51 @@ export async function addMeal(
   });
 
   return saved;
+}
+
+/**
+ * Update today's meal in place (edit flow). Same record, same lock, same
+ * event-log semantics as addMeal — no new storage, no duplicate entry.
+ * Totals stay authoritative; an empty foods list clears a previously
+ * saved breakdown. Returns null when the meal is not found (e.g. it was
+ * logged on another day, which this diary never edits).
+ */
+export async function updateMeal(
+  id: string,
+  name: string,
+  macros?: Partial<MacroTotals>,
+  foods?: MealFood[],
+): Promise<Meal | null> {
+  return withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(
+      getTodayKey(),
+    );
+
+    if (!Array.isArray(activity.meals)) {
+      return null;
+    }
+
+    const index = activity.meals.findIndex(
+      (meal) => meal.id === id,
+    );
+
+    if (index === -1) {
+      return null;
+    }
+
+    const updated: Meal = {
+      ...activity.meals[index],
+      name,
+      ...macros,
+      ...(foods && foods.length > 0 ? { foods } : { foods: undefined }),
+    };
+
+    activity.meals[index] = updated;
+
+    await writeDailyActivityUnlocked(activity);
+
+    return updated;
+  });
 }
 
 export async function getMealsForDate(
@@ -118,14 +165,15 @@ export async function getDailyMacroTotals(
   }
 
   return meals.reduce<MacroTotals>(
-    (totals, meal) => ({
-      calories:
-        totals.calories + (meal.calories ?? 0),
-      protein:
-        totals.protein + (meal.protein ?? 0),
-      carbs: totals.carbs + (meal.carbs ?? 0),
-      fat: totals.fat + (meal.fat ?? 0),
-    }),
+    (totals, meal) => {
+      const next = { ...totals };
+
+      for (const key of NUTRIENT_KEYS) {
+        next[key] = (next[key] ?? 0) + (meal[key] ?? 0);
+      }
+
+      return next;
+    },
     EMPTY_MACROS,
   );
 }

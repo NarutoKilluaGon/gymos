@@ -136,6 +136,7 @@ type DeletedIds = {
   meals: Set<string>;
   measurements: Set<string>;
   sleep: Set<string>;
+  cardio: Set<string>;
 };
 
 function isTombstoned(
@@ -158,6 +159,8 @@ function isTombstoned(
       );
     case "sleep.ended":
       return deleted.sleep.has(event.payload.sleepId);
+    case "workout.cardio.logged":
+      return deleted.cardio.has(event.payload.cardioId);
     default:
       return false;
   }
@@ -170,6 +173,7 @@ export async function getTimeline(): Promise<TimelineItem[]> {
     meals: new Set(),
     measurements: new Set(),
     sleep: new Set(),
+    cardio: new Set(),
   };
 
   for (const event of events) {
@@ -188,6 +192,10 @@ export async function getTimeline(): Promise<TimelineItem[]> {
       const tombstone = event as AppEvent<"sleep.deleted">;
 
       deletedIds.sleep.add(tombstone.payload.sleepId);
+    } else if (event.type === "workout.cardio.removed") {
+      const tombstone = event as AppEvent<"workout.cardio.removed">;
+
+      deletedIds.cardio.add(tombstone.payload.cardioId);
     }
   }
 

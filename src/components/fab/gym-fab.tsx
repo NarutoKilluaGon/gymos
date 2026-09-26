@@ -35,7 +35,9 @@ type GymFABProps = {
   weightUnit?: WeightUnit;
   onWaterAdd?: (amount: number) => void;
   onWeightAdd?: (weight: number) => void;
-  onMealAdd?: (meal: MealInput) => void;
+  onMealAdd?: (
+    meal: MealInput,
+  ) => void | boolean | Promise<void | boolean>;
   onSleepAdd?: (sleep: SleepInput) => void;
   onWorkoutStart?: () => void;
   onJournalAdd?: (text: string, mood?: JournalEntry["mood"]) => void;
@@ -156,7 +158,11 @@ export function GymFAB({
   async function handleMealSave(meal: MealInput) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    onMealAdd?.(meal);
+    const result = await onMealAdd?.(meal);
+
+    if (result === false) {
+      return;
+    }
 
     setMealSheetOpen(false);
   }

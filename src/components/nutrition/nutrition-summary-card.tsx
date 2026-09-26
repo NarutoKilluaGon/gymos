@@ -9,36 +9,77 @@ import type { NutritionTargets } from "@/storage/repositories/nutrition-targets"
 type NutritionSummaryCardProps = {
   totals: MacroTotals;
   targets: NutritionTargets;
+  /**
+   * S7: today's calculated target. Null when no maintenance is
+   * configured — the card then shows the static `targets.calories`
+   * exactly as before. Consumed calories always come from `totals`
+   * (logged meals), independent of this value.
+   */
+  calorieTarget?: {
+    value: number;
+    activityKcal: number;
+    adjustmentKcal: number;
+  } | null;
 };
 
 export function NutritionSummaryCard({
   totals,
   targets,
+  calorieTarget = null,
 }: NutritionSummaryCardProps) {
+  const staticTarget =
+    typeof targets.calories === "number" && targets.calories > 0
+      ? targets.calories
+      : null;
+  const displayTarget = calorieTarget?.value ?? staticTarget;
   const hasCalorieTarget =
-    typeof targets.calories === "number" &&
-    targets.calories > 0;
+    typeof displayTarget === "number" && displayTarget > 0;
+
+  const consumed = Math.round(totals.calories);
+  const remaining = hasCalorieTarget
+    ? displayTarget! - totals.calories
+    : null;
+
+  // One-line context so the dynamic target reads as dynamic: today's
+  // estimate, training's rough share, and the goal adjustment.
+  const estimateParts = calorieTarget
+    ? [
+        "Estimated for today",
+        calorieTarget.activityKcal > 0
+          ? `~${Math.round(calorieTarget.activityKcal)} kcal training`
+          : "updates with training",
+        calorieTarget.adjustmentKcal !== 0
+          ? `${calorieTarget.adjustmentKcal > 0 ? "+" : "-"}${Math.round(
+              Math.abs(calorieTarget.adjustmentKcal),
+            )} kcal goal`
+          : null,
+      ].filter((part): part is string => part !== null)
+    : [];
 
   return (
     <GymCard style={styles.card}>
       <Text style={styles.eyebrow}>TODAY</Text>
 
       <View style={styles.caloriesRow}>
-        <Text style={styles.caloriesValue}>
-          {Math.round(totals.calories)}
-        </Text>
+        <Text style={styles.caloriesValue}>{consumed}</Text>
 
         <Text style={styles.caloriesUnit}>
-          kcal {hasCalorieTarget ? `/ ${targets.calories}` : ""}
+          {hasCalorieTarget ? `/ ${displayTarget} kcal` : "kcal"}
         </Text>
       </View>
 
-      {hasCalorieTarget && (
-        <ProgressBar
-          current={totals.calories}
-          target={targets.calories!}
-          unit="kcal"
-        />
+      {remaining !== null && (
+        <Text style={styles.remaining}>
+          {remaining >= 0
+            ? `${Math.round(remaining)} kcal remaining`
+            : `${Math.round(-remaining)} kcal over target`}
+        </Text>
+      )}
+
+      {estimateParts.length > 0 && (
+        <Text style={styles.estimateNote}>
+          {estimateParts.join(" · ")}
+        </Text>
       )}
 
       <View style={styles.divider} />
@@ -83,7 +124,7 @@ function MacroRow({ label, value, target }: MacroRowProps) {
       </Text>
 
       {hasTarget && (
-        <ProgressBar current={value} target={target!} unit="g" />
+        <ProgressBar current={value} target={target!} unit="g" hideHeader />
       )}
     </View>
   );
@@ -108,13 +149,24 @@ const styles = StyleSheet.create({
 
   caloriesValue: {
     color: GymColors.text.primary,
-    fontSize: Typography.display,
+    fontSize: Typography.h1,
     fontWeight: "700",
   },
 
   caloriesUnit: {
     color: GymColors.text.secondary,
     fontSize: Typography.body,
+  },
+
+  remaining: {
+    color: GymColors.text.tertiary,
+    fontSize: Typography.caption,
+    marginTop: Spacing.half,
+  },
+
+  estimateNote: {
+    color: GymColors.text.tertiary,
+    fontSize: Typography.caption,
   },
 
   divider: {

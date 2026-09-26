@@ -1,7 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { GymCard } from "@/components/ui/gym-card";
-import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
+import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { mealFoodsLine } from "@/services/meal-estimator";
 import type { Meal } from "@/types/gymos";
 
 type MealCardProps = {
@@ -10,32 +11,35 @@ type MealCardProps = {
   onDelete: () => void;
 };
 
-function formatTime(timestamp: string): string {
-  const date = new Date(timestamp);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return date.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+/** Rounded display calories ("1,120") without relying on Intl. */
+function formatKcal(value: number): string {
+  return String(Math.round(value)).replace(
+    /\B(?=(\d{3})+(?!\d))/g,
+    ",",
+  );
 }
 
+/**
+ * Compact diary card: name, optional foods breakdown, calories, and macros.
+ * No timestamp — the timeline owns the time marker (meal.timestamp stays
+ * the persisted source of truth).
+ */
 export function MealCard({ meal, deleting, onDelete }: MealCardProps) {
-  const macros = [
-    meal.calories !== undefined
-      ? `${meal.calories} kcal`
-      : null,
-    meal.protein !== undefined
-      ? `${meal.protein}g protein`
-      : null,
-    meal.carbs !== undefined
-      ? `${meal.carbs}g carbs`
-      : null,
-    meal.fat !== undefined ? `${meal.fat}g fat` : null,
-  ].filter((m): m is string => m !== null);
+  // Secondary line only when it adds info beyond the title (e.g. a manual
+  // "Breakfast" with distinct foods — never a repeat of joined food names).
+  const foodsLine = mealFoodsLine(meal.name, meal.foods);
+
+  const macros: string[] = [];
+
+  if (meal.protein !== undefined) {
+    macros.push(`P ${Math.round(meal.protein)}g`);
+  }
+  if (meal.carbs !== undefined) {
+    macros.push(`C ${Math.round(meal.carbs)}g`);
+  }
+  if (meal.fat !== undefined) {
+    macros.push(`F ${Math.round(meal.fat)}g`);
+  }
 
   return (
     <GymCard style={styles.card}>
@@ -43,7 +47,11 @@ export function MealCard({ meal, deleting, onDelete }: MealCardProps) {
         <View style={styles.titleBlock}>
           <Text style={styles.name}>{meal.name}</Text>
 
-          <Text style={styles.time}>{formatTime(meal.timestamp)}</Text>
+          {foodsLine ? (
+            <Text style={styles.foods} numberOfLines={2}>
+              {foodsLine}
+            </Text>
+          ) : null}
         </View>
 
         <Pressable
@@ -57,12 +65,18 @@ export function MealCard({ meal, deleting, onDelete }: MealCardProps) {
         </Pressable>
       </View>
 
+      {meal.calories !== undefined && (
+        <Text style={styles.calories}>
+          {formatKcal(meal.calories)} kcal
+        </Text>
+      )}
+
       {macros.length > 0 && (
         <View style={styles.macroRow}>
           {macros.map((macro) => (
-            <View key={macro} style={styles.macroChip}>
-              <Text style={styles.macroChipText}>{macro}</Text>
-            </View>
+            <Text key={macro} style={styles.macroText}>
+              {macro}
+            </Text>
           ))}
         </View>
       )}
@@ -77,12 +91,14 @@ const styles = StyleSheet.create({
 
   top: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: Spacing.two,
   },
 
   titleBlock: {
     flex: 1,
+    gap: Spacing.half,
   },
 
   name: {
@@ -91,10 +107,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  time: {
+  foods: {
     color: GymColors.text.tertiary,
     fontSize: Typography.caption,
-    marginTop: Spacing.half,
   },
 
   deleteButton: {
@@ -110,20 +125,18 @@ const styles = StyleSheet.create({
     fontWeight: "300",
   },
 
+  calories: {
+    color: GymColors.text.primary,
+    fontSize: Typography.h3,
+    fontWeight: "700",
+  },
+
   macroRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
 
-  macroChip: {
-    backgroundColor: GymColors.background.surface,
-    borderRadius: Radius.medium,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-  },
-
-  macroChipText: {
+  macroText: {
     color: GymColors.text.secondary,
     fontSize: Typography.caption,
   },

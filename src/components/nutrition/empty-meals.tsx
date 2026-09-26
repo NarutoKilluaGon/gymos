@@ -1,12 +1,13 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 
-type EmptyMealsProps = {
-  onAddMeal: () => void;
-};
-
-export function EmptyMeals({ onAddMeal }: EmptyMealsProps) {
+/**
+ * Empty day state: title + guidance only. Logging always starts from
+ * the screen's floating Log meal action, so this view intentionally
+ * carries no second button into the same sheet.
+ */
+export function EmptyMeals() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>No meals logged yet</Text>
@@ -14,15 +15,6 @@ export function EmptyMeals({ onAddMeal }: EmptyMealsProps) {
       <Text style={styles.subtitle}>
         Add your first meal to start tracking today.
       </Text>
-
-      <Pressable
-        onPress={onAddMeal}
-        style={styles.button}
-        accessibilityRole="button"
-        accessibilityLabel="Add a meal"
-      >
-        <Text style={styles.buttonText}>Add a meal</Text>
-      </Pressable>
     </View>
   );
 }
@@ -48,18 +40,5 @@ const styles = StyleSheet.create({
     fontSize: Typography.body,
     textAlign: "center",
     marginBottom: Spacing.one,
-  },
-
-  button: {
-    backgroundColor: GymColors.semantic.accent,
-    borderRadius: Radius.medium,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-  },
-
-  buttonText: {
-    color: GymColors.background.primary,
-    fontSize: Typography.body,
-    fontWeight: "700",
   },
 });

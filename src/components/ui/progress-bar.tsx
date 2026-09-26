@@ -14,6 +14,12 @@ type ProgressBarProps = {
   target: number;
   unit: string;
   compact?: boolean;
+  /**
+   * Hide the value/status header and render only the track. Used where
+   * the parent already presents "current / target" text, so the numbers
+   * are not shown twice.
+   */
+  hideHeader?: boolean;
 };
 
 export function ProgressBar({
@@ -21,6 +27,7 @@ export function ProgressBar({
   target,
   unit,
   compact = false,
+  hideHeader = false,
 }: ProgressBarProps) {
   const progress = Math.min(current / target, 1);
 
@@ -47,19 +54,21 @@ export function ProgressBar({
   if (compact) {
     return (
       <View style={styles.containerCompact}>
-        <View style={styles.headerCompact}>
-          <Text style={styles.valueCompact}>
-            {current.toFixed(current >= 10 ? 0 : 1)} / {target.toFixed(target >= 10 ? 0 : 1)} {unit}
-          </Text>
+        {!hideHeader && (
+          <View style={styles.headerCompact}>
+            <Text style={styles.valueCompact}>
+              {current.toFixed(current >= 10 ? 0 : 1)} / {target.toFixed(target >= 10 ? 0 : 1)} {unit}
+            </Text>
 
-          <Text
-            style={[
-              styles.statusCompact,
-              current >= target && styles.completedCompact,
-            ]}>
-            {current >= target ? '✓' : ''}
-          </Text>
-        </View>
+            <Text
+              style={[
+                styles.statusCompact,
+                current >= target && styles.completedCompact,
+              ]}>
+              {current >= target ? '✓' : ''}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.trackCompact}>
           <Animated.View
@@ -76,20 +85,22 @@ export function ProgressBar({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.value}>
-          {current.toFixed(1)} / {target.toFixed(1)} {unit}
-        </Text>
+      {!hideHeader && (
+        <View style={styles.header}>
+          <Text style={styles.value}>
+            {current.toFixed(1)} / {target.toFixed(1)} {unit}
+          </Text>
 
-        <Text
-          style={[
-            styles.status,
-            current >= target && styles.completed,
-          ]}>
-          {current >= target ? '✓ ' : ''}
-          {status}
-        </Text>
-      </View>
+          <Text
+            style={[
+              styles.status,
+              current >= target && styles.completed,
+            ]}>
+            {current >= target ? '✓ ' : ''}
+            {status}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.track}>
         <Animated.View

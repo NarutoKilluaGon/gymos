@@ -230,19 +230,32 @@ export async function removeCardioFromWorkout(
   workoutId: string,
   cardioId: string,
 ): Promise<void> {
-  await withDailyLock(async () => {
+  const removed = await withDailyLock(async () => {
     const activity = await readDailyActivityUnlocked(getTodayKey());
 
     const workout = activity.workouts.find((item) => item.id === workoutId);
 
     if (!workout || !Array.isArray(workout.cardio)) {
-      return;
+      return false;
     }
 
+    const before = workout.cardio.length;
     workout.cardio = workout.cardio.filter((entry) => entry.id !== cardioId);
 
+    if (workout.cardio.length === before) {
+      return false;
+    }
+
     await writeDailyActivityUnlocked(activity);
+
+    return true;
   });
+
+  // Tombstone so derived views (timeline, calorie target) stop counting
+  // the removed entry. Only emitted when something was actually removed.
+  if (removed) {
+    await appendEvent("workout.cardio.removed", { workoutId, cardioId });
+  }
 }
 
 export async function finishWorkout(

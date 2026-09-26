@@ -41,6 +41,7 @@ import {
 } from "@/storage/repositories/workouts";
 import { pickAndSavePhotoFromLibrary } from "@/services/progress-photos";
 import { getStreak, type Streak } from "@/services/streak";
+import { toCanonicalMealNutrition } from "@/services/meal-estimator";
 import type {
   JournalEntry,
   Meal,
@@ -257,22 +258,32 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleMealAdd(meal: MealInput) {
+  async function handleMealAdd(meal: MealInput): Promise<boolean> {
     try {
-      await addMeal(meal.name, {
-        calories: meal.calories,
-        protein: meal.protein,
-        carbs: meal.carbs,
-        fat: meal.fat,
-      });
+      const saved = await addMeal(
+        meal.name,
+        toCanonicalMealNutrition(meal),
+        meal.foods,
+      );
 
-      setMeals(await getTodayMeals());
+      // The primary write succeeded. Keep the meal visible even if the
+      // best-effort dashboard refresh below encounters a storage error.
+      setMeals((current) => [...current, saved]);
 
-      const macros = await getDailyMacroTotals(getTodayKey());
+      try {
+        setMeals(await getTodayMeals());
 
-      setProtein(macros.protein);
+        const macros = await getDailyMacroTotals(getTodayKey());
+        setProtein(macros.protein);
+      } catch {
+        // The meal is already persisted; do not report a save failure or
+        // invite the user to submit it a second time.
+      }
+
+      return true;
     } catch {
       showToast("Couldn't save meal");
+      return false;
     }
   }
 

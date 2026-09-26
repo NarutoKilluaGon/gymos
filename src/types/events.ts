@@ -12,6 +12,7 @@ export type EventType =
   | "workout.exercise.added"
   | "workout.set.logged"
   | "workout.cardio.logged"
+  | "workout.cardio.removed"
   | "workout.finished"
   | "routine.created"
   | "routine.updated"
@@ -56,6 +57,15 @@ export type EventPayload = {
     durationMin: number;
     distanceKm?: number;
     calories?: number;
+  };
+  /**
+   * Tombstone: hides one cardio row from derived views (timeline,
+   * calorie target) after the entry leaves its workout. The event log
+   * itself stays append-only.
+   */
+  "workout.cardio.removed": {
+    workoutId: ID;
+    cardioId: ID;
   };
   "workout.finished": {
     workoutId: ID;

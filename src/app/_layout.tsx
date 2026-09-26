@@ -10,7 +10,6 @@ import { ToastHost } from '@/components/ui/toast-host';
 import { ModulesProvider } from '@/contexts/modules-context';
 import { getOnboardingComplete } from '@/storage/repositories/onboarding';
 import { startStepTracking, stopStepTracking } from '@/services/steps';
-import { mockVisionProvider, setVisionProvider } from '@/services/meal-estimator';
 import { applyReminders, setupNotifications } from '@/services/notifications';
 import { getReminderPrefs } from '@/storage/repositories/reminders';
 
@@ -23,13 +22,6 @@ export default function TabLayout() {
   useEffect(() => {
     void startStepTracking();
     return () => stopStepTracking();
-  }, []);
-
-  // Initialize mock vision provider for development (replace with real provider in production)
-  useEffect(() => {
-    if (__DEV__) {
-      setVisionProvider(mockVisionProvider);
-    }
   }, []);
 
   // Restore scheduled reminders on every launch (idempotent re-apply).

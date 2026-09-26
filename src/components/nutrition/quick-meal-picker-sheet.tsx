@@ -15,6 +15,10 @@ import {
   Typography,
 } from "@/constants/theme";
 import {
+  foodEntryToEstimate,
+  searchFoods,
+} from "@/services/food-db";
+import {
   mealInputFromEstimate,
   searchQuickMeals,
   type MealEstimate,
@@ -33,6 +37,13 @@ export function QuickMealPickerSheet({
 
   const results = useMemo(
     () => searchQuickMeals(query),
+    [query],
+  );
+
+  // Offline food database — manual food selection (Slice 3A). Same
+  // search semantics as the quick-pick catalog above.
+  const foodResults = useMemo(
+    () => searchFoods(query),
     [query],
   );
 
@@ -99,6 +110,34 @@ export function QuickMealPickerSheet({
             </Pressable>
           );
         })}
+
+        {/* Tapping a food wraps it as a single-food estimate and follows
+            the same onSelect → MealSheet review → save path as quick
+            pick, so manual selection needs no second save pipeline. */}
+        <Text style={styles.sectionLabel}>Food database</Text>
+
+        {foodResults.map((entry) => (
+          <Pressable
+            key={`db-${entry.id}`}
+            onPress={() => onSelect(foodEntryToEstimate(entry))}
+            accessibilityRole="button"
+            accessibilityLabel={`Pick ${entry.name}`}
+            style={styles.row}
+          >
+            <View style={styles.rowTextBlock}>
+              <Text style={styles.rowName}>{entry.name}</Text>
+
+              <Text style={styles.rowMacros}>
+                {entry.amount} {entry.unit} · {entry.calories} kcal ·{" "}
+                {entry.protein}g protein
+                {entry.carbs ? ` · ${entry.carbs}g carbs` : ""}
+                {entry.fat ? ` · ${entry.fat}g fat` : ""}
+              </Text>
+            </View>
+
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        ))}
       </ScrollView>
     </View>
   );
@@ -160,6 +199,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     marginBottom: Spacing.three,
+  },
+
+  sectionLabel: {
+    color: GymColors.text.secondary,
+    fontSize: Typography.body,
+    fontWeight: "600",
+    marginTop: Spacing.two,
   },
 
   scroll: {
