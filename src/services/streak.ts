@@ -1,4 +1,5 @@
 import { getAllDailyActivities } from "@/storage/daily";
+import { getMealDateKeys } from "@/storage/repositories/meals";
 import type { DailyActivity } from "@/types/gymos";
 
 export type Streak = {
@@ -6,7 +7,17 @@ export type Streak = {
   todayActive: boolean;
 };
 
-function isActive(activity: DailyActivity | undefined): boolean {
+/**
+ * `hasMeals` comes from the dedicated meals store, not `activity.meals`
+ * — meals no longer live embedded in the daily blob (see meals.ts), so
+ * a day can be active purely from a logged meal even when it has no
+ * DailyActivity record at all (`activity` undefined).
+ */
+function isActive(
+  activity: DailyActivity | undefined,
+  hasMeals: boolean,
+): boolean {
+  if (hasMeals) return true;
   if (!activity) return false;
 
   // A malformed record (corrupt write, partial migration) may miss an
@@ -17,8 +28,6 @@ function isActive(activity: DailyActivity | undefined): boolean {
       activity.water.length > 0) ||
     (Array.isArray(activity.workouts) &&
       activity.workouts.length > 0) ||
-    (Array.isArray(activity.meals) &&
-      activity.meals.length > 0) ||
     (Array.isArray(activity.sleep) &&
       activity.sleep.length > 0) ||
     (Array.isArray(activity.measurements) &&
@@ -41,14 +50,16 @@ function dateKeyAtOffset(offsetDays: number): string {
 
 function countBackFrom(
   all: Record<string, DailyActivity>,
+  mealDateKeys: Set<string>,
   startOffset: number,
 ): number {
   let streak = 0;
 
   for (let offset = startOffset; offset < 365; offset++) {
-    const activity = all[dateKeyAtOffset(offset)];
+    const dateKey = dateKeyAtOffset(offset);
+    const activity = all[dateKey];
 
-    if (isActive(activity)) {
+    if (isActive(activity, mealDateKeys.has(dateKey))) {
       streak++;
     } else {
       break;
@@ -59,15 +70,28 @@ function countBackFrom(
 }
 
 export async function getStreak(): Promise<Streak> {
-  const all = await getAllDailyActivities();
+  const [all, mealDateKeys] = await Promise.all([
+    getAllDailyActivities(),
+    getMealDateKeys(),
+  ]);
 
-  const todayActive = isActive(all[dateKeyAtOffset(0)]);
+  const todayKey = dateKeyAtOffset(0);
+  const todayActive = isActive(
+    all[todayKey],
+    mealDateKeys.has(todayKey),
+  );
 
   if (todayActive) {
-    return { days: countBackFrom(all, 0), todayActive: true };
+    return {
+      days: countBackFrom(all, mealDateKeys, 0),
+      todayActive: true,
+    };
   }
 
   // Today isn't logged yet — the streak is preserved through
   // yesterday until the day ends, so count back from there.
-  return { days: countBackFrom(all, 1), todayActive: false };
+  return {
+    days: countBackFrom(all, mealDateKeys, 1),
+    todayActive: false,
+  };
 }

@@ -1,4 +1,5 @@
 import { getAllDailyActivities } from "@/storage/daily";
+import { getAllMeals } from "@/storage/repositories/meals";
 import {
   getLatestMeasurement,
   getMeasurementHistory,
@@ -34,6 +35,34 @@ function dateKeyOf(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Total logged calories per local date key, across every meal ever
+ * logged. Meals used to live embedded in each day's DailyActivity
+ * (`activity.meals`), so a calorie total per day fell out of iterating
+ * `getAllDailyActivities()` for free. Now that meals have their own
+ * store (see storage/repositories/meals.ts), computing a per-day total
+ * needs one pass over `getAllMeals()` instead — done once here and
+ * reused by both getWeekInsights and getMonthlySummaries rather than
+ * each re-deriving it.
+ */
+async function caloriesByDateKey(): Promise<Map<string, number>> {
+  const meals = await getAllMeals();
+  const totals = new Map<string, number>();
+
+  for (const meal of meals) {
+    const parsed = new Date(meal.timestamp);
+
+    if (Number.isNaN(parsed.getTime())) {
+      continue;
+    }
+
+    const key = dateKeyOf(parsed);
+    totals.set(key, (totals.get(key) ?? 0) + (meal.calories ?? 0));
+  }
+
+  return totals;
 }
 
 /** ISO weekday: Monday = 1 … Sunday = 7. */
@@ -116,7 +145,10 @@ export async function getHeatmap(
 }
 
 export async function getWeekInsights(): Promise<WeekInsights> {
-  const data = await getAllDailyActivities();
+  const [data, calories] = await Promise.all([
+    getAllDailyActivities(),
+    caloriesByDateKey(),
+  ]);
 
   const now = new Date();
   const currentStart = startOfWeek(now);
@@ -161,10 +193,7 @@ export async function getWeekInsights(): Promise<WeekInsights> {
       }, 0);
     }
 
-    const dayCalories = (activity.meals ?? []).reduce(
-      (sum, meal) => sum + (meal.calories ?? 0),
-      0,
-    );
+    const dayCalories = calories.get(dateKey) ?? 0;
 
     if (dayCalories > 0) {
       bucket.calorieDays += 1;
@@ -267,7 +296,10 @@ function monthLabelFull(date: Date): string {
 export async function getMonthlySummaries(
   months: number = 6,
 ): Promise<MonthlySummary[]> {
-  const data = await getAllDailyActivities();
+  const [data, calories] = await Promise.all([
+    getAllDailyActivities(),
+    caloriesByDateKey(),
+  ]);
 
   const now = new Date();
 
@@ -329,10 +361,7 @@ export async function getMonthlySummaries(
       }, 0);
     }
 
-    const dayCalories = (activity.meals ?? []).reduce(
-      (sum, meal) => sum + (meal.calories ?? 0),
-      0,
-    );
+    const dayCalories = calories.get(dateKey) ?? 0;
 
     if (dayCalories > 0) {
       bucket.calorieDays += 1;

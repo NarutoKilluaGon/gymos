@@ -20,6 +20,59 @@ import {
 export const OFFLINE_DESCRIPTION_MESSAGE =
   "You're offline. We'll estimate this when you're back online.";
 
+/**
+ * After this many automatic attempts a still-failing item moves to
+ * needs-attention even though every failure was a plain network error.
+ * Without a cap, an item whose failure never changes (e.g. the proxy is
+ * permanently down) would get retried on every single app resume forever.
+ * The user can still retry it manually at any time regardless of this cap.
+ */
+export const MAX_AUTOMATIC_RETRIES = 6;
+
+/**
+ * Delay before each successive automatic attempt is even considered,
+ * indexed by the item's current retryCount. The last value repeats for
+ * any further attempts. Kept short at first (a dropped signal on a train
+ * platform resolves itself in under a minute) and long by the end (no
+ * point hammering a proxy that's been down for an hour).
+ */
+const RETRY_BACKOFF_MS = [
+  30_000, // 30s
+  2 * 60_000, // 2m
+  10 * 60_000, // 10m
+  60 * 60_000, // 1h
+];
+
+function backoffForRetryCount(retryCount: number): number {
+  const index = Math.min(retryCount, RETRY_BACKOFF_MS.length - 1);
+  return RETRY_BACKOFF_MS[index];
+}
+
+/**
+ * Whether an item should be included in an automatic retry pass right
+ * now. Manual retry (the Retry button) bypasses this entirely — it's
+ * only the automatic app-resume/online-event pass that respects backoff,
+ * so a user who wants to try again immediately always can.
+ */
+export function isDueForAutomaticRetry(
+  item: Pick<
+    PendingDescriptionAnalysis,
+    "status" | "retryCount" | "lastAttemptAt"
+  >,
+  now: number = Date.now(),
+): boolean {
+  if (item.status !== "pending") {
+    return false;
+  }
+
+  if (!item.lastAttemptAt) {
+    return true;
+  }
+
+  const elapsed = now - new Date(item.lastAttemptAt).getTime();
+  return elapsed >= backoffForRetryCount(item.retryCount);
+}
+
 export type PendingDescriptionRetryResult =
   | {
       status: "review";
@@ -133,6 +186,9 @@ function mapErrorCode(
  * caller must hand the estimate to the existing review flow and then call
  * `acknowledgePendingDescriptionReview`. This closes the crash window
  * between an AI response and a visible review sheet.
+ *
+ * Always attempts regardless of backoff — this is also the manual-retry
+ * path, and a user tapping "Retry" should never be told to wait.
  */
 export async function retryPendingDescription(
   id: string,
@@ -188,6 +244,7 @@ export async function retryPendingDescription(
       const updated = await recordPendingDescriptionFailure(
         item.id,
         mapErrorCode(invalid.code),
+        { maxAutomaticRetries: MAX_AUTOMATIC_RETRIES },
       );
 
       return {
@@ -200,10 +257,11 @@ export async function retryPendingDescription(
     const updated = await recordPendingDescriptionFailure(
       item.id,
       mapErrorCode(result.error.code),
+      { maxAutomaticRetries: MAX_AUTOMATIC_RETRIES },
     );
     const nextItem = updated ?? item;
 
-    return result.error.code === "network"
+    return nextItem.status === "pending"
       ? {
           status: "pending",
           item: nextItem,
@@ -220,9 +278,11 @@ export async function retryPendingDescription(
 }
 
 /**
- * Retry automatically eligible items sequentially. The first successful
- * result stops the pass so the caller can open one review sheet at a time;
- * remaining items stay durable for the next focus/resume pass.
+ * Retry automatically eligible items sequentially. "Eligible" now means
+ * both `pending` and past its backoff window — see `isDueForAutomaticRetry`.
+ * The first successful result stops the pass so the caller can open one
+ * review sheet at a time; remaining items stay durable for the next
+ * focus/resume pass.
  */
 export function retryPendingDescriptions(
   options: {
@@ -244,7 +304,7 @@ export function retryPendingDescriptions(
     }
 
     const items = (await getPendingDescriptionAnalyses()).filter(
-      (item) => item.status === "pending",
+      (item) => isDueForAutomaticRetry(item),
     );
     const results: PendingDescriptionRetryResult[] = [];
 

@@ -5,9 +5,17 @@ jest.mock("@/storage/daily", () => ({
   getAllDailyActivities: jest.fn(),
 }));
 
+jest.mock("@/storage/repositories/meals", () => ({
+  getMealDateKeys: jest.fn(),
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getAllDailyActivities } = require("@/storage/daily") as {
   getAllDailyActivities: jest.Mock;
+};
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { getMealDateKeys } = require("@/storage/repositories/meals") as {
+  getMealDateKeys: jest.Mock;
 };
 
 function keyAtOffset(offsetDays: number): string {
@@ -49,6 +57,12 @@ function activeActivity(date: string): DailyActivity {
 describe("getStreak", () => {
   beforeEach(() => {
     getAllDailyActivities.mockReset();
+    getMealDateKeys.mockReset();
+    // Meals now come from their own store (meals.ts), not
+    // `activity.meals` — most tests here aren't exercising meals at
+    // all, so default to "no meal-active days" and let the one test
+    // that does care override this.
+    getMealDateKeys.mockResolvedValue(new Set());
   });
 
   it("returns 0 and todayActive false when nothing has ever been logged", async () => {
@@ -107,19 +121,28 @@ describe("getStreak", () => {
 
   it("a day with a logged meal still counts as active", async () => {
     const day0 = keyAtOffset(0);
-    const activity = emptyActivity(day0);
 
-    activity.meals.push({
-      id: "m1",
-      name: "Chicken rice",
-      calories: 580,
-      protein: 40,
-      carbs: 65,
-      fat: 12,
-      timestamp: new Date(`${day0}T12:00:00`).toISOString(),
+    // The day's DailyActivity itself is otherwise empty — meals live in
+    // their own store now, so activity alone should not be enough, and
+    // isn't: only getMealDateKeys() reporting today makes this active.
+    getAllDailyActivities.mockResolvedValue({
+      [day0]: emptyActivity(day0),
     });
+    getMealDateKeys.mockResolvedValue(new Set([day0]));
 
-    getAllDailyActivities.mockResolvedValue({ [day0]: activity });
+    await expect(getStreak()).resolves.toEqual({
+      days: 1,
+      todayActive: true,
+    });
+  });
+
+  it("a logged meal counts as active even with no DailyActivity record at all", async () => {
+    const day0 = keyAtOffset(0);
+
+    // No entry for today whatsoever — not even an empty one. A meal is
+    // now the only signal for the day, and must still count.
+    getAllDailyActivities.mockResolvedValue({});
+    getMealDateKeys.mockResolvedValue(new Set([day0]));
 
     await expect(getStreak()).resolves.toEqual({
       days: 1,

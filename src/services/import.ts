@@ -114,6 +114,22 @@ export async function importFromUri(uri: string): Promise<number> {
     entries.push([key, serializeValue(value)]);
   }
 
+  // A backup taken before meals got their own storage key still carries
+  // its meals embedded inside "@gymos/daily" — this restore is about to
+  // overwrite that key, but has nothing to write for "@gymos/meals"
+  // itself (merge leaves it untouched). Without this, this device's
+  // already-migrated flag would stay true and those restored meals
+  // would never move into the dedicated store: invisible, not deleted,
+  // but effectively lost. Forcing the flag false makes meals.ts safely
+  // re-derive/re-merge (by id, so nothing already there gets duplicated)
+  // the next time anything touches meals.
+  const restoresDaily = bundle.data["@gymos/daily"] !== undefined;
+  const restoresMeals = bundle.data["@gymos/meals"] !== undefined;
+
+  if (restoresDaily && !restoresMeals) {
+    entries.push(["@gymos/meals-migrated-v1", serializeValue(false)]);
+  }
+
   try {
     // Hold the daily mutex across the whole batch write: a concurrent
     // @gymos/daily transaction snapshots the store, then writes it back,
