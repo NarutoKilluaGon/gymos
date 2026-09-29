@@ -275,6 +275,7 @@ export function AddMealSheet({
       }
 
       onResolved(result.estimate, text);
+
     } finally {
       setProgress(null);
       setResolving(false);

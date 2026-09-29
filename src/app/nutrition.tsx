@@ -23,6 +23,7 @@ import { DayTimeline } from "@/components/nutrition/day-timeline";
 import { NutritionSummaryCard } from "@/components/nutrition/nutrition-summary-card";
 import { PendingDescriptionSection } from "@/components/nutrition/pending-description-section";
 import { NutritionTargetsSheet } from "@/components/dashboard/nutrition-targets-sheet";
+import { planReviewHandoff } from "@/services/review-handoff";
 import {
   MealSheet,
   type MealInput,
@@ -281,29 +282,20 @@ export default function NutritionScreen() {
       pendingId?: string,
       description?: string,
     ) => {
-      const availability = reviewAvailabilityRef.current;
+      const plan = planReviewHandoff({
+        availability: reviewAvailabilityRef.current,
+        handoffInFlight: pendingReviewHandoffRef.current,
+        pendingId,
+        description,
+      });
 
-      if (
-        !availability.screenMounted ||
-        !availability.nutritionEnabled ||
-        availability.mealSheetOpen ||
-        pendingReviewHandoffRef.current
-      ) {
-        return;
-      }
-
-      if (
-        pendingId &&
-        !canPresentPendingDescriptionReview(availability)
-      ) {
+      if (!plan.open) {
         return;
       }
 
       setEstimatedMeal(estimate);
-      setPendingReviewId(pendingId ?? null);
-      setPendingReviewDescription(
-        pendingId ? null : description?.trim() || null,
-      );
+      setPendingReviewId(plan.pendingReviewId);
+      setPendingReviewDescription(plan.pendingReviewDescription);
       setAddMealOpen(false);
       setMealSheetOpen(true);
     },
@@ -727,7 +719,9 @@ export default function NutritionScreen() {
             onQuickLog={handleQuickLog}
             onManual={handleManualMeal}
             onSelectQuickMeal={handleQuickPickSelect}
-            onResolved={handleResolvedFoods}
+            onResolved={(estimate, description) =>
+              handleResolvedFoods(estimate, undefined, description)
+            }
             onPendingChanged={refreshPendingDescriptions}
             onSelectSavedMeal={handleSelectSavedMeal}
             onClose={() => setAddMealOpen(false)}
