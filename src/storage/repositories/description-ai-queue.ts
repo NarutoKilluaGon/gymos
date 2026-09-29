@@ -65,6 +65,27 @@ function byCreatedAt(
   return a.createdAt.localeCompare(b.createdAt);
 }
 
+/**
+ * A fresh network failure landing on a description that was previously
+ * marked needs-attention (e.g. an earlier bad AI response) means the
+ * earlier verdict no longer applies. Reviving it — rather than returning
+ * the stale record untouched — is what makes "we'll retry automatically"
+ * actually true. retryCount resets because this is functionally a new
+ * failure episode for backoff purposes; createdAt is preserved because
+ * that's "how long has this description been stuck", which is still true.
+ */
+function revivedForFreshNetworkFailure(
+  existing: PendingDescriptionAnalysis,
+): PendingDescriptionAnalysis {
+  return {
+    ...existing,
+    status: "pending",
+    retryCount: 0,
+    lastAttemptAt: new Date().toISOString(),
+    lastErrorCode: "network",
+  };
+}
+
 export async function getPendingDescriptionAnalyses(): Promise<
   PendingDescriptionAnalysis[]
 > {
@@ -85,6 +106,13 @@ export async function getPendingDescriptionAnalysis(
  * Add a description once. The first original spelling is retained, while
  * duplicate detection ignores incidental whitespace/case so repeated taps
  * or reconnect passes cannot create parallel work.
+ *
+ * A match against an existing `pending` item is returned unchanged — it's
+ * already in the automatic pool, nothing to do. A match against a
+ * `needs-attention` item is revived: this attempt failed with a plain
+ * network error, which is a different (retryable) failure mode than
+ * whatever put it in needs-attention before, so it goes back into the
+ * automatic pool instead of silently keeping the old, stale record.
  */
 export async function enqueuePendingDescriptionAnalysis(
   description: string,
@@ -96,12 +124,22 @@ export async function enqueuePendingDescriptionAnalysis(
   return queueMutex.runExclusive(async () => {
     const queue = await readQueueUnlocked();
     const key = descriptionKey(description);
-    const existing = queue.find(
+    const index = queue.findIndex(
       (item) => descriptionKey(item.description) === key,
     );
 
-    if (existing) {
-      return existing;
+    if (index !== -1) {
+      const existing = queue[index];
+
+      if (existing.status === "pending") {
+        return existing;
+      }
+
+      const revived = revivedForFreshNetworkFailure(existing);
+      const updated = [...queue];
+      updated[index] = revived;
+      await writeQueueUnlocked(updated);
+      return revived;
     }
 
     const item: PendingDescriptionAnalysis = {
@@ -118,13 +156,17 @@ export async function enqueuePendingDescriptionAnalysis(
 }
 
 /**
- * Record a failed attempt. Network failures stay automatically retryable;
- * HTTP and invalid-response failures move to needs-attention so an
- * automatic pass will not loop forever. The item itself is never removed.
+ * Record a failed attempt. Network failures stay automatically retryable
+ * up to `maxAutomaticRetries` (unset = no cap, for callers that don't
+ * care); beyond that they move to needs-attention too, so a permanently
+ * unreachable proxy can't get hit forever on every app resume. HTTP and
+ * invalid-response failures always move to needs-attention immediately.
+ * The item itself is never removed.
  */
 export async function recordPendingDescriptionFailure(
   id: string,
   errorCode: PendingDescriptionErrorCode,
+  options: { maxAutomaticRetries?: number } = {},
 ): Promise<PendingDescriptionAnalysis | null> {
   return queueMutex.runExclusive(async () => {
     const queue = await readQueueUnlocked();
@@ -135,11 +177,15 @@ export async function recordPendingDescriptionFailure(
     }
 
     const current = queue[index];
+    const nextRetryCount = current.retryCount + 1;
+    const cap = options.maxAutomaticRetries ?? Infinity;
+    const staysAutomatic =
+      errorCode === "network" && nextRetryCount < cap;
+
     const next: PendingDescriptionAnalysis = {
       ...current,
-      status:
-        errorCode === "network" ? "pending" : "needs-attention",
-      retryCount: current.retryCount + 1,
+      status: staysAutomatic ? "pending" : "needs-attention",
+      retryCount: nextRetryCount,
       lastAttemptAt: new Date().toISOString(),
       lastErrorCode: errorCode,
     };

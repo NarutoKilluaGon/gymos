@@ -25,6 +25,7 @@ import {
   mealInputFromRecentMeal,
   RESOLUTION_STAGES,
   resolveMealDescriptionWithProviderStaged,
+  searchQuickMeals,
   type MealEstimate,
   type ResolutionProgress,
 } from "@/services/meal-estimator";
@@ -50,7 +51,6 @@ export type AddMealSheetProps = {
   recentFoods: MealFood[];
   onQuickLog: (meal: MealInput) => void;
   onManual: () => void;
-  onQuickMeals: () => void;
   /** Description-first entry: receives the resolved estimate from the
    *  optional description provider plus local Food DB precedence. When no
    *  provider is configured, the existing local/manual flow is used. */
@@ -58,6 +58,11 @@ export type AddMealSheetProps = {
     estimate: MealEstimate,
     description?: string,
   ) => void;
+  /** A curated Quick Meal pick is a single-food ESTIMATE, not the user's
+   *  own verified nutrition — it opens the same review pipeline a saved
+   *  MEAL does, rather than quick-logging directly (see the section
+   *  ordering note below for why). */
+  onSelectQuickMeal: (meal: MealEstimate) => void;
   /** Refresh the Nutrition screen after a network failure is queued. */
   onPendingChanged?: () => void | Promise<void>;
   /** S4: a saved MEAL opens the review pipeline (stored nutrition). */
@@ -66,6 +71,12 @@ export type AddMealSheetProps = {
 };
 
 const MAX_SEARCH_RESULTS = 15;
+/** Cap on the always-visible Quick Meals list before the user types a
+ *  search — the full catalog (searchQuickMeals("")) returns every
+ *  entry, which would crowd out the user's own saved/recent foods on a
+ *  screen that opens with nothing typed yet. Typing narrows to matches
+ *  only, so the cap never hides a result the user asked for. */
+const FEATURED_QUICK_MEALS = 6;
 
 /** "135 kcal · 20g protein · 7g carbs · 3g fat", skipping unknowns. */
 function formatMacros(macros: {
@@ -93,7 +104,10 @@ function formatMacros(macros: {
   return parts.join(" · ");
 }
 
-/** One-tap row: name + macros + a + quick-log action. */
+/** One-tap row: name + macros + a "+" action that logs IMMEDIATELY, no
+ *  review. Reserved for nutrition the app already trusts: a Food DB
+ *  catalog match, the user's own saved food, or something they've
+ *  logged before. */
 function LogRow({
   name,
   meta,
@@ -129,6 +143,44 @@ function LogRow({
   );
 }
 
+/** Same shell as LogRow, but the whole row opens REVIEW instead of
+ *  logging instantly — a chevron replaces the "+" so the two are never
+ *  visually confused. Reserved for nutrition that's still an estimate
+ *  (a curated Quick Meal's macros) rather than a known/verified value,
+ *  the same distinction the app already makes for AI estimates. */
+function ReviewRow({
+  name,
+  meta,
+  actionLabel,
+  onOpen,
+}: {
+  name: string;
+  meta: string;
+  actionLabel: string;
+  onOpen: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onOpen}
+      style={styles.reviewRow}
+      accessibilityRole="button"
+      accessibilityLabel={actionLabel}
+    >
+      <View style={styles.logTextBlock}>
+        <Text style={styles.logName} numberOfLines={1}>
+          {name}
+        </Text>
+
+        <Text style={styles.logMeta} numberOfLines={1}>
+          {meta}
+        </Text>
+      </View>
+
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  );
+}
+
 function SectionLabel({ children }: { children: string }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
 }
@@ -136,12 +188,20 @@ function SectionLabel({ children }: { children: string }) {
 /**
  * Description-first logging entry point: one natural-language
  * description drives the optional description provider plus local
- * Food DB precedence into the existing MealSheet review; food-DB search,
- * recent foods, saved foods/meals, and recent meals sit below as
- * secondary shortcuts, with manual / quick-meal entry as quiet footnote
- * links. Quick-log (+) rows save immediately and keep the sheet open for
- * multi-add; review flows (description, manual, quick, saved meal) hand
- * off to the MealSheet pipeline via callbacks.
+ * Food DB precedence into the existing MealSheet review.
+ *
+ * Everything else the user might want lives in ONE shared search box
+ * below it, split into two kinds of result:
+ *   - LogRow (a "+" button, logs immediately): Food DB matches, the
+ *     user's own saved foods, recent foods, recent meals — nutrition
+ *     the app already trusts.
+ *   - ReviewRow (a chevron, opens MealSheet review first): the curated
+ *     Quick Meals catalog and saved MEALS — an estimate or a multi-food
+ *     combination worth a final look before it's logged.
+ * Manual entry sits as a quiet footnote link. There is exactly one
+ * search box and one saved-foods list in the whole app; the Hub's
+ * Saved Foods screen manages the underlying list (add/delete) but
+ * never duplicates this one for logging.
  */
 export function AddMealSheet({
   savedFoods,
@@ -149,8 +209,8 @@ export function AddMealSheet({
   recentFoods,
   onQuickLog,
   onManual,
-  onQuickMeals,
   onResolved,
+  onSelectQuickMeal,
   onPendingChanged,
   onSelectSavedMeal,
   onClose,
@@ -215,6 +275,7 @@ export function AddMealSheet({
       }
 
       onResolved(result.estimate, text);
+
     } finally {
       setProgress(null);
       setResolving(false);
@@ -228,6 +289,17 @@ export function AddMealSheet({
         : [],
     [query],
   );
+
+  const quickMealResults = useMemo(() => {
+    const results = searchQuickMeals(query);
+    // Unfiltered (empty query) results are the ENTIRE catalog — capped
+    // here so it doesn't crowd out saved/recent foods on first open. A
+    // real search is never truncated: every match the user typed for
+    // stays visible.
+    return query.trim()
+      ? results
+      : results.slice(0, FEATURED_QUICK_MEALS);
+  }, [query]);
 
   function logFoodEntry(entry: FoodEntry) {
     const estimate = foodEntryToEstimate(entry);
@@ -300,8 +372,7 @@ export function AddMealSheet({
           editable={!resolving}
           accessibilityLabel="Meal description"
         />
-
-        <Pressable
+         <Pressable
           onPress={handleAnalyze}
           disabled={!canAnalyze}
           style={[
@@ -309,26 +380,24 @@ export function AddMealSheet({
             !canAnalyze && styles.analyzeButtonDisabled,
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Resolve meal description"
+          accessibilityLabel="Analyze description"
         >
-          <View style={styles.analyzeInner}>
-            <Text style={styles.analyzeText}>
-              {resolving ? "Resolving…" : "Analyze"}
-            </Text>
-          </View>
+          {resolving && progress ? (
+            <View style={styles.analyzeInner}>
+              <NutritionProcessingProgress
+                label={progress.label}
+                detail={progress.detail}
+                current={progress.stageIndex + 1}
+                total={RESOLUTION_STAGES.length}
+              />
+              <Text style={styles.analyzeText}>
+                {progress.label} — {progress.detail}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.analyzeText}>Analyze</Text>
+          )}
         </Pressable>
-
-        {resolving && progress && (
-          <NutritionProcessingProgress
-            label={progress.label}
-            detail={`${progress.detail} · Step ${
-              progress.stageIndex + 1
-            } of ${RESOLUTION_STAGES.length}`}
-            current={progress.current}
-            total={progress.total}
-            status="active"
-          />
-        )}
       </View>
 
       <TextInput
@@ -368,33 +437,61 @@ export function AddMealSheet({
           </View>
         )}
 
+        {quickMealResults.length > 0 && (
+          <View style={styles.section}>
+            <SectionLabel>Quick meals</SectionLabel>
+
+            {quickMealResults.map((meal) => {
+              const input = mealInputFromEstimate(meal);
+
+              return (
+                <ReviewRow
+                  key={input.name}
+                  name={input.name}
+                  meta={formatMacros(input)}
+                  actionLabel={`Review ${input.name}`}
+                  onOpen={() => onSelectQuickMeal(meal)}
+                />
+              );
+            })}
+          </View>
+        )}
+
         {savedFoods.length > 0 && (
           <View style={styles.section}>
             <SectionLabel>Saved foods & meals</SectionLabel>
 
-            {savedFoods.map((food) => (
-              <LogRow
-                key={food.id}
-                name={food.name}
-                meta={formatMacros(food)}
-                actionLabel={`Log ${food.name}`}
-                onLog={() =>
-                  // Saved meals open review from stored nutrition
-                  // (offline, S4); individual foods quick-log their
-                  // stored values directly, never through the Food DB.
-                  isSavedMeal(food)
-                    ? onSelectSavedMeal(food)
-                    : onQuickLog({
-                        name: food.name,
-                        calories: food.calories,
-                        protein: food.protein,
-                        carbs: food.carbs,
-                        fat: food.fat,
-                        ...pickMicronutrients(food),
-                      })
-                }
-              />
-            ))}
+            {savedFoods.map((food) =>
+              // Saved meals open review from stored nutrition (offline,
+              // S4); individual foods quick-log their stored values
+              // directly, never through the Food DB.
+              isSavedMeal(food) ? (
+                <ReviewRow
+                  key={food.id}
+                  name={food.name}
+                  meta={formatMacros(food)}
+                  actionLabel={`Review ${food.name}`}
+                  onOpen={() => onSelectSavedMeal(food)}
+                />
+              ) : (
+                <LogRow
+                  key={food.id}
+                  name={food.name}
+                  meta={formatMacros(food)}
+                  actionLabel={`Log ${food.name}`}
+                  onLog={() =>
+                    onQuickLog({
+                      name: food.name,
+                      calories: food.calories,
+                      protein: food.protein,
+                      carbs: food.carbs,
+                      fat: food.fat,
+                      ...pickMicronutrients(food),
+                    })
+                  }
+                />
+              ),
+            )}
           </View>
         )}
 
@@ -442,15 +539,6 @@ export function AddMealSheet({
           accessibilityLabel="Build a meal manually"
         >
           <Text style={styles.footnoteText}>Build manually</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={onQuickMeals}
-          style={styles.footnoteLink}
-          accessibilityRole="button"
-          accessibilityLabel="Pick a quick meal"
-        >
-          <Text style={styles.footnoteText}>Quick meals</Text>
         </Pressable>
       </View>
     </View>
@@ -572,7 +660,6 @@ const styles = StyleSheet.create({
   },
 
   scroll: {
-    flex: 1,
   },
 
   scrollContent: {
@@ -603,6 +690,16 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.three,
   },
 
+  reviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+    backgroundColor: GymColors.background.card,
+    borderRadius: Radius.medium,
+    paddingLeft: Spacing.three,
+    paddingRight: Spacing.three,
+  },
+
   logTextBlock: {
     flex: 1,
     paddingVertical: Spacing.two,
@@ -631,5 +728,11 @@ const styles = StyleSheet.create({
     color: GymColors.text.primary,
     fontSize: 24,
     fontWeight: "600",
+  },
+
+  chevron: {
+    color: GymColors.text.tertiary,
+    fontSize: 22,
+    fontWeight: "300",
   },
 });

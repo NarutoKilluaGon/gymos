@@ -4,8 +4,8 @@
  * Static, zero-dependency catalog of common foods with estimated macros
  * per stated portion. Bundled at build time, so search/selection works
  * fully offline. Used for:
- *   - manual food selection (QuickMealPickerSheet "Food database" section)
- *   - the Add Food sheet search + the meal review's food resolver (S6A)
+ *   - the Add Food sheet search (also serves AddMealSheet's inline
+ *     Quick Meals section) + the meal review's food resolver (S6A)
  *
  * All values are rough ESTIMATES for the stated portion, in the same
  * spirit as QUICK_MEALS in meal-estimator.ts — including micronutrients,

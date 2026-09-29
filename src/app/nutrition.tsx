@@ -22,8 +22,8 @@ import { AddMealSheet } from "@/components/nutrition/add-meal-sheet";
 import { DayTimeline } from "@/components/nutrition/day-timeline";
 import { NutritionSummaryCard } from "@/components/nutrition/nutrition-summary-card";
 import { PendingDescriptionSection } from "@/components/nutrition/pending-description-section";
-import { QuickMealPickerSheet } from "@/components/nutrition/quick-meal-picker-sheet";
 import { NutritionTargetsSheet } from "@/components/dashboard/nutrition-targets-sheet";
+import { planReviewHandoff } from "@/services/review-handoff";
 import {
   MealSheet,
   type MealInput,
@@ -104,7 +104,6 @@ export default function NutritionScreen() {
   const [mealSheetOpen, setMealSheetOpen] = useState(false);
   const [addMealOpen, setAddMealOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [quickPickOpen, setQuickPickOpen] = useState(false);
   // S7 targets sheet, exposed directly from Nutrition (§10): same sheet
   // the home tab uses — one implementation, one stored record.
   const [targetsSheetOpen, setTargetsSheetOpen] = useState(false);
@@ -283,29 +282,20 @@ export default function NutritionScreen() {
       pendingId?: string,
       description?: string,
     ) => {
-      const availability = reviewAvailabilityRef.current;
+      const plan = planReviewHandoff({
+        availability: reviewAvailabilityRef.current,
+        handoffInFlight: pendingReviewHandoffRef.current,
+        pendingId,
+        description,
+      });
 
-      if (
-        !availability.screenMounted ||
-        !availability.nutritionEnabled ||
-        availability.mealSheetOpen ||
-        pendingReviewHandoffRef.current
-      ) {
-        return;
-      }
-
-      if (
-        pendingId &&
-        !canPresentPendingDescriptionReview(availability)
-      ) {
+      if (!plan.open) {
         return;
       }
 
       setEstimatedMeal(estimate);
-      setPendingReviewId(pendingId ?? null);
-      setPendingReviewDescription(
-        pendingId ? null : description?.trim() || null,
-      );
+      setPendingReviewId(plan.pendingReviewId);
+      setPendingReviewDescription(plan.pendingReviewDescription);
       setAddMealOpen(false);
       setMealSheetOpen(true);
     },
@@ -568,9 +558,13 @@ export default function NutritionScreen() {
     }
   }
 
+  /** A quick-meal catalog pick is a single-food ESTIMATE, not the user's
+   *  own verified nutrition — it opens the same review pipeline a saved
+   *  MEAL or a resolved description would, rather than quick-logging
+   *  directly. Now reached inline from AddMealSheet's own "Quick meals"
+   *  section (folded in — no separate picker sheet). */
   function handleQuickPickSelect(meal: MealEstimate) {
     setEstimatedMeal(meal);
-    setQuickPickOpen(false);
     setAddMealOpen(false);
     setMealSheetOpen(true);
   }
@@ -708,24 +702,6 @@ export default function NutritionScreen() {
       </Pressable>
 
       <Modal
-        visible={quickPickOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setQuickPickOpen(false)}
-      >
-        <View style={styles.modal}>
-          <Pressable
-            style={styles.backdrop}
-            onPress={() => setQuickPickOpen(false)}
-          />
-          <QuickMealPickerSheet
-            onSelect={handleQuickPickSelect}
-            onClose={() => setQuickPickOpen(false)}
-          />
-        </View>
-      </Modal>
-
-      <Modal
         visible={addMealOpen}
         transparent
         animationType="slide"
@@ -742,8 +718,10 @@ export default function NutritionScreen() {
             recentFoods={recentFoods}
             onQuickLog={handleQuickLog}
             onManual={handleManualMeal}
-            onQuickMeals={() => setQuickPickOpen(true)}
-            onResolved={handleResolvedFoods}
+            onSelectQuickMeal={handleQuickPickSelect}
+            onResolved={(estimate, description) =>
+              handleResolvedFoods(estimate, undefined, description)
+            }
             onPendingChanged={refreshPendingDescriptions}
             onSelectSavedMeal={handleSelectSavedMeal}
             onClose={() => setAddMealOpen(false)}
