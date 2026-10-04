@@ -60,7 +60,8 @@ export function TodayView({
   const cardio = data.cardio[dateKey] ?? [];
   const others = (plan?.days ?? []).filter((day) => day.id !== planned?.id);
   const lastWeek = completedSessions(data.sessions).filter((session) => {
-    const age = (Date.now() - dateFromKey(sessionDate(session)).getTime()) / 864e5;
+    // todayKey (not Date.now()) keeps render pure and rolls over at midnight.
+    const age = (dateFromKey(todayKey).getTime() - dateFromKey(sessionDate(session)).getTime()) / 864e5;
 
     return age < 7;
   }).length;
@@ -124,7 +125,7 @@ export function TodayView({
         <Pressable key={session.id} accessibilityRole="button" onPress={() => { tap(); onOpen(session); }}>
           <FCard style={s.card}>
             <Text style={s.meta}>
-              {`Done · ${session.backdated ? "logged" : formatClock(durationMs(session, Date.now()))}`}
+              {`Done · ${session.backdated ? "logged" : formatClock(durationMs(session, 0))}`}
             </Text>
             <Text style={s.bigName}>{session.name}</Text>
             <Text style={s.meta}>

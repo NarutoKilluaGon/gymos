@@ -90,7 +90,7 @@ export async function deleteMeasurement(
   const deleted = await withDailyLock(async () => {
     const data = await readAllDailyActivitiesUnlocked();
 
-    for (const [dayKey, activity] of Object.entries(data)) {
+    for (const activity of Object.values(data)) {
       if (!Array.isArray(activity.measurements)) {
         continue;
       }

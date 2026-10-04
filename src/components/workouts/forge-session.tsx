@@ -245,12 +245,16 @@ export function ForgeSession({
     return () => clearInterval(timer);
   }, []);
 
+  // True once the rest countdown has run out. The effect fires only on the
+  // false -> true edge, so the haptic plays once per rest; `restLeft` is 0
+  // after expiry, which already hides the rest UI.
+  const restDone = restEnd !== null && now >= restEnd;
+
   useEffect(() => {
-    if (restEnd !== null && now >= restEnd) {
+    if (restDone) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setRestEnd(null);
     }
-  }, [now, restEnd]);
+  }, [restDone]);
 
   const names = useMemo(() => {
     const out: Record<string, string> = {};

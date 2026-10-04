@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BarChart, LineChart } from "@/components/nutrition/nourish-charts";
@@ -15,6 +15,7 @@ import {
 } from "@/components/nutrition/nourish-ui";
 import { N, NSerif } from "@/constants/nourish-theme";
 import type { useNourish } from "@/hooks/use-nourish";
+import { useTodayKey } from "@/hooks/use-today-key";
 import {
   availableRanges,
   averageOf,
@@ -40,7 +41,6 @@ import {
 } from "@/services/nourish/weight";
 import { buildWeeklyRead } from "@/services/nourish/weekly-read";
 import type { NourishSettings } from "@/types/nourish";
-import { getTodayKey } from "@/utils/date";
 import { showToast } from "@/utils/toast";
 
 type Nourish = ReturnType<typeof useNourish>;
@@ -60,7 +60,7 @@ export function InsightsView({
   onChangeSettings: (patch: Partial<NourishSettings>, description: string) => void;
 }) {
   const { data, records, actions, weightUnit } = nourish;
-  const todayKey = getTodayKey();
+  const todayKey = useTodayKey();
   const [rangeId, setRangeId] = useState<RangeId>("7");
   const [seriesKey, setSeriesKey] = useState<SeriesKey>("protein");
   const [weightText, setWeightText] = useState("");
@@ -71,28 +71,22 @@ export function InsightsView({
   // If the chosen range stops being available, fall back to the shortest.
   const range = ranges.find((r) => r.id === rangeId) ?? RANGES[0]!;
 
-  const days = useMemo(
-    () =>
-      records && data
-        ? recentDays(rangeDayCount(range, span), todayKey, records, data.settings)
-        : [],
-    [records, data, range, span, todayKey],
-  );
+  const days =
+    records && data
+      ? recentDays(rangeDayCount(range, span), todayKey, records, data.settings)
+      : [];
   const logged = days.filter((day) => day.totals);
-  const series = useMemo(() => bucketSeries(days, seriesKey), [days, seriesKey]);
-  const { rows, weakest } = useMemo(() => mealByMeal(logged), [logged]);
+  const series = bucketSeries(days, seriesKey);
+  const { rows, weakest } = mealByMeal(logged);
 
-  const read = useMemo(() => {
-    if (!records || !data) return null;
-
-    const fortnight = recentDays(14, todayKey, records, data.settings);
-
-    return buildWeeklyRead({
-      days: fortnight,
-      settings: data.settings,
-      weightSlope: weeklySlope(data.weights.slice(-14)),
-    });
-  }, [records, data, todayKey]);
+  const read =
+    records && data
+      ? buildWeeklyRead({
+          days: recentDays(14, todayKey, records, data.settings),
+          settings: data.settings,
+          weightSlope: weeklySlope(data.weights.slice(-14)),
+        })
+      : null;
 
   if (!data) return <Text style={s.mute}>Loading…</Text>;
 
