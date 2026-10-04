@@ -3,6 +3,7 @@ import {
   recomputeSessionPrs,
   sortKey,
 } from "@/services/forge/history";
+import type { DailyData } from "@/storage/constants";
 import { appendEvent } from "@/storage/events";
 import { createMutex } from "@/storage/mutex";
 import { getWeightUnit } from "@/storage/repositories/preferences";
@@ -19,9 +20,8 @@ import { dateKeyFromTimestamp, getTodayKey } from "@/utils/date";
 const sessionDate = (session: WorkoutSession): string =>
   session.date ?? dateKeyFromTimestamp(session.startedAt) ?? getTodayKey();
 
-/** Every session, newest first. Legacy sessions get their `date` filled in. */
-export async function getAllSessions(): Promise<WorkoutSession[]> {
-  const data = await withDailyLock(readAllDailyActivitiesUnlocked);
+/** Every session in `data`, newest first. Legacy sessions get their `date` filled in. */
+function sessionsFrom(data: DailyData): WorkoutSession[] {
   const all: WorkoutSession[] = [];
 
   for (const [bucket, activity] of Object.entries(data)) {
@@ -38,6 +38,11 @@ export async function getAllSessions(): Promise<WorkoutSession[]> {
     (a, b) =>
       new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   );
+}
+
+/** Every session, newest first. Legacy sessions get their `date` filled in. */
+export async function getAllSessions(): Promise<WorkoutSession[]> {
+  return sessionsFrom(await withDailyLock(readAllDailyActivitiesUnlocked));
 }
 
 /** Keeps two PR re-derivations from interleaving; each reads fresh data. */
@@ -102,6 +107,58 @@ export async function getActiveSession(): Promise<WorkoutSession | null> {
 }
 
 /**
+ * The locked part of `saveSession`: move/replace/insert `saved` in the daily
+ * store. Caller must already hold the daily lock (see `withDailyLock`).
+ */
+async function writeSessionUnlocked(
+  saved: WorkoutSession,
+): Promise<{ previous: WorkoutSession | undefined }> {
+  const date = saved.date ?? sessionDate(saved);
+  const data = await readAllDailyActivitiesUnlocked();
+  let previous: WorkoutSession | undefined;
+  let previousBucket: string | undefined;
+
+  for (const [bucket, activity] of Object.entries(data)) {
+    const found = (activity.workouts ?? []).find(
+      (item) => item?.id === saved.id,
+    );
+
+    if (found) {
+      previous = found;
+      previousBucket = bucket;
+      break;
+    }
+  }
+
+  if (previousBucket && previousBucket !== date) {
+    const old = await readDailyActivityUnlocked(previousBucket);
+
+    old.workouts = old.workouts.filter((item) => item.id !== saved.id);
+    await writeDailyActivityUnlocked(old);
+  }
+
+  const activity = await readDailyActivityUnlocked(date);
+  const index = activity.workouts.findIndex((item) => item.id === saved.id);
+
+  if (index >= 0) {
+    activity.workouts[index] = saved;
+  } else {
+    activity.workouts.push(saved);
+  }
+
+  await writeDailyActivityUnlocked(activity);
+
+  return { previous };
+}
+
+const appendStarted = (saved: WorkoutSession) =>
+  appendEvent("workout.started", {
+    workoutId: saved.id,
+    name: saved.name,
+    ...(saved.routineId ? { routineId: saved.routineId } : {}),
+  });
+
+/**
  * Insert or replace a session (matched by id, in any day). The day bucket
  * follows `session.date`. Events are appended once: `workout.started` the
  * first time the id is seen, `workout.finished` the first time `endedAt`
@@ -113,51 +170,9 @@ export async function saveSession(
   const date = sessionDate(session);
   const saved: WorkoutSession = { ...session, date };
 
-  const outcome = await withDailyLock(async () => {
-    const data = await readAllDailyActivitiesUnlocked();
-    let previous: WorkoutSession | undefined;
-    let previousBucket: string | undefined;
+  const outcome = await withDailyLock(() => writeSessionUnlocked(saved));
 
-    for (const [bucket, activity] of Object.entries(data)) {
-      const found = (activity.workouts ?? []).find(
-        (item) => item?.id === saved.id,
-      );
-
-      if (found) {
-        previous = found;
-        previousBucket = bucket;
-        break;
-      }
-    }
-
-    if (previousBucket && previousBucket !== date) {
-      const old = await readDailyActivityUnlocked(previousBucket);
-
-      old.workouts = old.workouts.filter((item) => item.id !== saved.id);
-      await writeDailyActivityUnlocked(old);
-    }
-
-    const activity = await readDailyActivityUnlocked(date);
-    const index = activity.workouts.findIndex((item) => item.id === saved.id);
-
-    if (index >= 0) {
-      activity.workouts[index] = saved;
-    } else {
-      activity.workouts.push(saved);
-    }
-
-    await writeDailyActivityUnlocked(activity);
-
-    return { previous };
-  });
-
-  if (!outcome.previous) {
-    await appendEvent("workout.started", {
-      workoutId: saved.id,
-      name: saved.name,
-      ...(saved.routineId ? { routineId: saved.routineId } : {}),
-    });
-  }
+  if (!outcome.previous) await appendStarted(saved);
 
   if (saved.endedAt && !outcome.previous?.endedAt) {
     await appendEvent("workout.finished", {
@@ -182,6 +197,36 @@ export async function saveSession(
   }
 
   return saved;
+}
+
+/**
+ * Start a new session unless one is already running. The check and the
+ * insert happen under one daily lock, so any number of concurrent calls
+ * (a double-tapped Start, two screens) leave exactly one unfinished session:
+ * the first creates `session`, the rest get that same running session back
+ * with `created: false` and write nothing. `session` must be unfinished.
+ */
+export async function createSessionIfNoneActive(
+  session: WorkoutSession,
+): Promise<{ session: WorkoutSession; created: boolean }> {
+  const date = sessionDate(session);
+  const saved: WorkoutSession = { ...session, date };
+
+  const outcome = await withDailyLock(async () => {
+    const running = sessionsFrom(await readAllDailyActivitiesUnlocked()).find(
+      (item) => !item.endedAt,
+    );
+
+    if (running) return { session: running, created: false };
+
+    await writeSessionUnlocked(saved);
+
+    return { session: saved, created: true };
+  });
+
+  if (outcome.created) await appendStarted(saved);
+
+  return outcome;
 }
 
 export async function deleteSession(id: string): Promise<boolean> {

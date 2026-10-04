@@ -24,6 +24,7 @@ import {
 } from "@/storage/repositories/forge-settings";
 import { getMeasurements } from "@/storage/repositories/measurements";
 import {
+  createSessionIfNoneActive,
   deleteSession,
   getAllSessions,
   saveSession,
@@ -145,7 +146,8 @@ export function useForge() {
         });
 
         try {
-          const saved = await saveSession(session);
+          // Atomic: a second Start while one is running gets that session.
+          const { session: saved } = await createSessionIfNoneActive(session);
 
           await reload();
 
