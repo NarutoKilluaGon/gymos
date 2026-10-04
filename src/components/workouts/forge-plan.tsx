@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { NumberField } from "@/components/workouts/forge-session";
+import {
+  DraftScope,
+  NumberField,
+  type DraftRegistry,
+} from "@/components/workouts/forge-session";
 import {
   ConfirmSheet,
   ExercisePickerSheet,
@@ -26,7 +30,7 @@ import {
   updatePlanExercise,
 } from "@/services/forge/plan";
 import { activePlan, MAX_REST_SECONDS } from "@/services/forge/settings";
-import type { CatalogExercise, ForgeSettings, Plan } from "@/types/forge";
+import type { CatalogExercise, ForgeSettings, Plan, PlanExercise } from "@/types/forge";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const REST_CHOICES = [
@@ -44,10 +48,13 @@ export function PlanView({
   unit,
   onSave,
   onCreateExercise,
+  drafts,
 }: {
   data: ForgeData;
   unit: WeightUnit;
   onSave: (change: Change) => Promise<boolean>;
+  /** Lets the parent commit pending number drafts before leaving this tab. */
+  drafts?: DraftRegistry;
   onCreateExercise: (
     name: string,
     muscle: MuscleGroup,
@@ -75,6 +82,15 @@ export function PlanView({
     }));
   };
 
+  /** Edit one exercise row, but only if that row is still the same
+   *  exercise (a draft for a removed row must not hit its neighbour). */
+  const editRow = (dayId: string, index: number, exerciseId: string, patch: Partial<PlanExercise>) =>
+    edit((current, now) =>
+      current.days.find((entry) => entry.id === dayId)?.exercises[index]?.exerciseId === exerciseId
+        ? updatePlanExercise(current, dayId, index, patch, now)
+        : current,
+    );
+
   const create = (template: string | null, name: string) => {
     const made =
       (template ? planFromTemplate(template, catalog) : null) ?? newPlan(name);
@@ -89,6 +105,7 @@ export function PlanView({
   };
 
   return (
+    <DraftScope value={drafts ?? null}>
     <View style={s.root}>
       <View style={s.pills}>
         {settings.plans.map((entry) => (
@@ -186,7 +203,7 @@ export function PlanView({
                       label={`${exercise.name} sets`}
                       value={exercise.sets}
                       placeholder="sets"
-                      onCommit={(sets) => edit((current, now) => updatePlanExercise(current, day.id, index, { sets: Math.min(20, Math.max(1, sets || 1)) }, now))}
+                      onCommit={(sets) => editRow(day.id, index, exercise.exerciseId, { sets: Math.min(20, Math.max(1, sets || 1)) })}
                     />
                     <Text style={s.times}>×</Text>
                     <TextInput
@@ -204,7 +221,7 @@ export function PlanView({
                       decimal
                       value={exercise.weight ? round1(convert(exercise.weight, "kg", unit)) : undefined}
                       placeholder={unit}
-                      onCommit={(value) => edit((current, now) => updatePlanExercise(current, day.id, index, { weight: Math.max(0, toKg(value, unit)) }, now))}
+                      onCommit={(value) => editRow(day.id, index, exercise.exerciseId, { weight: Math.max(0, toKg(value, unit)) })}
                     />
                   </View>
                   <View style={s.rowActions}>
@@ -288,6 +305,7 @@ export function PlanView({
         }}
       />
     </View>
+    </DraftScope>
   );
 }
 

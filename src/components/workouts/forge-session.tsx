@@ -1,5 +1,14 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   Pressable,
   ScrollView,
@@ -42,7 +51,39 @@ import { durationMs, formatClock, pause, resume } from "@/services/forge/timing"
 import type { CatalogExercise } from "@/types/forge";
 import type { SessionPr, WorkoutSession } from "@/types/gymos";
 
-/** Number input that keeps what you type and commits when you leave it. */
+/**
+ * The NumberFields on a screen register here so the screen can commit every
+ * pending draft synchronously (before it flushes or finishes), instead of
+ * waiting for a blur or an unmount that may come too late.
+ */
+export type DraftRegistry = {
+  register: (commit: () => void) => () => void;
+  flushAll: () => void;
+};
+
+export function createDraftRegistry(): DraftRegistry {
+  const fields = new Set<() => void>();
+
+  return {
+    register: (commit) => {
+      fields.add(commit);
+
+      return () => {
+        fields.delete(commit);
+      };
+    },
+    flushAll: () => {
+      for (const commit of [...fields]) commit();
+    },
+  };
+}
+
+const DraftContext = createContext<DraftRegistry | null>(null);
+
+export const DraftScope = DraftContext.Provider;
+
+/** Number input that keeps what you type and commits when you leave it, or
+ *  when its screen asks for pending drafts to be flushed. */
 export function NumberField({
   value,
   placeholder,
@@ -57,21 +98,43 @@ export function NumberField({
   onCommit: (next: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  // The ref is the source of truth for "is there a pending draft": it is
+  // read by flush/blur/unmount, which can run before a re-render.
+  const draftRef = useRef<string | null>(null);
+  const onCommitRef = useRef(onCommit);
+  const decimalRef = useRef(decimal);
+  const registry = useContext(DraftContext);
   const shown = draft ?? (value ? String(round1(value)) : "");
 
-  const commit = () => {
-    if (draft === null) return;
+  useEffect(() => {
+    onCommitRef.current = onCommit;
+    decimalRef.current = decimal;
+  });
 
-    const parsed = Number(draft.replace(",", "."));
+  // Clears the draft before committing, so a blur, an endEditing and a
+  // flush that all land for the same draft commit it exactly once.
+  const commit = useCallback(() => {
+    const text = draftRef.current;
 
+    if (text === null) return;
+
+    draftRef.current = null;
     setDraft(null);
 
-    if (draft.trim() === "") {
-      onCommit(0);
+    const parsed = Number(text.replace(",", "."));
+
+    if (text.trim() === "") {
+      onCommitRef.current(0);
     } else if (Number.isFinite(parsed)) {
-      onCommit(decimal ? parsed : Math.max(0, Math.round(parsed)));
+      onCommitRef.current(decimalRef.current ? parsed : Math.max(0, Math.round(parsed)));
     }
-  };
+  }, []);
+
+  useEffect(() => registry?.register(commit), [registry, commit]);
+
+  // Final safety net. Consumers commit by identity (not position), so a
+  // field whose row was removed commits to nothing.
+  useEffect(() => commit, [commit]);
 
   return (
     <TextInput
@@ -81,13 +144,33 @@ export function NumberField({
       placeholderTextColor={F.dim}
       selectionColor={F.acc}
       keyboardType={decimal ? "decimal-pad" : "number-pad"}
-      onChangeText={setDraft}
+      onChangeText={(text) => {
+        draftRef.current = text;
+        setDraft(text);
+      }}
       onBlur={commit}
       onEndEditing={commit}
       selectTextOnFocus
       style={s.input}
     />
   );
+}
+
+/** Set a set's values by id. A set that is gone (removed while its field was
+ *  focused) is a no-op, so a stale draft can't land on a neighbour. */
+function setValuesById(
+  session: WorkoutSession,
+  exerciseId: string,
+  setId: string,
+  values: { weight?: number; reps?: number },
+): WorkoutSession {
+  const exerciseIndex = session.exercises.findIndex((entry) => entry.id === exerciseId);
+  const setIndex =
+    session.exercises[exerciseIndex]?.sets.findIndex((entry) => entry.id === setId) ?? -1;
+
+  return exerciseIndex < 0 || setIndex < 0
+    ? session
+    : setSetValues(session, exerciseIndex, setIndex, values, new Date());
 }
 
 type SheetState =
@@ -129,6 +212,7 @@ export function ForgeSession({
     data.sessions,
     unit,
   );
+  const [drafts] = useState(createDraftRegistry);
   const [sheet, setSheet] = useState<SheetState>({ kind: "none" });
   const [now, setNow] = useState(() => Date.now());
   const [restEnd, setRestEnd] = useState<number | null>(null);
@@ -140,13 +224,20 @@ export function ForgeSession({
   const finished = Boolean(session.endedAt);
   const paused = Boolean(session.pausedAt);
 
+  // What the parent awaits before leaving: commit typed-but-uncommitted
+  // fields into the session first, then drain the save queue.
+  const flushAll = useCallback(async () => {
+    drafts.flushAll();
+    await flush();
+  }, [drafts, flush]);
+
   useEffect(() => {
-    flushRef.current = flush;
+    flushRef.current = flushAll;
 
     return () => {
-      if (flushRef.current === flush) flushRef.current = null;
+      if (flushRef.current === flushAll) flushRef.current = null;
     };
-  }, [flush, flushRef]);
+  }, [flushAll, flushRef]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -192,6 +283,8 @@ export function ForgeSession({
   };
 
   const finishWith = async (mode: "keep" | "complete" | "drop") => {
+    // Typed values must be in the session before it is finished and judged.
+    drafts.flushAll();
     setSheet({ kind: "none" });
 
     if (mode !== "keep") {
@@ -253,6 +346,7 @@ export function ForgeSession({
     : undefined;
 
   return (
+    <DraftScope value={drafts}>
     <View style={s.root}>
       <View style={s.bar}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => { tap(); onClose(); }} style={s.back}>
@@ -363,14 +457,14 @@ export function ForgeSession({
                       decimal
                       value={set.weight}
                       placeholder={ref ? String(round1(ref.weight ?? 0)) : exercise.bodyweight ? "+0" : set.unit ?? unit}
-                      onCommit={(weight) => update((current) => setSetValues(current, index, setIndex, { weight }, new Date()))}
+                      onCommit={(weight) => update((current) => setValuesById(current, exercise.id, set.id, { weight }))}
                     />
                     <Text style={s.times}>{`${set.unit ?? unit} ×`}</Text>
                     <NumberField
                       label={`Set ${setIndex + 1} reps`}
                       value={set.reps}
                       placeholder={ref ? String(ref.reps) : "reps"}
-                      onCommit={(reps) => update((current) => setSetValues(current, index, setIndex, { reps }, new Date()))}
+                      onCommit={(reps) => update((current) => setValuesById(current, exercise.id, set.id, { reps }))}
                     />
                     <View style={{ flex: 1 }} />
                     <Pressable
@@ -464,6 +558,7 @@ export function ForgeSession({
         onConfirm={() => {
           // Drain pending saves first so one can't land after the delete
           // and bring the workout back.
+          drafts.flushAll();
           void flush()
             .then(() => onDelete(session.id))
             .then((ok) => {
@@ -483,6 +578,7 @@ export function ForgeSession({
         formatPr={(pr) => `${round1(pr.weight)} ${pr.unit}×${pr.reps}`}
       />
     </View>
+    </DraftScope>
   );
 }
 

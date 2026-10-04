@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 
-import { ForgeSession } from "@/components/workouts/forge-session";
+import { createDraftRegistry, ForgeSession } from "@/components/workouts/forge-session";
 import { HistoryView } from "@/components/workouts/forge-history";
 import { PlanView } from "@/components/workouts/forge-plan";
 import { TodayView } from "@/components/workouts/forge-today";
@@ -32,6 +32,8 @@ export function ForgeApp() {
   const { data, unit, actions, reload } = forge;
   const flushRef = useRef<(() => Promise<void>) | null>(null);
   const closing = useRef(false);
+  // Number fields on the Plan tab; committed before the tab is left.
+  const [planDrafts] = useState(createDraftRegistry);
 
   /**
    * Leave the open session. The session's save queue is drained first, so the
@@ -104,7 +106,14 @@ export function ForgeApp() {
         <Text style={s.eyebrow}>FORGE</Text>
         <Text style={s.title}>Workouts</Text>
         <View style={s.tabs}>
-          <Seg options={TABS} value={tab} onChange={setTab} />
+          <Seg
+            options={TABS}
+            value={tab}
+            onChange={(next) => {
+              planDrafts.flushAll();
+              setTab(next);
+            }}
+          />
         </View>
 
         {tab === "today" ? (
@@ -129,6 +138,7 @@ export function ForgeApp() {
             unit={unit}
             onSave={actions.saveSettings}
             onCreateExercise={actions.addCustom}
+            drafts={planDrafts}
           />
         ) : null}
         {tab === "history" ? <HistoryView data={data} unit={unit} onOpen={(session) => void openSession(session)} /> : null}
