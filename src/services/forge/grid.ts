@@ -1,4 +1,4 @@
-import { finishedSessions, sessionDate } from "@/services/forge/history";
+import { completedSessions, sessionDate } from "@/services/forge/history";
 import {
   bestSet,
   formatSet,
@@ -28,7 +28,7 @@ export function historyGrid(
   unit: WeightUnit,
   limit = 8,
 ): { columns: GridColumn[]; rows: GridRow[] } {
-  const recent = finishedSessions(sessions).slice(-limit);
+  const recent = completedSessions(sessions).slice(-limit);
   const columns = recent.map((session) => {
     const date = dateFromKey(sessionDate(session));
 

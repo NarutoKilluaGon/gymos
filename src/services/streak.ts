@@ -1,9 +1,9 @@
-import { isWorkSet } from "@/services/forge/load";
+import { isCompletedWorkout } from "@/services/forge/history";
 import { getAllDailyActivities } from "@/storage/daily";
 import { getMealDateKeys } from "@/storage/repositories/meals";
 import { getCardioMap } from "@/storage/repositories/nourish-cardio";
 import type { CardioMap } from "@/types/nourish";
-import type { DailyActivity, WorkoutSession } from "@/types/gymos";
+import type { DailyActivity } from "@/types/gymos";
 import { addDaysToKey, toDateKey } from "@/utils/date";
 
 export type Streak = {
@@ -13,39 +13,6 @@ export type Streak = {
 
 /** How far back a streak is counted. */
 const MAX_DAYS = 365;
-
-/**
- * A Forge workout counts toward the streak only when it is *completed* by
- * Forge's own rules: it was finished (`endedAt`, the same test History and
- * Today use via `finishedSessions`) and it holds something real — at least
- * one completed non-warm-up set (`isWorkSet`, the same rule volume, PRs and
- * the grid use) or at least one cardio entry. A session that was merely
- * started, reopened, or finished with nothing logged does not count.
- */
-function isCompletedWorkout(workout: WorkoutSession | undefined): boolean {
-  if (!workout || typeof workout !== "object") return false;
-  if (!workout.endedAt) return false;
-
-  const hasWorkSet =
-    Array.isArray(workout.exercises) &&
-    workout.exercises.some(
-      (exercise) =>
-        Array.isArray(exercise?.sets) &&
-        exercise.sets.some((set) => Boolean(set) && isWorkSet(set)),
-    );
-
-  if (hasWorkSet) return true;
-
-  return (
-    Array.isArray(workout.cardio) &&
-    workout.cardio.some(
-      (entry) =>
-        Boolean(entry) &&
-        Number.isFinite(entry.durationMin) &&
-        entry.durationMin > 0,
-    )
-  );
-}
 
 /**
  * `hasMeals` comes from the dedicated meals store, not `activity.meals`

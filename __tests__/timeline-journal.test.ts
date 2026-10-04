@@ -20,6 +20,9 @@ const dayOf = (item: TimelineItem): string | null =>
 const workouts = (items: TimelineItem[]) =>
   items.filter((item) => item.kind === "workout");
 
+/** A completed work set: a finished workout needs one to be a "workout". */
+const workSet = { id: "s1", reps: 5, weight: 60, completed: true };
+
 /** A finished session in the shape Forge stores it. Times are local. */
 const done = (
   id: string,
@@ -36,7 +39,7 @@ const done = (
     endedAt: new Date(y!, m! - 1, d!, 19, 0, 0).toISOString(),
     durationMs: 3_600_000,
     exercises: [
-      { id: "e1", exerciseId: "bench", name: "Bench", sets: [] },
+      { id: "e1", exerciseId: "bench", name: "Bench", sets: [workSet] },
     ],
     ...extra,
   };
@@ -52,7 +55,9 @@ describe("timeline: entries sit on the workout's date, not the log time", () => 
     const backdated = buildSession({
       name: "Upper",
       date: PAST,
-      exercises: [],
+      exercises: [
+        { id: "e1", exerciseId: "bench", name: "Bench", sets: [workSet] },
+      ],
       backdated: true,
     });
     const { session } = finish(backdated, new Date());
@@ -141,8 +146,8 @@ describe("timeline: editing a workout updates its entry", () => {
       done("r", PAST, {
         name: "Upper B",
         exercises: [
-          { id: "e1", exerciseId: "bench", name: "Bench", sets: [] },
-          { id: "e2", exerciseId: "row", name: "Row", sets: [] },
+          { id: "e1", exerciseId: "bench", name: "Bench", sets: [workSet] },
+          { id: "e2", exerciseId: "row", name: "Row", sets: [workSet] },
         ],
       }),
     );

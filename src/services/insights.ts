@@ -1,3 +1,4 @@
+import { isCompletedWorkout } from "@/services/forge/history";
 import { sessionVolumeKg } from "@/services/forge/load";
 import { getAllDailyActivities } from "@/storage/daily";
 import { getAllMeals } from "@/storage/repositories/meals";
@@ -99,7 +100,7 @@ export async function getHeatmap(
 
   for (const activity of Object.values(data)) {
     const completed = (activity.workouts ?? []).filter(
-      (workout) => workout.endedAt !== undefined,
+      isCompletedWorkout,
     ).length;
 
     if (completed > 0) {
@@ -181,7 +182,7 @@ export async function getWeekInsights(): Promise<WeekInsights> {
     }
 
     const completedWorkouts = (activity.workouts ?? []).filter(
-      (workout) => workout.endedAt !== undefined,
+      isCompletedWorkout,
     );
 
     if (completedWorkouts.length > 0) {
@@ -348,7 +349,7 @@ export async function getMonthlySummaries(
       };
 
     const completedWorkouts = (activity.workouts ?? []).filter(
-      (workout) => workout.endedAt !== undefined,
+      isCompletedWorkout,
     );
 
     if (completedWorkouts.length > 0) {

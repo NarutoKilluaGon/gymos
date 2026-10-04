@@ -5,7 +5,7 @@ import { CardioSheet } from "@/components/nutrition/more-sheets";
 import { Button, FCard, Label, Pill, fmtInt, tap } from "@/components/workouts/forge-ui";
 import { F, FSerif } from "@/constants/forge-theme";
 import type { ForgeData } from "@/hooks/use-forge";
-import { finishedSessions, sessionDate } from "@/services/forge/history";
+import { completedSessions, sessionDate } from "@/services/forge/history";
 import { formatSets, fromKg, sessionVolumeKg } from "@/services/forge/load";
 import { dayFor } from "@/services/forge/plan";
 import { activePlan } from "@/services/forge/settings";
@@ -50,12 +50,12 @@ export function TodayView({
   const plan = activePlan(data.settings) ?? undefined;
   const planned = dayFor(plan, dateKey, todayKey, data.sessions);
   const active = data.sessions.find((session) => !session.endedAt);
-  const done = finishedSessions(data.sessions).filter(
+  const done = completedSessions(data.sessions).filter(
     (session) => sessionDate(session) === dateKey,
   );
   const cardio = data.cardio[dateKey] ?? [];
   const others = (plan?.days ?? []).filter((day) => day.id !== planned?.id);
-  const lastWeek = finishedSessions(data.sessions).filter((session) => {
+  const lastWeek = completedSessions(data.sessions).filter((session) => {
     const age = (Date.now() - dateFromKey(sessionDate(session)).getTime()) / 864e5;
 
     return age < 7;

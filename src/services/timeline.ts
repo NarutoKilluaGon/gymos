@@ -1,4 +1,4 @@
-import { sessionDate } from "@/services/forge/history";
+import { isCompletedWorkout, sessionDate } from "@/services/forge/history";
 import { getEvents } from "@/storage/events";
 import { getAllJournalEntries } from "@/storage/repositories/journal";
 import { getAllSessions } from "@/storage/repositories/workout-sessions";
@@ -302,10 +302,11 @@ export async function getTimeline(): Promise<TimelineItem[]> {
     .filter((event) => {
       if (event.type !== "workout.finished") return true;
 
-      // A workout that has been reopened is not finished any more.
+      // A workout that has been reopened, or finished with nothing logged,
+      // is not a completed workout (same rule as streak/History/Insights).
       const stored = sessionsById.get(event.payload.workoutId);
 
-      return !stored || Boolean(stored.endedAt);
+      return !stored || isCompletedWorkout(stored);
     })
     .map((event) => {
       if (event.type === "workout.finished") {

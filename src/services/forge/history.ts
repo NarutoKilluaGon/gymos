@@ -1,5 +1,6 @@
 import {
   bestSet,
+  isWorkSet,
   score,
   workSets,
   type WeightUnit,
@@ -35,10 +36,58 @@ export const sortSessions = (
     return left < right ? -1 : left > right ? 1 : 0;
   });
 
+/**
+ * Sessions that have an `endedAt`, in chronological order. "Finished" is a
+ * lifecycle fact only: a finished session may hold nothing (no completed
+ * work, warm-ups only). Use it where the lifecycle is what matters (PR
+ * derivation and ordering). Anything that *counts or lists workouts* must use
+ * `completedSessions` / `isCompletedWorkout` instead.
+ */
 export const finishedSessions = (
   sessions: readonly WorkoutSession[],
 ): WorkoutSession[] =>
   sortSessions(sessions.filter((session) => session.endedAt));
+
+/**
+ * The one definition of a *completed* workout, shared by every consumer that
+ * counts workouts (streak, heatmap, weekly/monthly stats, History,
+ * Today, Timeline). It was finished (`endedAt`) AND holds something real: at
+ * least one completed non-warm-up set (`isWorkSet`, the rule volume, PRs and
+ * the grid use) or meaningful cardio (an entry with a positive duration).
+ * Merely started, reopened, warm-up-only or empty sessions do not count.
+ * Tolerates malformed stored records (missing arrays) by reading them as empty.
+ */
+export function isCompletedWorkout(
+  workout: WorkoutSession | undefined,
+): boolean {
+  if (!workout || typeof workout !== "object") return false;
+  if (!workout.endedAt) return false;
+
+  const hasWorkSet =
+    Array.isArray(workout.exercises) &&
+    workout.exercises.some(
+      (exercise) =>
+        Array.isArray(exercise?.sets) &&
+        exercise.sets.some((set) => Boolean(set) && isWorkSet(set)),
+    );
+
+  if (hasWorkSet) return true;
+
+  return (
+    Array.isArray(workout.cardio) &&
+    workout.cardio.some(
+      (entry) =>
+        Boolean(entry) &&
+        Number.isFinite(entry.durationMin) &&
+        entry.durationMin > 0,
+    )
+  );
+}
+
+/** Completed workouts (see `isCompletedWorkout`), in chronological order. */
+export const completedSessions = (
+  sessions: readonly WorkoutSession[],
+): WorkoutSession[] => sortSessions(sessions.filter(isCompletedWorkout));
 
 /** Finished sessions strictly before `session`, oldest first. */
 export function sessionsBefore(
@@ -238,13 +287,13 @@ export function recomputeSessionPrs(
   return changes;
 }
 
-/** Finished sessions in the window of the last `days` days. */
+/** Completed workouts in the window of the last `days` days. */
 export function sessionsInLast(
   sessions: readonly WorkoutSession[],
   days: number,
   now: Date,
 ): WorkoutSession[] {
-  return finishedSessions(sessions).filter((session) => {
+  return completedSessions(sessions).filter((session) => {
     const day = new Date(`${sessionDate(session)}T12:00:00`).getTime();
 
     return (now.getTime() - day) / 86_400_000 < days;

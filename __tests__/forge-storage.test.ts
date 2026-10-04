@@ -11,6 +11,13 @@ const mk = (id: string, date: string, extra: Partial<WorkoutSession> = {}): Work
   id, name: id, startedAt: `${date}T10:00:00.000Z`, date, exercises: [], ...extra,
 });
 
+/** A completed work set: a finished session needs one to count as a workout. */
+const worked: Partial<WorkoutSession> = {
+  exercises: [
+    { id: "e1", exerciseId: "bench", name: "Bench", sets: [{ id: "s1", reps: 5, weight: 60, completed: true }] },
+  ],
+};
+
 describe("workout session repository", () => {
   it("upserts by id, active until finished", async () => {
     await saveSession(mk("s1", "2026-03-01"));
@@ -38,7 +45,7 @@ describe("workout session repository", () => {
     expect(mine.filter((e) => e.type === "workout.finished").length).toBe(1);
   });
   it("finished sessions feed existing consumers", async () => {
-    await saveSession(mk("c1", "2026-03-03", { endedAt: "2026-03-03T11:00:00.000Z" }));
+    await saveSession(mk("c1", "2026-03-03", { ...worked, endedAt: "2026-03-03T11:00:00.000Z" }));
     expect((await getCompletedWorkouts()).some((s) => s.id === "c1")).toBe(true);
   });
   it("moving a session's date moves it between days", async () => {
@@ -57,9 +64,9 @@ describe("workout session repository", () => {
     expect(JSON.stringify(tl)).not.toContain("d1");
   });
   it("reopen then re-finish leaves one timeline entry", async () => {
-    await saveSession(mk("r1", "2026-03-07", { endedAt: "2026-03-07T11:00:00.000Z" }));
-    await saveSession(mk("r1", "2026-03-07"));
-    await saveSession(mk("r1", "2026-03-07", { endedAt: "2026-03-07T11:30:00.000Z" }));
+    await saveSession(mk("r1", "2026-03-07", { ...worked, endedAt: "2026-03-07T11:00:00.000Z" }));
+    await saveSession(mk("r1", "2026-03-07", worked));
+    await saveSession(mk("r1", "2026-03-07", { ...worked, endedAt: "2026-03-07T11:30:00.000Z" }));
     const tl = await getTimeline();
     expect(JSON.stringify(tl).split('"r1"').length - 1).toBeLessThanOrEqual(1);
   });

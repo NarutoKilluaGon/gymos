@@ -5,7 +5,7 @@ import { F } from "@/constants/forge-theme";
 import type { ForgeData } from "@/hooks/use-forge";
 import { muscleBalance } from "@/services/forge/balance";
 import { historyGrid } from "@/services/forge/grid";
-import { finishedSessions, sessionDate } from "@/services/forge/history";
+import { completedSessions, sessionDate } from "@/services/forge/history";
 import { fromKg, sessionVolumeKg, type WeightUnit } from "@/services/forge/load";
 import { MONTH_SHORT } from "@/services/nourish/insights";
 import type { WorkoutSession } from "@/types/gymos";
@@ -23,7 +23,7 @@ export function HistoryView({
   const balance = muscleBalance(data.sessions, data.catalog, 30, new Date());
   const hasBalance = balance.some((entry) => entry.sets > 0);
   const grid = historyGrid(data.sessions, unit, 8);
-  const recent = [...finishedSessions(data.sessions)].reverse().slice(0, 20);
+  const recent = [...completedSessions(data.sessions)].reverse().slice(0, 20);
 
   if (recent.length === 0) {
     return (

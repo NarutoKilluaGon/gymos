@@ -1,4 +1,5 @@
 import { getAllDailyActivities, getDailyActivity, readDailyActivityUnlocked, withDailyLock, writeDailyActivityUnlocked } from "@/storage/daily";
+import { isCompletedWorkout } from "@/services/forge/history";
 import { appendEvent } from "@/storage/events";
 import type {
   CardioEntry,
@@ -314,7 +315,11 @@ export async function getCompletedWorkouts(): Promise<WorkoutSession[]> {
     .flatMap((activity) =>
       Array.isArray(activity.workouts) ? activity.workouts : [],
     )
-    .filter((workout): workout is WorkoutSession => Boolean(workout?.endedAt))
+    // "Completed" by the one shared rule (finished AND real work or cardio),
+    // not merely finished: a session ended with nothing logged is no workout.
+    .filter((workout): workout is WorkoutSession =>
+      isCompletedWorkout(workout),
+    )
     .sort(
       (a, b) =>
         new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
