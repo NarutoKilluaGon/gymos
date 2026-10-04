@@ -23,7 +23,6 @@ import {
   updateForgeSettings,
 } from "@/storage/repositories/forge-settings";
 import { getMeasurements } from "@/storage/repositories/measurements";
-import { setPR } from "@/storage/repositories/prs";
 import {
   deleteSession,
   getAllSessions,
@@ -265,26 +264,23 @@ export function useLiveSession(
     [persist],
   );
 
-  /** Finish: stamp the clock, detect PRs, save, update best-effort PR store. */
+  /**
+   * Finish: stamp the clock, detect PRs, save. The record book is re-derived
+   * by the repository when the finished session is saved.
+   */
   const complete = useCallback(
     async (now: Date = new Date()) => {
+      // Judge against what is stored, not the list this screen last loaded;
+      // fall back to that list only if storage can't be read. Read first so
+      // an edit made while waiting is still part of the finished session.
+      const history = await getAllSessions().catch(() => allSessions);
       const { session: closed, trimmed } = finish(latest.current, now);
-      const prs = detectPrs(allSessions, closed, unit);
+      const prs = detectPrs(history, closed, unit);
       const done: WorkoutSession = { ...closed, prs };
 
       latest.current = done;
       setSession(done);
       await persist(done);
-
-      for (const pr of prs) {
-        await setPR({
-          exerciseId: pr.exerciseId,
-          weight: pr.weight,
-          reps: pr.reps,
-          unit: pr.unit,
-          timestamp: done.endedAt ?? now.toISOString(),
-        }).catch(() => undefined);
-      }
 
       return { session: done, trimmed };
     },

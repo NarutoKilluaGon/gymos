@@ -1,11 +1,19 @@
+import {
+  personalRecords,
+  recomputeSessionPrs,
+  sortKey,
+} from "@/services/forge/history";
 import { appendEvent } from "@/storage/events";
+import { createMutex } from "@/storage/mutex";
+import { getWeightUnit } from "@/storage/repositories/preferences";
+import { replaceAllPRs } from "@/storage/repositories/prs";
 import {
   readAllDailyActivitiesUnlocked,
   readDailyActivityUnlocked,
   withDailyLock,
   writeDailyActivityUnlocked,
 } from "@/storage/daily";
-import type { WorkoutSession } from "@/types/gymos";
+import type { SessionPr, WorkoutSession } from "@/types/gymos";
 import { dateKeyFromTimestamp, getTodayKey } from "@/utils/date";
 
 const sessionDate = (session: WorkoutSession): string =>
@@ -30,6 +38,60 @@ export async function getAllSessions(): Promise<WorkoutSession[]> {
     (a, b) =>
       new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   );
+}
+
+/** Keeps two PR re-derivations from interleaving; each reads fresh data. */
+const prStateMutex = createMutex();
+
+/** Overwrite `prs` on stored sessions, touching nothing else on them. */
+async function applyPrFlags(changes: Map<string, SessionPr[]>): Promise<void> {
+  await withDailyLock(async () => {
+    const data = await readAllDailyActivitiesUnlocked();
+
+    for (const [bucket, activity] of Object.entries(data)) {
+      if (!(activity.workouts ?? []).some((item) => changes.has(item?.id))) {
+        continue;
+      }
+
+      const day = await readDailyActivityUnlocked(bucket);
+
+      day.workouts = day.workouts.map((item) =>
+        changes.has(item.id)
+          ? { ...item, prs: changes.get(item.id) ?? [] }
+          : item,
+      );
+      await writeDailyActivityUnlocked(day);
+    }
+  });
+}
+
+/**
+ * PR state is derived from finished sessions, so it must be re-derived
+ * whenever one finishes, is reopened or is deleted: the stored record book,
+ * plus the record flags of later sessions that were judged against it.
+ * Best-effort like the PR store always was: the workout change that
+ * triggered this has already been saved and must not report as failed.
+ */
+async function reconcilePrState(
+  changed: readonly WorkoutSession[],
+): Promise<void> {
+  const exerciseIds = new Set(
+    changed.flatMap((session) => session.exercises.map((e) => e.exerciseId)),
+  );
+  const after = changed.map(sortKey).sort()[0] ?? "";
+
+  try {
+    await prStateMutex.runExclusive(async () => {
+      const sessions = await getAllSessions();
+      const flags = recomputeSessionPrs(sessions, after, exerciseIds);
+
+      if (flags.size > 0) await applyPrFlags(flags);
+
+      await replaceAllPRs(personalRecords(sessions, await getWeightUnit()));
+    });
+  } catch {
+    // Re-derived again on the next finish, reopen or delete.
+  }
 }
 
 /** The newest session that has not been finished, if any. */
@@ -112,6 +174,13 @@ export async function saveSession(
     });
   }
 
+  // Finishing or reopening changes what counts as history.
+  if (Boolean(saved.endedAt) !== Boolean(outcome.previous?.endedAt)) {
+    await reconcilePrState(
+      outcome.previous ? [outcome.previous, saved] : [saved],
+    );
+  }
+
   return saved;
 }
 
@@ -120,7 +189,9 @@ export async function deleteSession(id: string): Promise<boolean> {
     const data = await readAllDailyActivitiesUnlocked();
 
     for (const [bucket, activity] of Object.entries(data)) {
-      if (!(activity.workouts ?? []).some((item) => item?.id === id)) {
+      const found = (activity.workouts ?? []).find((item) => item?.id === id);
+
+      if (!found) {
         continue;
       }
 
@@ -129,15 +200,18 @@ export async function deleteSession(id: string): Promise<boolean> {
       day.workouts = day.workouts.filter((item) => item.id !== id);
       await writeDailyActivityUnlocked(day);
 
-      return true;
+      return found;
     }
 
-    return false;
+    return null;
   });
 
   if (removed) {
     await appendEvent("workout.deleted", { workoutId: id });
+
+    // An unfinished session was never history, so nothing derives from it.
+    if (removed.endedAt) await reconcilePrState([removed]);
   }
 
-  return removed;
+  return removed !== null;
 }
