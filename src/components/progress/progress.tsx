@@ -537,6 +537,7 @@ export default function ProgressScreen() {
                 </Text>
 
                 <MeasurementChart
+                  type={item.type}
                   measurements={history}
                   hasHistoricalData={
                     hasHistoricalData
