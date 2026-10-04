@@ -241,17 +241,29 @@ export function useLiveSession(
     };
   }, []);
 
-  const persist = useCallback((next: WorkoutSession) => {
-    latest.current = next;
-    queue.current = queue.current
-      .catch(() => undefined)
-      .then(() => saveSession(latest.current))
-      .catch(() => {
-        if (alive.current) showToast("Couldn't save your last change");
+  /**
+   * Queue a save of the newest state. The shared queue never rejects (so one
+   * failed save can't block later ones, and `flush` stays safe to await), but
+   * the returned promise settles with this write's own outcome so a caller
+   * that must know whether it was stored (Complete) can see a failure.
+   * `quiet` leaves the failure toast to that caller.
+   */
+  const persist = useCallback(
+    (next: WorkoutSession, quiet = false): Promise<unknown> => {
+      latest.current = next;
+
+      const write = queue.current
+        .catch(() => undefined)
+        .then(() => saveSession(latest.current));
+
+      queue.current = write.catch(() => {
+        if (!quiet && alive.current) showToast("Couldn't save your last change");
       });
 
-    return queue.current;
-  }, []);
+      return write;
+    },
+    [],
+  );
 
   const update = useCallback(
     (change: (current: WorkoutSession) => WorkoutSession) => {
@@ -261,14 +273,17 @@ export function useLiveSession(
 
       latest.current = next;
       setSession(next);
-      void persist(next);
+      // Failure is already toasted by the queue; nothing to handle here.
+      persist(next).catch(() => undefined);
     },
     [persist],
   );
 
   /**
    * Finish: stamp the clock, detect PRs, save. The record book is re-derived
-   * by the repository when the finished session is saved.
+   * by the repository when the finished session is saved. Rejects if the
+   * finished session could not be saved; the screen is then put back to the
+   * unfinished session so it never looks completed when nothing was stored.
    */
   const complete = useCallback(
     async (now: Date = new Date()) => {
@@ -276,13 +291,28 @@ export function useLiveSession(
       // fall back to that list only if storage can't be read. Read first so
       // an edit made while waiting is still part of the finished session.
       const history = await getAllSessions().catch(() => allSessions);
-      const { session: closed, trimmed } = finish(latest.current, now);
+      const before = latest.current;
+      const { session: closed, trimmed } = finish(before, now);
       const prs = detectPrs(history, closed, unit);
       const done: WorkoutSession = { ...closed, prs };
 
       latest.current = done;
       setSession(done);
-      await persist(done);
+
+      try {
+        await persist(done, true);
+      } catch (error) {
+        // Roll back only if nothing newer was edited in the meantime.
+        if (latest.current === done) {
+          latest.current = before;
+
+          if (alive.current) setSession(before);
+        }
+
+        if (alive.current) showToast("Couldn't save workout");
+
+        throw error;
+      }
 
       return { session: done, trimmed };
     },

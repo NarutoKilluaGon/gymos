@@ -307,7 +307,15 @@ export function ForgeSession({
       });
     }
 
-    const result = await complete();
+    let result: Awaited<ReturnType<typeof complete>>;
+
+    try {
+      result = await complete();
+    } catch {
+      // Not saved: `complete` already toasted and restored the open workout.
+      // No summary, no reload as if it had finished.
+      return;
+    }
 
     setRestEnd(null);
     setSummary({ prs: result.session.prs ?? [], trimmed: result.trimmed });
