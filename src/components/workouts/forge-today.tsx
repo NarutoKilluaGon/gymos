@@ -5,6 +5,7 @@ import { CardioSheet } from "@/components/nutrition/more-sheets";
 import { Button, FCard, Label, Pill, fmtInt, tap } from "@/components/workouts/forge-ui";
 import { F, FSerif } from "@/constants/forge-theme";
 import type { ForgeData } from "@/hooks/use-forge";
+import { useTodayKey } from "@/hooks/use-today-key";
 import { completedSessions, sessionDate } from "@/services/forge/history";
 import { formatSets, fromKg, sessionVolumeKg } from "@/services/forge/load";
 import { dayFor } from "@/services/forge/plan";
@@ -42,10 +43,13 @@ export function TodayView({
   onRemoveCardio: (dayKey: string, id: string) => void;
   onGoPlan: () => void;
 }) {
-  const todayKey = getTodayKey();
-  const [dateKey, setDateKey] = useState(todayKey);
+  const todayKey = useTodayKey();
+  // null follows "today" (so it rolls over at midnight); a string is a past
+  // day the user deliberately navigated to and stays put.
+  const [picked, setPicked] = useState<string | null>(null);
   const [cardioOpen, setCardioOpen] = useState(false);
 
+  const dateKey = picked ?? todayKey;
   const isToday = dateKey === todayKey;
   const plan = activePlan(data.settings) ?? undefined;
   const planned = dayFor(plan, dateKey, todayKey, data.sessions);
@@ -74,16 +78,36 @@ export function TodayView({
     }
   }
 
-  const start = (dayId: string | null, date = dateKey) =>
-    onStart({ dayId, date, backdated: date !== todayKey });
+  // Resolved at tap time from the clock, never from render state, so a
+  // stale render can't file a workout/cardio under yesterday. An explicit
+  // `date` (a missed day) or a picked past day stays backdated.
+  const resolveDate = (explicit?: string) => {
+    const now = getTodayKey();
+    const wanted = explicit ?? picked ?? now;
+
+    return wanted < now ? wanted : now;
+  };
+
+  const start = (dayId: string | null, date?: string) => {
+    const now = getTodayKey();
+    const resolved = resolveDate(date);
+
+    onStart({ dayId, date: resolved, backdated: resolved !== now });
+  };
+
+  const stepDay = (delta: number) => {
+    const next = addDaysToKey(dateKey, delta);
+
+    setPicked(next < todayKey ? next : null);
+  };
 
   return (
     <View style={s.root}>
       <View style={s.dateRow}>
         <Text style={s.date}>{isToday ? "Today" : dayLabel(dateKey)}</Text>
         <View style={s.nav}>
-          <Pill label="‹" onPress={() => setDateKey(addDaysToKey(dateKey, -1))} />
-          <Pill label="›" disabled={isToday} onPress={() => setDateKey(addDaysToKey(dateKey, 1))} />
+          <Pill label="‹" onPress={() => stepDay(-1)} />
+          <Pill label="›" disabled={isToday} onPress={() => stepDay(1)} />
         </View>
       </View>
       {!isToday ? <Text style={s.meta}>{dayLabel(dateKey)}. Anything you start here is logged for this day.</Text> : null}
@@ -190,7 +214,7 @@ export function TodayView({
         onClose={() => setCardioOpen(false)}
         initialText=""
         weightKg={weightKg}
-        onSave={(entry) => onAddCardio(dateKey, entry)}
+        onSave={(entry) => onAddCardio(resolveDate(), entry)}
       />
     </View>
   );
