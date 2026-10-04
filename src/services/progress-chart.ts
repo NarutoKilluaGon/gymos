@@ -26,6 +26,17 @@ export type MeasurementSeries = {
   points: ChartSeriesPoint[];
 };
 
+/**
+ * The newest reading of a history in `getMeasurementHistory` order, which
+ * is oldest first. The Progress snapshot and "delete latest" both use it so
+ * they always agree on which reading is the latest.
+ */
+export function latestMeasurement(
+  history: readonly Measurement[] | undefined,
+): Measurement | undefined {
+  return history?.[history.length - 1];
+}
+
 /** Keeps converted lb values from showing float noise (159.60000000000002). */
 function round2(value: number): number {
   return Math.round(value * 100) / 100;

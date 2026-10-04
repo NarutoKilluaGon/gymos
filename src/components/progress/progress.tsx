@@ -36,6 +36,7 @@ import {
   type ExercisePerformance,
   type ExerciseSummary,
 } from "@/storage/repositories/workout-progress";
+import { latestMeasurement } from "@/services/progress-chart";
 import { pickAndSavePhotoFromLibrary } from "@/services/progress-photos";
 import { getNorthStarProgress, getMonthlySummaries } from "@/services/insights";
 import type {
@@ -279,8 +280,9 @@ export default function ProgressScreen() {
   function handleMeasurementDelete(
     item: MeasurementConfig,
   ) {
-    const latest =
-      measurements[item.type]?.[0];
+    const latest = latestMeasurement(
+      measurements[item.type],
+    );
 
     if (!latest) return;
 
@@ -330,8 +332,9 @@ export default function ProgressScreen() {
     > = {};
 
     for (const item of MEASUREMENTS) {
-      result[item.type] =
-        measurements[item.type]?.[0];
+      result[item.type] = latestMeasurement(
+        measurements[item.type],
+      );
     }
 
     return result;
