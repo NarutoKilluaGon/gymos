@@ -354,7 +354,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
     sheetRoot: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: F.scrim },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: F.scrim },
   pane: {
     backgroundColor: F.bg,
     borderTopLeftRadius: 28,

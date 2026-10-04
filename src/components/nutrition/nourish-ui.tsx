@@ -403,12 +403,12 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   ringCenter: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },
   sheetRoot: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: N.scrim },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: N.scrim },
   pane: {
     backgroundColor: N.bg,
     borderTopLeftRadius: 28,
