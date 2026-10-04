@@ -9,6 +9,10 @@ jest.mock("@/storage/repositories/meals", () => ({
   getMealDateKeys: jest.fn(),
 }));
 
+jest.mock("@/storage/repositories/nourish-cardio", () => ({
+  getCardioMap: jest.fn(),
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getAllDailyActivities } = require("@/storage/daily") as {
   getAllDailyActivities: jest.Mock;
@@ -16,6 +20,10 @@ const { getAllDailyActivities } = require("@/storage/daily") as {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getMealDateKeys } = require("@/storage/repositories/meals") as {
   getMealDateKeys: jest.Mock;
+};
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { getCardioMap } = require("@/storage/repositories/nourish-cardio") as {
+  getCardioMap: jest.Mock;
 };
 
 function keyAtOffset(offsetDays: number): string {
@@ -63,6 +71,8 @@ describe("getStreak", () => {
     // all, so default to "no meal-active days" and let the one test
     // that does care override this.
     getMealDateKeys.mockResolvedValue(new Set());
+    getCardioMap.mockReset();
+    getCardioMap.mockResolvedValue({});
   });
 
   it("returns 0 and todayActive false when nothing has ever been logged", async () => {
