@@ -79,6 +79,7 @@ async function applyPrFlags(changes: Map<string, SessionPr[]>): Promise<void> {
  */
 async function reconcilePrState(
   changed: readonly WorkoutSession[],
+  edited?: string,
 ): Promise<void> {
   const exerciseIds = new Set(
     changed.flatMap((session) => session.exercises.map((e) => e.exerciseId)),
@@ -88,7 +89,7 @@ async function reconcilePrState(
   try {
     await prStateMutex.runExclusive(async () => {
       const sessions = await getAllSessions();
-      const flags = recomputeSessionPrs(sessions, after, exerciseIds);
+      const flags = recomputeSessionPrs(sessions, after, exerciseIds, edited);
 
       if (flags.size > 0) await applyPrFlags(flags);
 
@@ -189,11 +190,15 @@ export async function saveSession(
     });
   }
 
-  // Finishing or reopening changes what counts as history.
+  // Finishing or reopening changes what counts as history. So does editing a
+  // session that is already finished (its sets, exercises or day): its own
+  // records and those of later sessions must be re-derived too.
   if (Boolean(saved.endedAt) !== Boolean(outcome.previous?.endedAt)) {
     await reconcilePrState(
       outcome.previous ? [outcome.previous, saved] : [saved],
     );
+  } else if (saved.endedAt && outcome.previous) {
+    await reconcilePrState([outcome.previous, saved], saved.id);
   }
 
   return saved;

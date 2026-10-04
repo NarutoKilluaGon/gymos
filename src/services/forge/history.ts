@@ -252,32 +252,49 @@ const samePrs = (a: readonly SessionPr[], b: readonly SessionPr[]): boolean => {
 
 /**
  * Corrected `prs` for finished sessions that come after a session which was
- * deleted, reopened or just finished. A record is judged against everything
- * before it, so changing the past can add or remove later records. Only the
- * given exercises are re-judged and only changed sessions are returned.
+ * deleted, reopened, just finished or edited while finished. A record is
+ * judged against everything before it, so changing the past can add or remove
+ * later records. Only the given exercises are re-judged and only changed
+ * sessions are returned.
+ *
+ * `edited` names a finished session whose own sets were changed: it is
+ * re-judged too (even though it is not after itself) and its stamped records
+ * are replaced by what it now holds, not kept, since the stamp may be stale.
  */
 export function recomputeSessionPrs(
   sessions: readonly WorkoutSession[],
   after: string,
   exerciseIds: ReadonlySet<string>,
+  edited?: string,
 ): Map<string, SessionPr[]> {
   const changes = new Map<string, SessionPr[]>();
 
   if (exerciseIds.size === 0) return changes;
 
   for (const session of finishedSessions(sessions)) {
-    if (sortKey(session) <= after) continue;
-    if (!session.exercises.some((e) => exerciseIds.has(e.exerciseId))) continue;
+    const isEdited = session.id === edited;
+
+    if (!isEdited && sortKey(session) <= after) continue;
+    // The edited session is always re-judged: it may have just lost every
+    // exercise it had a stamped record on.
+    if (
+      !isEdited &&
+      !session.exercises.some((e) => exerciseIds.has(e.exerciseId))
+    ) {
+      continue;
+    }
 
     const current = session.prs ?? [];
     const next = [
       ...current.filter((pr) => !exerciseIds.has(pr.exerciseId)),
       ...detectPrs(sessions, session)
         .filter((pr) => exerciseIds.has(pr.exerciseId))
-        // Still a record: keep what was stamped rather than rewrite it.
-        .map(
-          (pr) =>
-            current.find((old) => old.exerciseId === pr.exerciseId) ?? pr,
+        // Still a record: keep what was stamped rather than rewrite it
+        // (unless this is the edited session, whose stamp may be stale).
+        .map((pr) =>
+          isEdited
+            ? pr
+            : (current.find((old) => old.exerciseId === pr.exerciseId) ?? pr),
         ),
     ];
 
