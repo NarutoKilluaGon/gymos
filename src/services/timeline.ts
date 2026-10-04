@@ -1,7 +1,11 @@
+import { sessionDate } from "@/services/forge/history";
 import { getEvents } from "@/storage/events";
 import { getAllJournalEntries } from "@/storage/repositories/journal";
+import { getAllSessions } from "@/storage/repositories/workout-sessions";
 import type { AppEvent } from "@/types/events";
+import type { WorkoutSession } from "@/types/gymos";
 import type { TimelineItem } from "@/types/timeline";
+import { dateKeyFromTimestamp, timestampForKey } from "@/utils/date";
 
 type TimelineEventType =
   | "workout.finished"
@@ -30,6 +34,53 @@ const TIMELINE_EVENT_TYPES: TimelineEventType[] = [
 type TimelineEvent = {
   [K in TimelineEventType]: AppEvent<K>;
 }[TimelineEventType];
+
+/**
+ * When a workout belongs on the timeline: inside the local day it is filed
+ * under (`session.date`), never the moment its event was logged. A workout
+ * finished today for a past day is therefore listed on that past day. The
+ * real finish/start time is kept when it falls on that day; otherwise (a
+ * backdated or re-dated session) the day's noon stands in, the same anchor
+ * Forge uses for backdated sessions.
+ */
+function workoutTimestamp(session: WorkoutSession): string {
+  const day = sessionDate(session);
+
+  for (const candidate of [session.endedAt, session.startedAt]) {
+    if (candidate && dateKeyFromTimestamp(candidate) === day) {
+      return candidate;
+    }
+  }
+
+  return day ? timestampForKey(day, "12:00") : session.startedAt;
+}
+
+/**
+ * The timeline entry for a finished workout, read from the stored session.
+ * Events only record the moment of finishing (append-only), so renaming,
+ * re-noting, re-dating or editing the workout afterwards would otherwise
+ * leave the entry showing what it looked like at finish time.
+ */
+function storedWorkoutItem(
+  event: AppEvent<"workout.finished">,
+  session: WorkoutSession,
+): TimelineItem {
+  return {
+    kind: "workout",
+    id: event.id,
+    timestamp: workoutTimestamp(session),
+    name: session.name || "Workout",
+    durationMs:
+      session.durationMs ??
+      Math.max(
+        0,
+        new Date(session.endedAt ?? session.startedAt).getTime() -
+          new Date(session.startedAt).getTime(),
+      ),
+    exerciseCount: session.exercises.length,
+    ...(session.notes ? { notes: session.notes } : {}),
+  };
+}
 
 function toTimelineItem(
   event: TimelineEvent,
@@ -232,6 +283,14 @@ export async function getTimeline(): Promise<TimelineItem[]> {
     }
   }
 
+  const sessionsById = new Map<string, WorkoutSession>();
+
+  for (const session of await getAllSessions()) {
+    if (Array.isArray(session.exercises)) {
+      sessionsById.set(session.id, session);
+    }
+  }
+
   const timelineEvents = events
     .filter(isTimelineEvent)
     .filter((event) => !isTombstoned(event, deletedIds))
@@ -240,9 +299,25 @@ export async function getTimeline(): Promise<TimelineItem[]> {
 
       return latestFinish.get(event.payload.workoutId) === event.id;
     })
-    .map((event) =>
-      toTimelineItem(event, workoutNames),
-    );
+    .filter((event) => {
+      if (event.type !== "workout.finished") return true;
+
+      // A workout that has been reopened is not finished any more.
+      const stored = sessionsById.get(event.payload.workoutId);
+
+      return !stored || Boolean(stored.endedAt);
+    })
+    .map((event) => {
+      if (event.type === "workout.finished") {
+        const stored = sessionsById.get(event.payload.workoutId);
+
+        if (stored) return storedWorkoutItem(event, stored);
+      }
+
+      // Everything else (and a finish whose session is no longer stored)
+      // keeps reading the event payload, as before.
+      return toTimelineItem(event, workoutNames);
+    });
 
   const journalEntries =
     await getAllJournalEntries();
