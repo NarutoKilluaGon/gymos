@@ -73,6 +73,9 @@ export async function getExerciseHistory(
         }
 
         for (const set of exercise.sets) {
+          // Warm-ups and sets that were never done aren't performance.
+          if (set.warmup || !set.completed) continue;
+
           results.push({
             workoutId: workout.id,
             workoutName: workout.name,

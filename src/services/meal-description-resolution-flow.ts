@@ -6,7 +6,7 @@
  * completes, never an arbitrary percentage.
  */
 
-import type { EstimatedFood } from "@/components/quick-add/meal-sheet";
+import type { EstimatedFood } from "@/types/gymos";
 import {
   DescriptionAiError,
   getDescriptionAiProvider,

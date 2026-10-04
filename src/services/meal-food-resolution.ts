@@ -6,7 +6,7 @@
  * assistant, not the foundation" path in code.
  */
 
-import type { EstimatedFood } from "@/components/quick-add/meal-sheet";
+import type { EstimatedFood } from "@/types/gymos";
 import {
   isSameUnit,
   matchFoodEntry,

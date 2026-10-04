@@ -6,7 +6,12 @@ import {
 } from "@/storage/daily";
 import { createMutex } from "@/storage/mutex";
 import { getStorage, setStorage } from "@/storage/storage";
-import type { Meal, MealFood, Micronutrients } from "@/types/gymos";
+import type {
+  Meal,
+  MealFood,
+  MealSlot,
+  Micronutrients,
+} from "@/types/gymos";
 import { NUTRIENT_KEYS } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
 import { createId } from "@/utils/id";
@@ -134,79 +139,128 @@ async function ensureMigratedUnlocked(): Promise<void> {
   await setStorage(MEALS_MIGRATED_KEY, true);
 }
 
-export async function addMeal(
-  name: string,
-  macros?: Partial<MacroTotals>,
-  foods?: MealFood[],
-): Promise<Meal> {
+/** Optional fields a diary entry carries beyond its nutrition. */
+export type MealExtras = {
+  /** When it was eaten; defaults to now. */
+  timestamp?: string;
+  slot?: MealSlot;
+  qty?: string;
+  confidence?: number;
+};
+
+export type NewMeal = {
+  name: string;
+  macros?: Partial<MacroTotals>;
+  foods?: MealFood[];
+} & MealExtras;
+
+function buildMeal(input: NewMeal, now: string): Meal {
+  return {
+    id: createId(),
+    name: input.name,
+    timestamp: input.timestamp ?? now,
+    ...(input.slot ? { slot: input.slot } : {}),
+    ...(input.qty ? { qty: input.qty } : {}),
+    ...(typeof input.confidence === "number"
+      ? { confidence: input.confidence }
+      : {}),
+    ...input.macros,
+    // Optional per-food breakdown rides in the same record under the same
+    // lock: one storage key, one source of truth, no second write.
+    ...(input.foods && input.foods.length > 0
+      ? { foods: input.foods }
+      : {}),
+  };
+}
+
+async function appendLoggedEvent(meal: Meal): Promise<void> {
+  await appendEvent("meal.logged", {
+    mealId: meal.id,
+    name: meal.name,
+    calories: meal.calories,
+    protein: meal.protein,
+    carbs: meal.carbs,
+    fat: meal.fat,
+  });
+}
+
+/**
+ * Log several entries in ONE read-modify-write, so a three-food sentence
+ * is either fully saved or not saved at all.
+ */
+export async function addMeals(inputs: readonly NewMeal[]): Promise<Meal[]> {
+  if (inputs.length === 0) {
+    return [];
+  }
+
   const saved = await mealsMutex.runExclusive(async () => {
     await ensureMigratedUnlocked();
 
     const meals = await readMealsUnlocked();
+    // One batch is one moment: entries without their own time share it.
+    const now = new Date().toISOString();
+    const created = inputs.map((input) => buildMeal(input, now));
 
-    const meal: Meal = {
-      id: createId(),
-      name,
-      timestamp: new Date().toISOString(),
-      ...macros,
-      // Optional per-food breakdown (incl. additionals) rides in the same
-      // record under the same lock — one storage key, one source of
-      // truth, no second write to keep in sync.
-      ...(foods && foods.length > 0 ? { foods } : {}),
-    };
-
-    meals.push(meal);
+    meals.push(...created);
 
     await writeMealsUnlocked(meals);
 
-    return meal;
+    return created;
   });
 
-  await appendEvent("meal.logged", {
-    mealId: saved.id,
-    name,
-    calories: saved.calories,
-    protein: saved.protein,
-    carbs: saved.carbs,
-    fat: saved.fat,
-  });
+  for (const meal of saved) {
+    await appendLoggedEvent(meal);
+  }
 
   return saved;
 }
 
-/**
- * Update today's meal in place (edit flow). Same record, same lock, same
- * event-log semantics as addMeal — no new storage, no duplicate entry.
- * Totals stay authoritative; an empty foods list clears a previously
- * saved breakdown. Returns null when the meal is not found among
- * TODAY's meals (e.g. it was logged on another day, which this diary
- * never edits — unchanged from before the storage split).
- */
-export async function updateMeal(
-  id: string,
+export async function addMeal(
   name: string,
   macros?: Partial<MacroTotals>,
   foods?: MealFood[],
+  extras?: MealExtras,
+): Promise<Meal> {
+  const [saved] = await addMeals([{ name, macros, foods, ...extras }]);
+
+  if (!saved) {
+    throw new Error("Meal was not saved");
+  }
+
+  return saved;
+}
+
+export type MealPatch = {
+  name?: string;
+  macros?: Partial<MacroTotals>;
+  slot?: MealSlot;
+  qty?: string;
+  timestamp?: string;
+  confidence?: number;
+};
+
+/**
+ * Edit a meal in place, on ANY day (the diary lets you fix past days).
+ * Same record, same lock — never a duplicate entry. Returns null when the
+ * id is not found.
+ */
+export async function updateMealById(
+  id: string,
+  patch: MealPatch,
 ): Promise<Meal | null> {
   return mealsMutex.runExclusive(async () => {
     await ensureMigratedUnlocked();
 
     const meals = await readMealsUnlocked();
-    const todayKey = getTodayKey();
-    const index = meals.findIndex(
-      (meal) => meal.id === id && dateKeyOfMeal(meal) === todayKey,
-    );
+    const index = meals.findIndex((meal) => meal.id === id);
+    const current = meals[index];
 
-    if (index === -1) {
+    if (index === -1 || !current) {
       return null;
     }
 
-    const updated: Meal = {
-      ...meals[index],
-      name,
-      ...macros,
-      ...(foods && foods.length > 0 ? { foods } : { foods: undefined }),
-    };
+    const { macros, ...fields } = patch;
+    const updated: Meal = { ...current, ...fields, ...macros };
 
     meals[index] = updated;
 
@@ -232,6 +286,8 @@ export async function getTodayMeals(): Promise<Meal[]> {
   return getMealsForDate(getTodayKey());
 }
 
+/** Delete a meal from any day; appends the tombstone event the journal
+ *  timeline uses to hide it. */
 export async function deleteMeal(
   mealId: string,
 ): Promise<void> {
@@ -239,17 +295,9 @@ export async function deleteMeal(
     await ensureMigratedUnlocked();
 
     const meals = await readMealsUnlocked();
-    const todayKey = getTodayKey();
-    const countBefore = meals.length;
+    const filtered = meals.filter((meal) => meal.id !== mealId);
 
-    // Matches only among TODAY's meals — same restriction as before the
-    // storage split (this diary never edits another day's log).
-    const filtered = meals.filter(
-      (meal) =>
-        !(meal.id === mealId && dateKeyOfMeal(meal) === todayKey),
-    );
-
-    if (filtered.length === countBefore) {
+    if (filtered.length === meals.length) {
       return false;
     }
 

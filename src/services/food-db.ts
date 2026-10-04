@@ -15,7 +15,7 @@
  * vitaminA/vitaminD/vitaminB12/folate in µg amounts.
  */
 
-import type { EstimatedFood } from "@/components/quick-add/meal-sheet";
+import type { EstimatedFood } from "@/types/gymos";
 import type { MealEstimate } from "@/services/meal-estimator";
 import type { MacroTotals } from "@/storage/repositories/meals";
 import {

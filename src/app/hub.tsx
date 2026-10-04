@@ -11,7 +11,7 @@ import { ModulesSheet } from "@/components/hub/modules-sheet";
 import { PersonalRecordsSheet } from "@/components/hub/prs-sheet";
 import { WorkoutHistorySheet } from "@/components/hub/workout-history-sheet";
 import { RemindersSheet } from "@/components/hub/reminders-sheet";
-import { SavedFoodsSheet } from "@/components/hub/saved-foods-sheet";
+import { HubSavedFoodsSheet } from "@/components/hub/saved-foods-sheet";
 import { SupplementsSheet } from "@/components/hub/supplements-sheet";
 import { InsightsSheet } from "@/components/insights/insights-sheet";
 import { JournalTimeline } from "@/components/journal/journal-timeline";
@@ -210,20 +210,10 @@ export default function HubScreen() {
         </View>
       </Modal>
 
-      <Modal
+      <HubSavedFoodsSheet
         visible={savedFoodsOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSavedFoodsOpen(false)}
-      >
-        <View style={styles.modal}>
-          <Pressable
-            style={styles.backdrop}
-            onPress={() => setSavedFoodsOpen(false)}
-          />
-          <SavedFoodsSheet onClose={() => setSavedFoodsOpen(false)} />
-        </View>
-      </Modal>
+        onClose={() => setSavedFoodsOpen(false)}
+      />
 
       <Modal
         visible={libraryOpen}

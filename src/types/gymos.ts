@@ -21,9 +21,14 @@ export type WaterEntry = {
 export type WorkoutSet = {
   id: ID;
   reps: number;
+  /** Load in `unit`. For a bodyweight exercise this is the EXTRA load
+   *  (negative = assisted), added to the session's body weight. */
   weight?: number;
   unit?: "kg" | "lb";
   completed: boolean;
+  /** Warm-up sets are logged but never count toward volume, PRs or
+   *  history. Absent on every record saved before Forge. */
+  warmup?: boolean;
 };
 
 export type CardioActivity =
@@ -52,6 +57,23 @@ export type WorkoutExercise = {
   exerciseId: ID;
   name: string;
   sets: WorkoutSet[];
+  /** Load is body weight plus the set's (extra) weight. */
+  bodyweight?: boolean;
+  note?: string;
+  /** Coaching cue carried over from the plan. */
+  tip?: string;
+  /** Exercises sharing a group id and adjacent in order form a superset. */
+  group?: string;
+  /** The last session hit the top of the rep range on every set, so the
+   *  planned weight was nudged up. */
+  progressed?: boolean;
+};
+
+export type SessionPr = {
+  exerciseId: ID;
+  weight: number;
+  reps: number;
+  unit: "kg" | "lb";
 };
 
 export type WorkoutSession = {
@@ -63,6 +85,26 @@ export type WorkoutSession = {
   routineId?: ID;
   cardio?: CardioEntry[];
   notes?: string;
+  /** Local "YYYY-MM-DD" the session belongs to. Derived from `startedAt`
+   *  for sessions saved before Forge. */
+  date?: string;
+  planId?: ID;
+  dayId?: ID;
+  /** Deload week: fewer sets, lighter loads. */
+  deload?: boolean;
+  /** Body weight (kg) at the time; makes bodyweight loads comparable. */
+  bodyweightKg?: number;
+  /** Total time spent paused, ms. */
+  pausedMs?: number;
+  /** Set while paused. */
+  pausedAt?: Timestamp;
+  /** Active (paused/idle-trimmed) duration, ms, once finished. */
+  durationMs?: number;
+  /** Logged after the fact: has no meaningful duration. */
+  backdated?: boolean;
+  /** Last time anything was edited; drives idle-time trimming. */
+  lastActivityAt?: Timestamp;
+  prs?: SessionPr[];
 };
 
 export type RoutineExercise = {
@@ -124,6 +166,34 @@ export type Micronutrients = {
  */
 export type NutritionSource = "food-db" | "ai" | "manual";
 
+/** The four diary sections a logged food belongs to. */
+export const MEAL_SLOTS = [
+  "Breakfast",
+  "Lunch",
+  "Snacks",
+  "Dinner",
+] as const;
+export type MealSlot = (typeof MEAL_SLOTS)[number];
+
+/** One food as it appears in a review list before it is saved. Totals are
+ *  for the WHOLE stated amount, never per 100 g. */
+export type EstimatedFood = {
+  name: string;
+  estimatedAmount: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  /** Offline food-database entry id when nutrition came from the catalog. */
+  entryId?: string;
+  /** True when no confident match existed: macros are zero as "unknown",
+   *  never as a measurement. Never persisted. */
+  unresolved?: boolean;
+  /** Transient provenance; not written to the persisted record. */
+  nutritionSource?: NutritionSource;
+} & Micronutrients;
+
 /** Canonical nutrient key list, macros first: the single enumerator every
  *  summation/scaling helper iterates. Extend here, never per call-site. */
 export const NUTRIENT_KEYS: readonly (MacroKey | MicronutrientKey)[] = [
@@ -176,6 +246,11 @@ export type MealFood = {
    *  catalog — lets a later amount/unit edit rescale this row from the
    *  catalog portion. Absent for manually-entered or pre-S6A foods. */
   entryId?: string;
+  /** Human portion label ("2 rotis", "1 katori"). Optional so records
+   *  saved before the Nourish diary keep loading unchanged. */
+  qty?: string;
+  /** 0..1 confidence in the estimate. Absent reads as "unknown". */
+  confidence?: number;
   calories: number;
   protein: number;
   carbs: number;
@@ -188,7 +263,17 @@ export type MealFood = {
 export type Meal = {
   id: ID;
   name: string;
+  /** When the food was eaten (local time of day decides the default slot
+   *  and the diary day). */
   timestamp: Timestamp;
+  /** Diary section picked by the user or read from their message. When
+   *  absent (every record saved before the Nourish diary) the slot is
+   *  derived from the timestamp. */
+  slot?: MealSlot;
+  /** Human portion label, e.g. "2 rotis". */
+  qty?: string;
+  /** 0..1 confidence in the estimate; absent reads as unknown. */
+  confidence?: number;
   calories?: number;
   protein?: number;
   carbs?: number;

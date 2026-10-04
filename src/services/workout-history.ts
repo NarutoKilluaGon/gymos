@@ -16,7 +16,7 @@ export function workoutVolume(workout: WorkoutSession): number {
     (total, exercise) =>
       total +
       exercise.sets.reduce((sum, set) => {
-        if (!set.completed) {
+        if (!set.completed || set.warmup) {
           return sum;
         }
 
@@ -29,7 +29,8 @@ export function workoutVolume(workout: WorkoutSession): number {
 /** Count of logged (non-empty) sets across the workout. */
 export function workoutSetCount(workout: WorkoutSession): number {
   return workout.exercises.reduce(
-    (total, exercise) => total + exercise.sets.length,
+    (total, exercise) =>
+      total + exercise.sets.filter((set) => !set.warmup).length,
     0,
   );
 }

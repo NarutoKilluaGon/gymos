@@ -137,6 +137,7 @@ type DeletedIds = {
   measurements: Set<string>;
   sleep: Set<string>;
   cardio: Set<string>;
+  workouts: Set<string>;
 };
 
 function isTombstoned(
@@ -161,6 +162,8 @@ function isTombstoned(
       return deleted.sleep.has(event.payload.sleepId);
     case "workout.cardio.logged":
       return deleted.cardio.has(event.payload.cardioId);
+    case "workout.finished":
+      return deleted.workouts.has(event.payload.workoutId);
     default:
       return false;
   }
@@ -174,6 +177,7 @@ export async function getTimeline(): Promise<TimelineItem[]> {
     measurements: new Set(),
     sleep: new Set(),
     cardio: new Set(),
+    workouts: new Set(),
   };
 
   for (const event of events) {
@@ -192,6 +196,10 @@ export async function getTimeline(): Promise<TimelineItem[]> {
       const tombstone = event as AppEvent<"sleep.deleted">;
 
       deletedIds.sleep.add(tombstone.payload.sleepId);
+    } else if (event.type === "workout.deleted") {
+      const tombstone = event as AppEvent<"workout.deleted">;
+
+      deletedIds.workouts.add(tombstone.payload.workoutId);
     } else if (event.type === "workout.cardio.removed") {
       const tombstone = event as AppEvent<"workout.cardio.removed">;
 
@@ -212,9 +220,26 @@ export async function getTimeline(): Promise<TimelineItem[]> {
     }
   }
 
+  // A reopened-then-refinished workout emits `workout.finished` again;
+  // only its latest finish may appear in the timeline.
+  const latestFinish = new Map<string, string>();
+
+  for (const event of events) {
+    if (event.type === "workout.finished") {
+      const finished = event as AppEvent<"workout.finished">;
+
+      latestFinish.set(finished.payload.workoutId, event.id);
+    }
+  }
+
   const timelineEvents = events
     .filter(isTimelineEvent)
     .filter((event) => !isTombstoned(event, deletedIds))
+    .filter((event) => {
+      if (event.type !== "workout.finished") return true;
+
+      return latestFinish.get(event.payload.workoutId) === event.id;
+    })
     .map((event) =>
       toTimelineItem(event, workoutNames),
     );

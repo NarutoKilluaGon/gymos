@@ -15,10 +15,7 @@ import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { JournalSheet } from "@/components/quick-add/journal-sheet";
-import {
-  MealSheet,
-  type MealInput,
-} from "@/components/quick-add/meal-sheet";
+import { LogFoodSheet } from "@/components/nutrition/log-food-sheet";
 import { MeasurementSheet } from "@/components/quick-add/measurement-sheet";
 import {
   SleepSheet,
@@ -35,9 +32,8 @@ type GymFABProps = {
   weightUnit?: WeightUnit;
   onWaterAdd?: (amount: number) => void;
   onWeightAdd?: (weight: number) => void;
-  onMealAdd?: (
-    meal: MealInput,
-  ) => void | boolean | Promise<void | boolean>;
+  /** Called after food was logged from the quick-add sheet. */
+  onMealLogged?: () => void;
   onSleepAdd?: (sleep: SleepInput) => void;
   onWorkoutStart?: () => void;
   onJournalAdd?: (text: string, mood?: JournalEntry["mood"]) => void;
@@ -65,7 +61,7 @@ export function GymFAB({
   weightUnit = "kg",
   onWaterAdd,
   onWeightAdd,
-  onMealAdd,
+  onMealLogged,
   onSleepAdd,
   onWorkoutStart,
   onJournalAdd,
@@ -153,18 +149,6 @@ export function GymFAB({
     onWeightAdd?.(weight);
 
     setWeightSheetOpen(false);
-  }
-
-  async function handleMealSave(meal: MealInput) {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    const result = await onMealAdd?.(meal);
-
-    if (result === false) {
-      return;
-    }
-
-    setMealSheetOpen(false);
   }
 
   async function handleSleepSave(sleep: SleepInput) {
@@ -301,10 +285,10 @@ export function GymFAB({
       />
 
       {/* Meal Sheet */}
-      <MealSheet
+      <LogFoodSheet
         visible={mealSheetOpen}
         onClose={() => setMealSheetOpen(false)}
-        onSave={handleMealSave}
+        onLogged={onMealLogged}
       />
 
       {/* Sleep Sheet */}

@@ -1,6 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
 import { DailyTargetsCard } from "@/components/dashboard/daily-targets-card";
-import { NutritionTargetsSheet } from "@/components/dashboard/nutrition-targets-sheet";
 import { SupplementLogSheet } from "@/components/dashboard/supplement-log-sheet";
 import { Greeting } from "@/components/dashboard/greeting";
 import { NorthStarCard } from "@/components/dashboard/north-star-card";
@@ -10,19 +9,17 @@ import { WorkoutCard } from "@/components/dashboard/workout-card";
 import { GymFAB } from "@/components/fab/gym-fab";
 import { FadeIn } from "@/components/ui/fade-in";
 import { useModules } from "@/contexts/modules-context";
-import type { MealInput } from "@/components/quick-add/meal-sheet";
 import type { SleepInput } from "@/components/quick-add/sleep-sheet";
 import { GymColors, Spacing, Typography } from "@/constants/theme";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { addJournalEntry } from "@/storage/repositories/journal";
 import { addMeasurement } from "@/storage/repositories/measurements";
 import {
-  addMeal,
   getDailyMacroTotals,
   getTodayMeals,
 } from "@/storage/repositories/meals";
 import { getNorthStar } from "@/storage/repositories/north-star";
-import { getNutritionTargets } from "@/storage/repositories/nutrition-targets";
+import { getNourishSettings } from "@/storage/repositories/nourish-settings";
 import {
   getEnabledSupplementProgress,
   type SupplementProgress,
@@ -37,11 +34,9 @@ import { getTodaySteps } from "@/storage/repositories/steps";
 import { addWater, getTodayWater } from "@/storage/repositories/water";
 import {
   getTodayWorkouts,
-  startWorkout,
 } from "@/storage/repositories/workouts";
 import { pickAndSavePhotoFromLibrary } from "@/services/progress-photos";
 import { getStreak, type Streak } from "@/services/streak";
-import { toCanonicalMealNutrition } from "@/services/meal-estimator";
 import type {
   JournalEntry,
   Meal,
@@ -166,7 +161,6 @@ export default function HomeScreen() {
 
   const [proteinTarget, setProteinTarget] = useState<number | undefined>();
 
-  const [targetsSheetOpen, setTargetsSheetOpen] = useState(false);
 
   const [supplementProgress, setSupplementProgress] =
     useState<SupplementProgress>({ total: 0, taken: 0 });
@@ -211,9 +205,9 @@ export default function HomeScreen() {
 
           setStreak(await getStreak());
 
-          const nutritionTargets = await getNutritionTargets();
+          const nutritionSettings = await getNourishSettings();
 
-          setProteinTarget(nutritionTargets.protein);
+          setProteinTarget(nutritionSettings.protein);
 
           setSupplementProgress(
             await getEnabledSupplementProgress(),
@@ -258,42 +252,15 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleMealAdd(meal: MealInput): Promise<boolean> {
+  /** Food was logged from the quick-add sheet (which already saved it). */
+  async function handleMealLogged() {
     try {
-      const saved = await addMeal(
-        meal.name,
-        toCanonicalMealNutrition(meal),
-        meal.foods,
-      );
+      setMeals(await getTodayMeals());
 
-      // The primary write succeeded. Keep the meal visible even if the
-      // best-effort dashboard refresh below encounters a storage error.
-      setMeals((current) => [...current, saved]);
-
-      try {
-        setMeals(await getTodayMeals());
-
-        const macros = await getDailyMacroTotals(getTodayKey());
-        setProtein(macros.protein);
-      } catch {
-        // The meal is already persisted; do not report a save failure or
-        // invite the user to submit it a second time.
-      }
-
-      return true;
+      const macros = await getDailyMacroTotals(getTodayKey());
+      setProtein(macros.protein);
     } catch {
-      showToast("Couldn't save meal");
-      return false;
-    }
-  }
-
-  async function handleTargetsSaved() {
-    try {
-      const nutritionTargets = await getNutritionTargets();
-
-      setProteinTarget(nutritionTargets.protein);
-    } catch {
-      showToast("Couldn't load nutrition targets");
+      // The meal is already persisted; the next focus refresh catches up.
     }
   }
 
@@ -343,17 +310,10 @@ export default function HomeScreen() {
     );
   }
 
-  async function handleWorkoutStart() {
-    try {
-      await startWorkout(
-        scheduledRoutine?.name ?? "Workout",
-        scheduledRoutine?.id,
-      );
-
-      router.push("/workouts");
-    } catch {
-      showToast("Couldn't start workout");
-    }
+  /** Forge's Today tab owns starting a workout (plan day, blank, or
+   *  backdated), so Home just opens it. */
+  function handleWorkoutStart() {
+    router.push("/workouts");
   }
 
   async function handleJournalAdd(text: string, mood?: JournalEntry["mood"]) {
@@ -430,7 +390,9 @@ export default function HomeScreen() {
           steps={steps}
           stepsTarget={8000}
           nutritionEnabled={enabled.nutrition}
-          onEditTargets={() => setTargetsSheetOpen(true)}
+          onEditTargets={() =>
+            router.navigate({ pathname: "/nutrition", params: { view: "me" } })
+          }
           onSupplementsPress={() => setSupplementSheetOpen(true)}
           onSleepDeleteLongPress={handleSleepDeleteLongPress}
           compact
@@ -448,17 +410,11 @@ export default function HomeScreen() {
         weightUnit={weightUnit}
         onWaterAdd={handleWaterAdd}
         onWeightAdd={handleWeightAdd}
-        onMealAdd={handleMealAdd}
+        onMealLogged={handleMealLogged}
         onSleepAdd={handleSleepAdd}
         onWorkoutStart={handleWorkoutStart}
         onJournalAdd={handleJournalAdd}
         onProgressPhoto={handleProgressPhoto}
-      />
-
-      <NutritionTargetsSheet
-        visible={targetsSheetOpen}
-        onClose={() => setTargetsSheetOpen(false)}
-        onSaved={handleTargetsSaved}
       />
 
       <SupplementLogSheet
