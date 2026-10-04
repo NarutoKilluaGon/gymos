@@ -1,19 +1,20 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 
 import { GymCard } from "@/components/ui/gym-card";
-import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
-import type { Routine, WorkoutSession } from "@/types/gymos";
+import { GymColors, Spacing, Typography } from "@/constants/theme";
+import type { PlanDay } from "@/types/forge";
+import type { WorkoutSession } from "@/types/gymos";
 
 type WorkoutCardProps = {
   /** Today's workout, or null if none started yet. */
   workout?: WorkoutSession | null;
-  /** Scheduled routine to surface when no workout is active. */
-  routine?: Routine | null;
+  /** Today's day from Forge's active plan, shown when no workout is active. */
+  plannedDay?: PlanDay | null;
 };
 
-function exerciseCount(routine: Routine): string {
-  const count = routine.exercises.length;
+function exerciseCount(day: PlanDay): string {
+  const count = day.exercises.length;
 
   return `${count} ${count === 1 ? "exercise" : "exercises"}`;
 }
@@ -58,16 +59,16 @@ function describeWorkout(workout: WorkoutSession): {
 
 export function WorkoutCard({
   workout,
-  routine,
+  plannedDay,
 }: WorkoutCardProps) {
   const active = workout ?? null;
 
   const display = active
     ? describeWorkout(active)
-    : routine
+    : plannedDay
       ? {
-          title: routine.name,
-          message: `${exerciseCount(routine)} ready — start from Workouts.`,
+          title: plannedDay.name,
+          message: `${exerciseCount(plannedDay)} ready — start from Workouts.`,
         }
       : {
           title: "No workout yet",
@@ -87,11 +88,6 @@ export function WorkoutCard({
         {display.message}
       </Text>
 
-      {!active && routine && (
-        <View style={styles.startChip}>
-          <Text style={styles.startChipText}>Start routine</Text>
-        </View>
-      )}
     </GymCard>
   );
 
@@ -133,20 +129,5 @@ const styles = StyleSheet.create({
     fontSize: Typography.body,
     marginTop: Spacing.one,
     lineHeight: 22,
-  },
-
-  startChip: {
-    marginTop: Spacing.three,
-    alignSelf: "flex-start",
-    backgroundColor: GymColors.semantic.accent,
-    borderRadius: Radius.medium,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-
-  startChipText: {
-    color: GymColors.background.primary,
-    fontSize: Typography.caption,
-    fontWeight: "700",
   },
 });

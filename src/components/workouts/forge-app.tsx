@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -30,19 +30,49 @@ export function ForgeApp() {
   const [tab, setTab] = useState<Tab>("today");
   const [open, setOpen] = useState<WorkoutSession | null>(null);
   const { data, unit, actions, reload } = forge;
+  const flushRef = useRef<(() => Promise<void>) | null>(null);
+  const closing = useRef(false);
+
+  /**
+   * Leave the open session. The session's save queue is drained first, so the
+   * reload below always reads the latest edit instead of racing it.
+   */
+  const closeSession = useCallback(async () => {
+    if (closing.current) return;
+
+    closing.current = true;
+
+    try {
+      await flushRef.current?.();
+      setOpen(null);
+      await reload();
+    } finally {
+      closing.current = false;
+    }
+  }, [reload]);
+
+  /** Open a workout from what is stored, not from the list held in memory. */
+  const openSession = useCallback(
+    async (stale: WorkoutSession) => {
+      const fresh = await actions.resume(stale.id);
+
+      if (fresh) setOpen(fresh);
+      else void reload();
+    },
+    [actions, reload],
+  );
 
   useEffect(() => {
     if (!open) return;
 
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      setOpen(null);
-      void reload();
+      void closeSession();
 
       return true;
     });
 
     return () => subscription.remove();
-  }, [open, reload]);
+  }, [open, closeSession]);
 
   if (!data) {
     return (
@@ -59,10 +89,8 @@ export function ForgeApp() {
         initial={open}
         data={data}
         unit={unit}
-        onClose={() => {
-          setOpen(null);
-          void reload();
-        }}
+        flushRef={flushRef}
+        onClose={() => void closeSession()}
         onDelete={actions.remove}
         onCreateExercise={actions.addCustom}
         onChanged={() => void reload()}
@@ -85,7 +113,7 @@ export function ForgeApp() {
             unit={unit}
             weightKg={forge.weightKg}
             onGoPlan={() => setTab("plan")}
-            onOpen={setOpen}
+            onOpen={(session) => void openSession(session)}
             onStart={(input) => {
               void actions.begin(input).then((session) => {
                 if (session) setOpen(session);
@@ -103,7 +131,7 @@ export function ForgeApp() {
             onCreateExercise={actions.addCustom}
           />
         ) : null}
-        {tab === "history" ? <HistoryView data={data} unit={unit} onOpen={setOpen} /> : null}
+        {tab === "history" ? <HistoryView data={data} unit={unit} onOpen={(session) => void openSession(session)} /> : null}
       </ScrollView>
     </View>
   );

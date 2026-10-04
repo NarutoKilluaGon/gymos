@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import {
   Pressable,
   ScrollView,
@@ -107,6 +107,7 @@ export function ForgeSession({
   onDelete,
   onCreateExercise,
   onChanged,
+  flushRef,
 }: {
   initial: WorkoutSession;
   data: ForgeData;
@@ -120,8 +121,10 @@ export function ForgeSession({
   ) => Promise<CatalogExercise | null>;
   /** The saved data changed; the parent should reload. */
   onChanged: () => void;
+  /** Filled with this session's save-queue flush so the parent can await it. */
+  flushRef: RefObject<(() => Promise<void>) | null>;
 }) {
-  const { session, update, complete, reopenSession } = useLiveSession(
+  const { session, update, complete, reopenSession, flush } = useLiveSession(
     initial,
     data.sessions,
     unit,
@@ -136,6 +139,14 @@ export function ForgeSession({
 
   const finished = Boolean(session.endedAt);
   const paused = Boolean(session.pausedAt);
+
+  useEffect(() => {
+    flushRef.current = flush;
+
+    return () => {
+      if (flushRef.current === flush) flushRef.current = null;
+    };
+  }, [flush, flushRef]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -451,9 +462,13 @@ export function ForgeSession({
         body="It disappears from history and progress. This can't be undone."
         confirmLabel="Delete workout"
         onConfirm={() => {
-          void onDelete(session.id).then((ok) => {
-            if (ok) onClose();
-          });
+          // Drain pending saves first so one can't land after the delete
+          // and bring the workout back.
+          void flush()
+            .then(() => onDelete(session.id))
+            .then((ok) => {
+              if (ok) onClose();
+            });
         }}
       />
       <SummarySheet

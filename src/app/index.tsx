@@ -20,11 +20,11 @@ import {
 } from "@/storage/repositories/meals";
 import { getNorthStar } from "@/storage/repositories/north-star";
 import { getNourishSettings } from "@/storage/repositories/nourish-settings";
+import { getForgeSettings } from "@/storage/repositories/forge-settings";
 import {
   getEnabledSupplementProgress,
   type SupplementProgress,
 } from "@/storage/repositories/supplement-logs";
-import { getRoutines } from "@/storage/repositories/routines";
 import {
   deleteSleepSession,
   getTodaySleep,
@@ -32,16 +32,19 @@ import {
 } from "@/storage/repositories/sleep";
 import { getTodaySteps } from "@/storage/repositories/steps";
 import { addWater, getTodayWater } from "@/storage/repositories/water";
+import { getAllSessions } from "@/storage/repositories/workout-sessions";
 import {
   getTodayWorkouts,
 } from "@/storage/repositories/workouts";
+import { dayFor } from "@/services/forge/plan";
+import { activePlan } from "@/services/forge/settings";
 import { pickAndSavePhotoFromLibrary } from "@/services/progress-photos";
 import { getStreak, type Streak } from "@/services/streak";
+import type { PlanDay } from "@/types/forge";
 import type {
   JournalEntry,
   Meal,
   NorthStar,
-  Routine,
   SleepSession,
   WorkoutSession,
 } from "@/types/gymos";
@@ -152,8 +155,7 @@ export default function HomeScreen() {
   const [activeWorkout, setActiveWorkout] =
     useState<WorkoutSession | undefined>();
 
-  const [scheduledRoutine, setScheduledRoutine] =
-    useState<Routine | null>(null);
+  const [plannedDay, setPlannedDay] = useState<PlanDay | null>(null);
 
   const [meals, setMeals] = useState<Meal[]>([]);
 
@@ -213,14 +215,22 @@ export default function HomeScreen() {
             await getEnabledSupplementProgress(),
           );
 
-          const routines = await getRoutines();
+          // Same source and rule as Forge's Today tab: the active plan and
+          // dayFor, so Home and Workouts always name the same session.
+          const [forgeSettings, allSessions] = await Promise.all([
+            getForgeSettings(),
+            getAllSessions(),
+          ]);
+          const todayKey = getTodayKey();
 
-          const dayOfWeek = new Date().getDay();
-
-          const scheduledIndex =
-            dayOfWeek === 0 || dayOfWeek === 6 ? 0 : dayOfWeek - 1;
-
-          setScheduledRoutine(routines[scheduledIndex] ?? routines[0] ?? null);
+          setPlannedDay(
+            dayFor(
+              activePlan(forgeSettings) ?? undefined,
+              todayKey,
+              todayKey,
+              allSessions,
+            ),
+          );
         } catch {
           showToast("Couldn't load today's data");
         }
@@ -360,7 +370,7 @@ export default function HomeScreen() {
             <View style={styles.halfCard}>
               <WorkoutCard
                 workout={activeWorkout}
-                routine={scheduledRoutine}
+                plannedDay={plannedDay}
               />
             </View>
           )}

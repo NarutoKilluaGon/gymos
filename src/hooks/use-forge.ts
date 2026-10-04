@@ -157,6 +157,22 @@ export function useForge() {
           return null;
         }
       },
+      /**
+       * Re-read one session from storage. Used when opening a workout so it
+       * never starts from a stale in-memory copy (the list in `data` can lag
+       * behind a save that was still in flight when it was loaded).
+       */
+      resume: async (id: string): Promise<WorkoutSession | null> => {
+        try {
+          const stored = await getAllSessions();
+
+          return stored.find((session) => session.id === id) ?? null;
+        } catch {
+          showToast("Couldn't open workout");
+
+          return null;
+        }
+      },
       remove: (id: string) =>
         act(() => deleteSession(id), "Couldn't delete workout"),
       saveSettings: (change: (current: ForgeSettings) => ForgeSettings) =>
@@ -282,5 +298,21 @@ export function useLiveSession(
     [update],
   );
 
-  return { session, update, complete, reopenSession };
+  /**
+   * Resolves once every queued save has been written, including saves queued
+   * while waiting. Call before leaving the session or reloading from storage
+   * so a reload can never read data older than the latest edit. Never
+   * rejects: a failed save already shows its own toast.
+   */
+  const flush = useCallback(async (): Promise<void> => {
+    let tail: Promise<unknown>;
+
+    // `persist` replaces the queue tail, so keep waiting until it stops moving.
+    do {
+      tail = queue.current;
+      await tail;
+    } while (tail !== queue.current);
+  }, []);
+
+  return { session, update, complete, reopenSession, flush };
 }
