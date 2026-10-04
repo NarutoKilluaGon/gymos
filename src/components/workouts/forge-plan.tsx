@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   DraftScope,
+  DraftTextField,
   NumberField,
   type DraftRegistry,
 } from "@/components/workouts/forge-session";
@@ -129,12 +130,13 @@ export function PlanView({
       ) : (
         <>
           <FCard style={s.gap}>
-            <Field
-              label="Plan name"
-              defaultValue={plan.name}
+            <DraftTextField
+              heading="Plan name"
+              accessibilityLabel="Plan name"
+              value={plan.name}
               key={plan.id}
-              onEndEditing={(event: { nativeEvent: { text: string } }) => {
-                const name = event.nativeEvent.text.trim();
+              onCommit={(text) => {
+                const name = text.trim();
 
                 if (name && name !== plan.name) edit((current, now) => ({ ...current, name, updatedAt: now.toISOString() }));
               }}
@@ -165,9 +167,9 @@ export function PlanView({
           {plan.days.map((day) => (
             <FCard key={day.id} style={s.gap}>
               <View style={s.dayHead}>
-                <TextInput
-                  defaultValue={day.name}
-                  onEndEditing={(event: { nativeEvent: { text: string } }) => edit((current, now) => renameDay(current, day.id, event.nativeEvent.text, now))}
+                <DraftTextField
+                  value={day.name}
+                  onCommit={(text) => edit((current, now) => renameDay(current, day.id, text, now))}
                   style={s.dayName}
                   placeholderTextColor={F.dim}
                   selectionColor={F.acc}
@@ -206,10 +208,10 @@ export function PlanView({
                       onCommit={(sets) => editRow(day.id, index, exercise.exerciseId, { sets: Math.min(20, Math.max(1, sets || 1)) })}
                     />
                     <Text style={s.times}>×</Text>
-                    <TextInput
+                    <DraftTextField
                       accessibilityLabel={`${exercise.name} reps`}
-                      defaultValue={exercise.reps}
-                      onEndEditing={(event: { nativeEvent: { text: string } }) => edit((current, now) => updatePlanExercise(current, day.id, index, { reps: event.nativeEvent.text.trim() || "8-10" }, now))}
+                      value={exercise.reps}
+                      onCommit={(text) => editRow(day.id, index, exercise.exerciseId, { reps: text.trim() || "8-10" })}
                       style={s.reps}
                       placeholder="8-10"
                       placeholderTextColor={F.dim}

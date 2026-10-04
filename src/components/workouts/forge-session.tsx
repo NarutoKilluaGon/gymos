@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
   View,
+  type TextInputProps,
 } from "react-native";
 
 import {
@@ -26,7 +27,7 @@ import {
   PlatesSheet,
   SummarySheet,
 } from "@/components/workouts/forge-sheets";
-import { Button, FCard, fmtInt, tap } from "@/components/workouts/forge-ui";
+import { Button, FCard, Field, fmtInt, tap } from "@/components/workouts/forge-ui";
 import { F } from "@/constants/forge-theme";
 import { useLiveSession, type ForgeData } from "@/hooks/use-forge";
 import { exerciseForSession } from "@/services/forge/start";
@@ -154,6 +155,67 @@ export function NumberField({
       style={s.input}
     />
   );
+}
+
+/** Text input that keeps what you type and commits when you leave it, when
+ *  its screen asks for pending drafts to be flushed, or when it unmounts.
+ *  The text twin of `NumberField`: same registry, same exactly-once commit.
+ *  `heading` renders it as a labelled `Field` instead of a bare input. */
+export function DraftTextField({
+  value,
+  onCommit,
+  heading,
+  ...input
+}: Omit<
+  TextInputProps,
+  "value" | "defaultValue" | "onChangeText" | "onBlur" | "onEndEditing"
+> & {
+  value: string;
+  onCommit: (text: string) => void;
+  heading?: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  // The ref is the source of truth for "is there a pending draft": it is
+  // read by flush/blur/unmount, which can run before a re-render.
+  const draftRef = useRef<string | null>(null);
+  const onCommitRef = useRef(onCommit);
+  const registry = useContext(DraftContext);
+
+  useEffect(() => {
+    onCommitRef.current = onCommit;
+  });
+
+  // Clears the draft before committing, so a blur, an endEditing, a flush
+  // and an unmount that all land for the same draft commit it exactly once.
+  const commit = useCallback(() => {
+    const text = draftRef.current;
+
+    if (text === null) return;
+
+    draftRef.current = null;
+    setDraft(null);
+    onCommitRef.current(text);
+  }, []);
+
+  useEffect(() => registry?.register(commit), [registry, commit]);
+
+  // Final safety net for a field that is destroyed while still focused (a
+  // tab switch does not blur it first). Consumers commit by identity, so a
+  // field whose row was removed commits to nothing.
+  useEffect(() => commit, [commit]);
+
+  const props: TextInputProps = {
+    ...input,
+    value: draft ?? value,
+    onChangeText: (text) => {
+      draftRef.current = text;
+      setDraft(text);
+    },
+    onBlur: commit,
+    onEndEditing: commit,
+  };
+
+  return heading ? <Field label={heading} {...props} /> : <TextInput {...props} />;
 }
 
 /** Set a set's values by id. A set that is gone (removed while its field was

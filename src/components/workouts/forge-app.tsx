@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   BackHandler,
   ScrollView,
   StyleSheet,
@@ -75,6 +76,20 @@ export function ForgeApp() {
 
     return () => subscription.remove();
   }, [open, closeSession]);
+
+  // Leaving the foreground can end the process before any blur or unmount
+  // runs, so commit every typed-but-uncommitted field now (Plan tab and open
+  // session) and let the open session's save queue drain.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") return;
+
+      planDrafts.flushAll();
+      flushRef.current?.().catch(() => undefined);
+    });
+
+    return () => subscription.remove();
+  }, [planDrafts]);
 
   if (!data) {
     return (
