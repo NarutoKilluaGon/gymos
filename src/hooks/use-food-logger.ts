@@ -15,9 +15,20 @@ export type ReviewState = {
   slot: MealSlot;
   /** "HH:MM" eaten, or "" for no clock time. */
   at: string;
+  /** The day this entry was opened for. Snapshotted so confirming after
+   *  midnight does not move it onto the new day. */
+  dayKey: string;
 };
 
-export type ManualState = { name: string };
+export type ManualState = {
+  name: string;
+  /** Day and "HH:MM" ("" for none) snapshotted when the sheet opened. */
+  dayKey: string;
+  at: string;
+};
+
+/** The date/time context captured when an entry is started. */
+type DayContext = { dayKey: string; at: string };
 
 function clock(now: Date): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -44,6 +55,9 @@ export function parseClock(value: string): string | null {
  */
 export function useFoodLogger(input: {
   dayKey: string;
+  /** Resolves the day to log to from the live clock at the moment an entry
+   *  is started (not from render state). Defaults to `dayKey`. */
+  resolveDay?: () => string;
   saved: readonly SavedFood[];
   /** Sections that already have entries on the viewed day. */
   filled: ReadonlySet<MealSlot>;
@@ -57,25 +71,36 @@ export function useFoodLogger(input: {
   onCardioText?: (text: string) => void;
   onLogged?: () => void;
 }) {
-  const { dayKey, saved, filled, save, onCardioText, onLogged } = input;
+  const { dayKey, resolveDay, saved, filled, save, onCardioText, onLogged } =
+    input;
   const [busy, setBusy] = useState(false);
   const [eatingOut, setEatingOut] = useState(false);
   const [review, setReview] = useState<ReviewState | null>(null);
   const [manual, setManual] = useState<ManualState | null>(null);
 
-  const defaultAt = useCallback(
-    () => (dayKey === getTodayKey() ? clock(new Date()) : ""),
-    [dayKey],
-  );
+  /** The day to log to and, for today only, the current clock time. */
+  const snapshot = useCallback((): DayContext => {
+    const day = resolveDay ? resolveDay() : dayKey;
+
+    return { dayKey: day, at: day === getTodayKey() ? clock(new Date()) : "" };
+  }, [dayKey, resolveDay]);
 
   const openReview = useCallback(
-    (items: DraftItem[], options?: { notice?: string; named?: MealSlot | null }) => {
-      const at = defaultAt();
+    (
+      items: DraftItem[],
+      options?: {
+        notice?: string;
+        named?: MealSlot | null;
+        context?: DayContext;
+      },
+    ) => {
+      const { dayKey: day, at } = options?.context ?? snapshot();
 
       setReview({
         items,
         ...(options?.notice ? { notice: options.notice } : {}),
         at,
+        dayKey: day,
         slot: pickSlot({
           named: options?.named ?? null,
           at: at || null,
@@ -83,7 +108,7 @@ export function useFoodLogger(input: {
         }),
       });
     },
-    [defaultAt, filled],
+    [filled, snapshot],
   );
 
   /** Returns true when the text was handled (so the caller can clear it). */
@@ -99,6 +124,10 @@ export function useFoodLogger(input: {
         return true;
       }
 
+      // Captured before resolving (which can take a while) so a slow
+      // lookup that finishes after midnight still logs to the day it began.
+      const context = snapshot();
+
       setBusy(true);
 
       try {
@@ -112,7 +141,7 @@ export function useFoodLogger(input: {
               ? "Couldn't read that. Add it manually."
               : "Offline and not a food I know. Add it manually.",
           );
-          setManual({ name: outcome.name });
+          setManual({ name: outcome.name, ...context });
 
           return true;
         }
@@ -120,24 +149,25 @@ export function useFoodLogger(input: {
         openReview(outcome.items, {
           ...(outcome.notice ? { notice: outcome.notice } : {}),
           named: slotFromText(trimmed),
+          context,
         });
 
         return true;
       } catch {
         showToast("Couldn't analyze that. Add it manually.");
-        setManual({ name: trimmed });
+        setManual({ name: trimmed, ...context });
 
         return true;
       } finally {
         setBusy(false);
       }
     },
-    [busy, eatingOut, onCardioText, openReview, saved],
+    [busy, eatingOut, onCardioText, openReview, saved, snapshot],
   );
 
   const openManual = useCallback(
-    (name = "") => setManual({ name }),
-    [],
+    (name = "") => setManual({ name, ...snapshot() }),
+    [snapshot],
   );
 
   const confirm = useCallback(async () => {
@@ -157,7 +187,7 @@ export function useFoodLogger(input: {
       items,
       slot: review.slot,
       at: parseClock(review.at),
-      dayKey,
+      dayKey: review.dayKey,
     });
 
     setBusy(false);
@@ -166,17 +196,20 @@ export function useFoodLogger(input: {
       setReview(null);
       onLogged?.();
     }
-  }, [busy, dayKey, onLogged, review, save]);
+  }, [busy, onLogged, review, save]);
 
   const saveManual = useCallback(
     async (item: DraftItem, slot: MealSlot) => {
+      // The sheet's own snapshot; falls back to now only if it was closed.
+      const context = manual ?? snapshot();
+
       setBusy(true);
 
       const ok = await save({
         items: [item],
         slot,
-        at: parseClock(defaultAt()),
-        dayKey,
+        at: parseClock(context.at),
+        dayKey: context.dayKey,
       });
 
       setBusy(false);
@@ -186,7 +219,7 @@ export function useFoodLogger(input: {
         onLogged?.();
       }
     },
-    [dayKey, defaultAt, onLogged, save],
+    [manual, onLogged, save, snapshot],
   );
 
   return {

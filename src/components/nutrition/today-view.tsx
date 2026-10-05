@@ -31,6 +31,7 @@ import {
 import { N, NRadius, NSerif } from "@/constants/nourish-theme";
 import { useFoodLogger } from "@/hooks/use-food-logger";
 import type { useNourish } from "@/hooks/use-nourish";
+import { useTodayKey } from "@/hooks/use-today-key";
 import { dayHeading, dayTitle, FEEL_OPTIONS } from "@/services/nourish/format";
 import { confidenceLabel, confidenceOf } from "@/services/nourish/nutrition";
 import { slotOfMeal, timeOfDay } from "@/services/nourish/slots";
@@ -44,15 +45,18 @@ import {
 import { isSavedMeal, type SavedFood } from "@/storage/repositories/saved-foods";
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
-import { addDaysToKey, getTodayKey } from "@/utils/date";
+import { addDaysToKey, dateKeyFromTimestamp, getTodayKey } from "@/utils/date";
 import { showToast } from "@/utils/toast";
 
 type Nourish = ReturnType<typeof useNourish>;
 
 export function TodayView({ nourish }: { nourish: Nourish }) {
   const { data, model, actions, records, weightKg } = nourish;
-  const todayKey = getTodayKey();
-  const [dayKey, setDayKey] = useState(todayKey);
+  const todayKey = useTodayKey();
+  // null follows "today" (so it rolls over at midnight); a string is a past
+  // day the user deliberately navigated to and stays put.
+  const [picked, setPicked] = useState<string | null>(null);
+  const dayKey = picked ?? todayKey;
   const [input, setInput] = useState("");
   const [cardioText, setCardioText] = useState<string | null>(null);
   const [microsOpen, setMicrosOpen] = useState(false);
@@ -73,6 +77,15 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     [day],
   );
 
+  // Resolved from the clock at tap time, never from render state, so a stale
+  // render can't file a new entry under yesterday. A picked past day stays.
+  const resolveDay = useCallback(() => {
+    const now = getTodayKey();
+    const wanted = picked ?? now;
+
+    return wanted < now ? wanted : now;
+  }, [picked]);
+
   const openCardio = useCallback((text: string) => {
     setInput("");
     setCardioText(text);
@@ -80,6 +93,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
 
   const logger = useFoodLogger({
     dayKey,
+    resolveDay,
     saved: data?.saved ?? [],
     filled,
     save: actions.logDraft,
@@ -123,6 +137,20 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const uncertainty = Math.round(totals.uncertainty / 10) * 10;
   const over = day.remaining < 0;
 
+  function stepDay(delta: number) {
+    const next = addDaysToKey(dayKey, delta);
+
+    setPicked(next < todayKey ? next : null);
+  }
+
+  /** Copy the day before the one being logged to, resolved at tap time. */
+  function repeatPrevious() {
+    const target = resolveDay();
+    const source = records?.get(addDaysToKey(target, -1))?.meals ?? [];
+
+    if (source.length > 0) void actions.repeatInto(source, target);
+  }
+
   async function send() {
     const handled = await logger.submit(input);
 
@@ -150,7 +178,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     setSavedOpen(false);
 
     if (isSavedMeal(food)) {
-      void actions.logSaved(food, dayKey);
+      void actions.logSaved(food, resolveDay());
     } else {
       logger.openReview([savedFoodToDraft(food)]);
     }
@@ -169,7 +197,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
             hitSlop={12}
             onPress={() => {
               tap();
-              setDayKey(prevKey);
+              stepDay(-1);
             }}
           >
             <ChevronLeft size={24} color={N.mute} />
@@ -184,7 +212,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
             disabled={isToday}
             onPress={() => {
               tap();
-              setDayKey(addDaysToKey(dayKey, 1));
+              stepDay(1);
             }}
             style={isToday && s.hidden}
           >
@@ -231,7 +259,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           {prevMeals.length > 0 ? (
             <Pill
               label={`Repeat ${dayTitle(prevKey, todayKey).toLowerCase()}`}
-              onPress={() => void actions.repeatInto(prevMeals, dayKey)}
+              onPress={repeatPrevious}
             />
           ) : null}
           <Pill label="Saved" onPress={() => setSavedOpen(true)} />
@@ -393,7 +421,14 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
 
           setEditBusy(true);
           void actions
-            .editEntry(editing, { factor, slot, at, dayKey })
+            .editEntry(editing, {
+              factor,
+              slot,
+              at,
+              // The entry's own persisted day, not the one on screen, so an
+              // edit left open across midnight can't move it.
+              dayKey: dateKeyFromTimestamp(editing.timestamp) ?? dayKey,
+            })
             .then((ok) => {
               if (ok) setEditing(null);
             })
@@ -412,7 +447,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         onClose={() => setCardioText(null)}
         initialText={cardioText ?? ""}
         weightKg={weightKg}
-        onSave={(entry) => actions.addCardio(dayKey, entry)}
+        onSave={(entry) => actions.addCardio(resolveDay(), entry)}
       />
       <MicrosSheet
         visible={microsOpen}
