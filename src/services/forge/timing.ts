@@ -89,7 +89,12 @@ export function finish(
   return { session: next, trimmed };
 }
 
-/** Reopen a finished session; the clock continues from its duration. */
+/**
+ * Reopen a finished session; the clock continues from its duration. Reopening
+ * is itself activity: without resetting `lastActivityAt`, finishing later
+ * would measure idle time from before the session was ever finished and trim
+ * the whole workout away. Backdated sessions keep their timestamps as is.
+ */
 export function reopen(session: WorkoutSession, now: Date): WorkoutSession {
   const next: WorkoutSession = { ...session };
 
@@ -97,6 +102,7 @@ export function reopen(session: WorkoutSession, now: Date): WorkoutSession {
     const elapsed = now.getTime() - ms(session.startedAt);
 
     next.pausedMs = Math.max(0, elapsed - durationMs(session, now.getTime()));
+    next.lastActivityAt = now.toISOString();
   }
 
   delete next.endedAt;
