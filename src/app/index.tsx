@@ -11,6 +11,7 @@ import { FadeIn } from "@/components/ui/fade-in";
 import { useModules } from "@/contexts/modules-context";
 import type { SleepInput } from "@/components/quick-add/sleep-sheet";
 import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { useTodayKey } from "@/hooks/use-today-key";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { addJournalEntry } from "@/storage/repositories/journal";
 import { addMeasurement } from "@/storage/repositories/measurements";
@@ -147,6 +148,9 @@ function getSuggestion(
 export default function HomeScreen() {
   const { enabled } = useModules();
   const { unit: weightUnit } = useWeightUnit();
+  // Live local day: changes at midnight and on returning to the foreground,
+  // which re-runs the focus load below so Home never shows yesterday.
+  const todayKey = useTodayKey();
 
   const [water, setWater] = useState(DEFAULT_WATER);
 
@@ -177,41 +181,73 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Set by the cleanup when this load is superseded (a new day, blur or
+      // unmount), so a slower older load can never overwrite a newer one.
+      let cancelled = false;
+
       async function loadHome() {
         try {
           const totalWaterMl = await getTodayWater();
+
+          if (cancelled) return;
 
           setWater(totalWaterMl / 1000);
 
           const storedNorthStar = await getNorthStar();
 
+          if (cancelled) return;
+
           setNorthStar(storedNorthStar);
 
           // Same global rule as Forge Today and Start: the running workout
           // is the unfinished session on any day, not just today's bucket.
-          setActiveWorkout((await getActiveSession()) ?? undefined);
+          const active = await getActiveSession();
 
-          const macros = await getDailyMacroTotals(
-            getTodayKey(),
-          );
+          if (cancelled) return;
+
+          setActiveWorkout(active ?? undefined);
+
+          const macros = await getDailyMacroTotals(todayKey);
+
+          if (cancelled) return;
 
           setProtein(macros.protein);
 
-          setMeals(await getTodayMeals());
+          const todayMeals = await getTodayMeals();
 
-          setSleep(await getTodaySleep());
+          if (cancelled) return;
 
-          setSteps(await getTodaySteps());
+          setMeals(todayMeals);
 
-          setStreak(await getStreak());
+          const todaySleep = await getTodaySleep();
+
+          if (cancelled) return;
+
+          setSleep(todaySleep);
+
+          const todaySteps = await getTodaySteps();
+
+          if (cancelled) return;
+
+          setSteps(todaySteps);
+
+          const currentStreak = await getStreak();
+
+          if (cancelled) return;
+
+          setStreak(currentStreak);
 
           const nutritionSettings = await getNourishSettings();
 
+          if (cancelled) return;
+
           setProteinTarget(nutritionSettings.protein);
 
-          setSupplementProgress(
-            await getEnabledSupplementProgress(),
-          );
+          const progress = await getEnabledSupplementProgress();
+
+          if (cancelled) return;
+
+          setSupplementProgress(progress);
 
           // Same source and rule as Forge's Today tab: the active plan and
           // dayFor, so Home and Workouts always name the same session.
@@ -219,7 +255,8 @@ export default function HomeScreen() {
             getForgeSettings(),
             getAllSessions(),
           ]);
-          const todayKey = getTodayKey();
+
+          if (cancelled) return;
 
           setPlannedDay(
             dayFor(
@@ -230,12 +267,16 @@ export default function HomeScreen() {
             ),
           );
         } catch {
-          showToast("Couldn't load today's data");
+          if (!cancelled) showToast("Couldn't load today's data");
         }
       }
 
-      loadHome();
-    }, []),
+      void loadHome();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [todayKey]),
   );
 
   async function handleWaterAdd(amountLitres: number) {
