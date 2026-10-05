@@ -178,7 +178,12 @@ describe("volume: stored sessions agree between History and the Insights trend",
     const fromForge = sessions.reduce((sum, s) => sum + sessionVolumeKg(s), 0);
     const trend = await getVolumeTrend(52);
 
-    expect(history.length).toBe(sessions.length);
+    // History lists completed workouts only, so the empty session (stored-9:
+    // finished, but no exercises and no cardio) is excluded by design. The
+    // other nine are listed. Volume below still covers all ten (empty = 0 kg).
+    expect(history.map((w) => w.id).sort()).toEqual(
+      Array.from({ length: 9 }, (_, i) => `stored-${i}`),
+    );
     expect(fromHistory).toBeCloseTo(fromForge, 6);
     expect(total(trend)).toBeCloseTo(fromForge, 6);
   });
