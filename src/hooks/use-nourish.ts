@@ -40,9 +40,9 @@ import {
   type NewMeal,
 } from "@/storage/repositories/meals";
 import {
-  addMeasurement,
   deleteMeasurement,
   getMeasurements,
+  replaceTodayWeight,
 } from "@/storage/repositories/measurements";
 import {
   deleteSavedFood,
@@ -59,7 +59,6 @@ import type {
   NourishSettings,
 } from "@/types/nourish";
 import { showToast } from "@/utils/toast";
-import { getTodayKey } from "@/utils/date";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 
 export type NourishData = {
@@ -235,20 +234,13 @@ export function useNourish() {
         act(() => removeCardioLog(dayKey, id), "Couldn't remove"),
       saveSettings: (settings: NourishSettings) =>
         act(() => saveNourishSettings(settings), "Couldn't save targets"),
-      /** Replace today's weight (one reading per day). */
+      /** Replace today's weight (one reading per day, atomically). */
       logWeight: (value: number) =>
-        act(async () => {
-          const today = getTodayKey();
-          const existing = data?.weights.find((w) => w.key === today);
-
-          if (existing) await deleteMeasurement(existing.id);
-
-          await addMeasurement("weight", value, unit);
-        }, "Couldn't save weight"),
+        act(() => replaceTodayWeight(value, unit), "Couldn't save weight"),
       removeWeight: (id: string) =>
         act(() => deleteMeasurement(id), "Couldn't delete"),
     }),
-    [act, actOnce, data, unit],
+    [act, actOnce, unit],
   );
 
   return {
