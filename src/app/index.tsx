@@ -32,10 +32,10 @@ import {
 } from "@/storage/repositories/sleep";
 import { getTodaySteps } from "@/storage/repositories/steps";
 import { addWater, getTodayWater } from "@/storage/repositories/water";
-import { getAllSessions } from "@/storage/repositories/workout-sessions";
 import {
-  getTodayWorkouts,
-} from "@/storage/repositories/workouts";
+  getActiveSession,
+  getAllSessions,
+} from "@/storage/repositories/workout-sessions";
 import { dayFor } from "@/services/forge/plan";
 import { activePlan } from "@/services/forge/settings";
 import { pickAndSavePhotoFromLibrary } from "@/services/progress-photos";
@@ -187,11 +187,9 @@ export default function HomeScreen() {
 
           setNorthStar(storedNorthStar);
 
-          const workouts = await getTodayWorkouts();
-
-          setActiveWorkout(
-            workouts.find((workout) => workout.endedAt === undefined),
-          );
+          // Same global rule as Forge Today and Start: the running workout
+          // is the unfinished session on any day, not just today's bucket.
+          setActiveWorkout((await getActiveSession()) ?? undefined);
 
           const macros = await getDailyMacroTotals(
             getTodayKey(),
