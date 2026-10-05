@@ -26,6 +26,7 @@ import { getMeasurements } from "@/storage/repositories/measurements";
 import {
   createSessionIfNoneActive,
   deleteSession,
+  getActiveSession,
   getAllSessions,
   saveSession,
 } from "@/storage/repositories/workout-sessions";
@@ -319,9 +320,39 @@ export function useLiveSession(
     [allSessions, persist, unit],
   );
 
+  /**
+   * Reopen a finished session. At most one workout may be unfinished at a
+   * time (Start enforces it with `createSessionIfNoneActive`), so reopening is
+   * refused while a different one is running; the finished session is left
+   * exactly as it was. Resolves true when the session was reopened.
+   */
   const reopenSession = useCallback(
-    (now: Date = new Date()) => {
-      update((current) => reopen(current, now));
+    async (now: Date = new Date()): Promise<boolean> => {
+      let active: WorkoutSession | null;
+
+      try {
+        active = await getActiveSession();
+      } catch {
+        // Can't tell whether another workout is running, so don't risk two.
+        if (alive.current) showToast("Couldn't reopen workout");
+
+        return false;
+      }
+
+      // The screen was left while checking: don't reopen behind its back.
+      if (!alive.current) return false;
+
+      // The session being reopened may itself be the stored unfinished one
+      // (e.g. its finish hasn't been written yet): that's not a conflict.
+      if (active && active.id !== latest.current.id) {
+        showToast("Finish or delete your current workout first");
+
+        return false;
+      }
+
+      update((current) => (current.endedAt ? reopen(current, now) : current));
+
+      return true;
     },
     [update],
   );
