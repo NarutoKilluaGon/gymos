@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import {
   buildDayModel,
@@ -134,6 +134,28 @@ export function useNourish() {
     [reload],
   );
 
+  // Non-idempotent diary actions (they append entries) must not run twice
+  // for one intent. A ref, not state, so a rapid second tap is blocked before
+  // React re-renders. Held through the write AND the reload that follows,
+  // because the UI only reflects the write once that reload lands.
+  const inFlight = useRef(new Set<string>());
+
+  /** Like `act`, but ignores a call while the same action is still running. */
+  const actOnce = useCallback(
+    async (name: string, write: () => Promise<unknown>, failure: string) => {
+      if (inFlight.current.has(name)) return false;
+
+      inFlight.current.add(name);
+
+      try {
+        return await act(write, failure);
+      } finally {
+        inFlight.current.delete(name);
+      }
+    },
+    [act],
+  );
+
   const records = useMemo(
     () =>
       data
@@ -192,11 +214,15 @@ export function useNourish() {
       setFeel: (dayKey: string, slot: MealSlot, value: FeelValue) =>
         act(() => toggleFeel(dayKey, slot, value), "Couldn't save"),
       repeatInto: (source: readonly Meal[], toKey: string) =>
-        act(() => repeatDay(source, toKey), "Couldn't repeat"),
+        actOnce("repeatInto", () => repeatDay(source, toKey), "Couldn't repeat"),
       saveSection: (meals: readonly Meal[], slot: MealSlot) =>
-        act(() => saveSlotAsMeal(meals, slot), "Couldn't save meal"),
+        actOnce(
+          "saveSection",
+          () => saveSlotAsMeal(meals, slot),
+          "Couldn't save meal",
+        ),
       logSaved: (saved: SavedFood, dayKey: string) =>
-        act(() => logSavedMeal(saved, dayKey), "Couldn't log"),
+        actOnce("logSaved", () => logSavedMeal(saved, dayKey), "Couldn't log"),
       removeSaved: (id: string) =>
         act(() => deleteSavedFood(id), "Couldn't delete"),
       addRecipe: (name: string, items: readonly DraftItem[], servings: number) =>
@@ -222,7 +248,7 @@ export function useNourish() {
       removeWeight: (id: string) =>
         act(() => deleteMeasurement(id), "Couldn't delete"),
     }),
-    [act, data, unit],
+    [act, actOnce, data, unit],
   );
 
   return {
