@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   buildDayModel,
@@ -80,7 +80,23 @@ export function useNourish() {
   const [data, setData] = useState<NourishData | null>(null);
   const { unit } = useWeightUnit();
 
+  // Identifies the newest reload. Reloads can overlap (focus, then a write's
+  // refresh), and an older one can finish last holding an older snapshot, so
+  // only the reload that is still the newest may commit. Bumped again on
+  // unmount so a reload still in flight then commits (and toasts) nothing.
+  const loadId = useRef(0);
+
+  useEffect(() => {
+    const ids = loadId;
+
+    return () => {
+      ids.current += 1;
+    };
+  }, []);
+
   const reload = useCallback(async () => {
+    const id = ++loadId.current;
+
     try {
       const [meals, feel, cardio, settings, saved, measurements, timeline] =
         await Promise.all([
@@ -94,6 +110,9 @@ export function useNourish() {
           getTimeline().catch(() => []),
         ]);
 
+      // Superseded by a newer reload (or unmounted): this snapshot is stale.
+      if (id !== loadId.current) return;
+
       setData({
         meals,
         feel,
@@ -104,7 +123,7 @@ export function useNourish() {
         workoutCardio: workoutCardioByDay(timeline),
       });
     } catch {
-      showToast("Couldn't load nutrition");
+      if (id === loadId.current) showToast("Couldn't load nutrition");
     }
   }, []);
 
