@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import {
   logSavedMeal,
   recipePerServing,
@@ -43,6 +45,10 @@ import type { DraftItem } from "@/types/nourish";
 import { addDaysToKey, getTodayKey } from "@/utils/date";
 
 const TODAY = getTodayKey();
+
+beforeEach(async () => {
+  await AsyncStorage.clear();
+});
 
 const draft = (over: Partial<DraftItem> = {}): DraftItem => ({
   name: "Dal",
