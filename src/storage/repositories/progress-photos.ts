@@ -14,6 +14,18 @@ const PHOTOS_KEY = "@gymos/progress-photos";
  *  take this lock, so it is safe to call from inside a task. */
 const photosMutex = createMutex();
 
+/** Best-effort removal of a file this call created. Never throws: cleanup
+ *  must not mask the error that triggered it. */
+function discardCreatedFile(file: File): void {
+  try {
+    if (file.exists) {
+      file.delete();
+    }
+  } catch (error) {
+    console.error("Couldn't clean up progress photo file", error);
+  }
+}
+
 function photosDirectory(): Directory {
   return new Directory(Paths.document, "progress-photos");
 }
@@ -49,22 +61,30 @@ export async function addProgressPhoto(
 
   await source.copy(destination);
 
-  const photo: ProgressPhoto = {
-    id,
-    uri: destination.uri,
-    date: getTodayKey(),
-    timestamp: new Date().toISOString(),
-  };
+  // `destination` was created by the copy above, so it is ours to remove if
+  // the record never becomes durable (a file with no record is unreachable).
+  try {
+    const photo: ProgressPhoto = {
+      id,
+      uri: destination.uri,
+      date: getTodayKey(),
+      timestamp: new Date().toISOString(),
+    };
 
-  // The copy above stays outside the lock (it is slow and doesn't touch
-  // the list); only the record read-modify-write is serialized.
-  await photosMutex.runExclusive(async () => {
-    const current = await getProgressPhotos();
+    // The copy above stays outside the lock (it is slow and doesn't touch
+    // the list); only the record read-modify-write is serialized.
+    await photosMutex.runExclusive(async () => {
+      const current = await getProgressPhotos();
 
-    await setStorage(PHOTOS_KEY, [...current, photo]);
-  });
+      await setStorage(PHOTOS_KEY, [...current, photo]);
+    });
 
-  return photo;
+    return photo;
+  } catch (error) {
+    discardCreatedFile(destination);
+
+    throw error;
+  }
 }
 
 export async function deleteProgressPhoto(

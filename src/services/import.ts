@@ -37,11 +37,31 @@ function serializeValue(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
+/** Best-effort removal of files this import newly created. Never throws:
+ *  rollback must not mask the error that triggered it. */
+function discardCreatedFiles(created: readonly File[]): void {
+  for (const file of created) {
+    try {
+      if (file.exists) {
+        file.delete();
+      }
+    } catch (error) {
+      console.error("Couldn't clean up imported photo file", error);
+    }
+  }
+}
+
 /** Materialize bundled photo bytes into this device's photo directory and
  *  rewrite each photo's `uri` to the local copy (exported paths belong to
  *  the origin device). Runs before any storage write: if this throws,
- *  AsyncStorage is left untouched. Bundles without photo files no-op. */
-function materializePhotoFiles(bundle: ExportBundle): void {
+ *  AsyncStorage is left untouched. Bundles without photo files no-op.
+ *
+ *  Returns the files this call newly created, so the caller can roll them
+ *  back if the import later fails. A file that already existed under the
+ *  same ID is overwritten (as before) but is never listed: it may be
+ *  referenced by a local record, so rollback must not delete it. If this
+ *  throws, the files it had already created are removed first. */
+function materializePhotoFiles(bundle: ExportBundle): File[] {
   const files = bundle.files;
   const photos = bundle.data[PHOTOS_KEY];
 
@@ -50,8 +70,10 @@ function materializePhotoFiles(bundle: ExportBundle): void {
     typeof files !== "object" ||
     !Array.isArray(photos)
   ) {
-    return;
+    return [];
   }
+
+  const created: File[] = [];
 
   try {
     const directory = new Directory(Paths.document, "progress-photos");
@@ -73,13 +95,22 @@ function materializePhotoFiles(bundle: ExportBundle): void {
       if (typeof blob !== "string") continue;
 
       const destination = new File(directory, `${id}.jpg`);
+
+      // Listed before create(): a file that is created but then fails to
+      // write must be rolled back too. Pre-existing files are not listed.
+      if (!destination.exists) created.push(destination);
+
       destination.create({ overwrite: true });
       destination.write(blob, { encoding: "base64" });
       record.uri = destination.uri;
     }
   } catch {
+    discardCreatedFiles(created);
+
     throw new Error("Couldn't save imported photos");
   }
+
+  return created;
 }
 
 /** Restore an exported GymOS backup. Merges: keys in the file overwrite
@@ -104,7 +135,7 @@ export async function importFromUri(uri: string): Promise<number> {
 
   // Rewrite photo URIs and write photo files first: a failure here must
   // abort the import before any storage key is touched.
-  materializePhotoFiles(bundle);
+  const createdPhotoFiles = materializePhotoFiles(bundle);
 
   const entries: [string, string][] = [];
 
@@ -139,6 +170,9 @@ export async function importFromUri(uri: string): Promise<number> {
     // section — imports are rare, user-initiated operations.
     await withDailyLock(() => AsyncStorage.multiSet(entries));
   } catch {
+    // Nothing was persisted, so the files this import wrote are unreferenced.
+    discardCreatedFiles(createdPhotoFiles);
+
     throw new Error("Couldn't save imported data");
   }
 
