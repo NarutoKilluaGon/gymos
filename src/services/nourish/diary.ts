@@ -14,9 +14,8 @@ import {
 } from "@/storage/repositories/meals";
 import {
   addSavedFood,
-  deleteSavedFood,
-  getSavedFoods,
   rememberFoods,
+  replaceRecipe,
   type SavedFood,
 } from "@/storage/repositories/saved-foods";
 import {
@@ -27,7 +26,6 @@ import {
   type MealSlot,
 } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
-import { normalizeFoodName } from "@/services/food-db";
 import { getTodayKey, timestampForKey } from "@/utils/date";
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -295,22 +293,11 @@ export async function saveRecipe(
   items: readonly DraftItem[],
   servings: number,
 ): Promise<SavedFood> {
-  const perServing = recipePerServing(items, servings);
-  const key = normalizeFoodName(name);
-
-  for (const existing of await getSavedFoods()) {
-    if (existing.recipe && normalizeFoodName(existing.name) === key) {
-      await deleteSavedFood(existing.id);
-    }
-  }
-
-  const { confidence, ...nutrition } = perServing;
+  const { confidence, ...nutrition } = recipePerServing(items, servings);
 
   void confidence;
 
-  return addSavedFood(name, nutrition, undefined, {
-    qty: "1 serving",
-    recipe: true,
-  });
+  // One atomic repository operation: a failed save keeps the old recipe.
+  return replaceRecipe(name, nutrition);
 }
 

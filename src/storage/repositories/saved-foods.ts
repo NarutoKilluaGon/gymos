@@ -102,6 +102,49 @@ export async function addSavedFood(
   });
 }
 
+/**
+ * Save a recipe, replacing every existing recipe with the same normalized
+ * name ("Rajma" and "rajma" are one recipe). The whole replacement is one
+ * locked read-modify-write with a single persisted write: if that write
+ * fails nothing changes (the old recipe survives), overlapping calls
+ * serialize (exactly one matching recipe remains), and no reader can see
+ * the list with the recipe missing. Duplicates already stored under the
+ * name collapse into the replacement. Saved meals, plain foods and
+ * differently named recipes are never touched.
+ *
+ * The replacement is a new entry (new id, new createdAt), as before.
+ */
+export async function replaceRecipe(
+  name: string,
+  macros?: Partial<
+    Pick<SavedFood, "calories" | "protein" | "carbs" | "fat">
+  > &
+    Micronutrients,
+): Promise<SavedFood> {
+  return savedFoodsMutex.runExclusive(async () => {
+    const existing = await readSavedFoodsUnlocked();
+    const key = normalizeFoodName(name);
+
+    const recipe: SavedFood = {
+      id: createId(),
+      name,
+      ...macros,
+      qty: "1 serving",
+      recipe: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    await setStorage(SAVED_FOODS_KEY, [
+      ...existing.filter(
+        (entry) => !(entry.recipe && normalizeFoodName(entry.name) === key),
+      ),
+      recipe,
+    ]);
+
+    return recipe;
+  });
+}
+
 export type RememberedFood = {
   name: string;
   qty: string;
