@@ -28,7 +28,16 @@ async function readUnlocked(): Promise<ForgeSettings> {
 
   // First open after the switch: turn the old routines into a plan once.
   // The routines themselves are never modified.
-  const routines = await getRoutines().catch(() => []);
+  let routines: Awaited<ReturnType<typeof getRoutines>>;
+
+  try {
+    routines = await getRoutines();
+  } catch {
+    // A failed read is not "no routines": leave the import undone (and
+    // nothing written) so the next read tries again.
+    return settings;
+  }
+
   const custom = await readCustom();
   const plan = planFromRoutines(routines, buildCatalog(custom));
   const next: ForgeSettings = {
