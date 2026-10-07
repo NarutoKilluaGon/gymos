@@ -186,89 +186,55 @@ export default function HomeScreen() {
       let cancelled = false;
 
       async function loadHome() {
-        try {
-          const totalWaterMl = await getTodayWater();
+        // Each source loads on its own: one that fails (steps, streak,
+        // supplements, ...) must not stop the others, above all the workout
+        // cards, from loading and updating. A failure keeps that card's last
+        // value and is reported once, after everything has had its turn.
+        let failed = false;
 
+        async function load<T>(read: () => Promise<T>, apply: (value: T) => void) {
           if (cancelled) return;
 
-          setWater(totalWaterMl / 1000);
+          try {
+            const value = await read();
 
-          const storedNorthStar = await getNorthStar();
-
-          if (cancelled) return;
-
-          setNorthStar(storedNorthStar);
-
-          // Same global rule as Forge Today and Start: the running workout
-          // is the unfinished session on any day, not just today's bucket.
-          const active = await getActiveSession();
-
-          if (cancelled) return;
-
-          setActiveWorkout(active ?? undefined);
-
-          const macros = await getDailyMacroTotals(todayKey);
-
-          if (cancelled) return;
-
-          setProtein(macros.protein);
-
-          const todayMeals = await getTodayMeals();
-
-          if (cancelled) return;
-
-          setMeals(todayMeals);
-
-          const todaySleep = await getTodaySleep();
-
-          if (cancelled) return;
-
-          setSleep(todaySleep);
-
-          const todaySteps = await getTodaySteps();
-
-          if (cancelled) return;
-
-          setSteps(todaySteps);
-
-          const currentStreak = await getStreak();
-
-          if (cancelled) return;
-
-          setStreak(currentStreak);
-
-          const nutritionSettings = await getNourishSettings();
-
-          if (cancelled) return;
-
-          setProteinTarget(nutritionSettings.protein);
-
-          const progress = await getEnabledSupplementProgress();
-
-          if (cancelled) return;
-
-          setSupplementProgress(progress);
-
-          // Same source and rule as Forge's Today tab: the active plan and
-          // dayFor, so Home and Workouts always name the same session.
-          const [forgeSettings, allSessions] = await Promise.all([
-            getForgeSettings(),
-            getAllSessions(),
-          ]);
-
-          if (cancelled) return;
-
-          setPlannedDay(
-            dayFor(
-              activePlan(forgeSettings) ?? undefined,
-              todayKey,
-              todayKey,
-              allSessions,
-            ),
-          );
-        } catch {
-          if (!cancelled) showToast("Couldn't load today's data");
+            if (!cancelled) apply(value);
+          } catch {
+            failed = true;
+          }
         }
+
+        await load(getTodayWater, (totalWaterMl) => setWater(totalWaterMl / 1000));
+        await load(getNorthStar, setNorthStar);
+        // Same global rule as Forge Today and Start: the running workout
+        // is the unfinished session on any day, not just today's bucket.
+        await load(getActiveSession, (active) => setActiveWorkout(active ?? undefined));
+        await load(
+          () => getDailyMacroTotals(todayKey),
+          (macros) => setProtein(macros.protein),
+        );
+        await load(getTodayMeals, setMeals);
+        await load(getTodaySleep, setSleep);
+        await load(getTodaySteps, setSteps);
+        await load(getStreak, setStreak);
+        await load(getNourishSettings, (settings) => setProteinTarget(settings.protein));
+        await load(getEnabledSupplementProgress, setSupplementProgress);
+        // Same source and rule as Forge's Today tab: the active plan and
+        // dayFor, so Home and Workouts always name the same session.
+        await load(
+          () => Promise.all([getForgeSettings(), getAllSessions()]),
+          ([forgeSettings, allSessions]) =>
+            setPlannedDay(
+              dayFor(
+                activePlan(forgeSettings) ?? undefined,
+                todayKey,
+                todayKey,
+                allSessions,
+              ),
+            ),
+        );
+
+        if (failed && !cancelled) showToast("Couldn't load today's data");
       }
 
       void loadHome();

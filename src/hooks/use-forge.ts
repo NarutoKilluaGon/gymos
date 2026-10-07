@@ -139,7 +139,15 @@ export function useForge() {
       }): Promise<WorkoutSession | null> => {
         if (!data) return null;
 
-        const plan = activePlan(data.settings) ?? undefined;
+        // Build from what is stored now, not the copy this screen last
+        // loaded: a plan edit still being saved (or made elsewhere) must be
+        // what Start uses. The settings read queues behind any pending plan
+        // write. Falls back to the loaded copy only if storage can't be read.
+        const [settings, sessions] = await Promise.all([
+          getForgeSettings().catch(() => data.settings),
+          getAllSessions().catch(() => data.sessions),
+        ]);
+        const plan = activePlan(settings) ?? undefined;
         const day = input.dayId
           ? (plan?.days.find((entry) => entry.id === input.dayId) ?? null)
           : null;
@@ -148,7 +156,7 @@ export function useForge() {
           ...(plan ? { plan } : {}),
           date: input.date ?? getTodayKey(),
           catalog: data.catalog,
-          sessions: data.sessions,
+          sessions,
           unit,
           ...(data.bodyweightKg ? { bodyweightKg: data.bodyweightKg } : {}),
           ...(input.backdated ? { backdated: true } : {}),
