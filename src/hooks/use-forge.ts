@@ -68,7 +68,14 @@ export function useForge() {
     };
   }, []);
 
+  // Reloads overlap (focus, every write's refresh, Start, close, finish), and
+  // an older one can finish last holding an older snapshot. Only the reload
+  // that is still the newest may commit; `alive` still covers unmount.
+  const loadId = useRef(0);
+
   const reload = useCallback(async () => {
+    const id = ++loadId.current;
+
     try {
       const [sessions, settings, custom, cardio, measurements, nourish] =
         await Promise.all([
@@ -82,7 +89,8 @@ export function useForge() {
       const weights = weightPoints(measurements);
       const latest = weights[weights.length - 1]?.kg;
 
-      if (!alive.current) return;
+      // Unmounted, or superseded by a newer reload: this snapshot is stale.
+      if (!alive.current || id !== loadId.current) return;
 
       setData({
         sessions,
@@ -93,7 +101,7 @@ export function useForge() {
         bodyweightKg: latest ?? nourish?.fallbackWeightKg,
       });
     } catch {
-      if (alive.current) showToast("Couldn't load workouts");
+      if (alive.current && id === loadId.current) showToast("Couldn't load workouts");
     }
   }, []);
 

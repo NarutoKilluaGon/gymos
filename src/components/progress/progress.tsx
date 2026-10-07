@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -184,7 +184,23 @@ export default function ProgressScreen() {
     MonthlySummary[]
   >([]);
 
+  // Loads overlap (focus, a saved measurement, a photo change), and an older
+  // one can finish last holding an older snapshot, e.g. a photo that has
+  // since been deleted. Only the load that is still the newest may commit.
+  // Bumped again on unmount so a load still in flight then commits nothing.
+  const loadId = useRef(0);
+
+  useEffect(() => {
+    const ids = loadId;
+
+    return () => {
+      ids.current += 1;
+    };
+  }, []);
+
   const loadProgress = useCallback(async () => {
+    const id = ++loadId.current;
+
     try {
       const results = await Promise.all(
         MEASUREMENTS.map(async (item) => {
@@ -196,6 +212,8 @@ export default function ProgressScreen() {
           return [item.type, history] as const;
         }),
       );
+
+      if (id !== loadId.current) return;
 
       setMeasurements(
         Object.fromEntries(results),
@@ -218,24 +236,34 @@ export default function ProgressScreen() {
           }),
         );
 
+      if (id !== loadId.current) return;
+
       setExercises(list);
       setChartHistory(
         Object.fromEntries(histories),
       );
 
-      setPhotos(await getProgressPhotos());
+      const storedPhotos = await getProgressPhotos();
+
+      if (id !== loadId.current) return;
+
+      setPhotos(storedPhotos);
 
       const [goal, summaries] = await Promise.all([
         getNorthStarProgress(),
         getMonthlySummaries(),
       ]);
 
+      if (id !== loadId.current) return;
+
       setGoalProgress(goal);
       setMonthlies(summaries);
     } catch {
-      showToast("Couldn't load progress");
+      if (id === loadId.current) {
+        showToast("Couldn't load progress");
+      }
     } finally {
-      setLoading(false);
+      if (id === loadId.current) setLoading(false);
     }
   }, []);
 
@@ -267,6 +295,10 @@ export default function ProgressScreen() {
                     (item) => item.id !== photo.id,
                   ),
                 );
+                // A load that started before this delete may still be
+                // reading the old photo list. Starting a new one supersedes
+                // it, so the deleted photo can't come back.
+                void loadProgress();
               })
               .catch(() => {
                 showToast("Couldn't delete photo");
