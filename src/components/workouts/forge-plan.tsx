@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -69,18 +69,23 @@ export function PlanView({
   const [addDayName, setAddDayName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  /** Edit the active plan atomically against whatever is stored now. */
-  const edit = (change: (current: Plan, now: Date) => Plan) => {
-    if (!plan) return;
+  /** Edit the active plan atomically against whatever is stored now.
+   *  Resolves whether the change was saved (false when there is no plan). */
+  const save = (change: (current: Plan, now: Date) => Plan): Promise<boolean> => {
+    if (!plan) return Promise.resolve(false);
 
     const id = plan.id;
 
-    void onSave((current) => ({
+    return onSave((current) => ({
       ...current,
       plans: current.plans.map((entry) =>
         entry.id === id ? change(entry, new Date()) : entry,
       ),
     }));
+  };
+
+  const edit = (change: (current: Plan, now: Date) => Plan) => {
+    void save(change);
   };
 
   /** Edit one exercise row, but only if that row is still the same
@@ -92,7 +97,40 @@ export function PlanView({
         : current,
     );
 
+  /** Row actions that address an exercise by position (remove, move up,
+   *  superset). `shown` is the day's rows as rendered when the button was
+   *  drawn. The change only applies if the stored row at `index` is still the
+   *  same exercise, and, when `around` names a neighbour the action also
+   *  shifts or touches (-1 previous, +1 next), that neighbour is unchanged
+   *  too. Otherwise this button is stale (an earlier tap already removed or
+   *  moved a row) and nothing happens, rather than hitting whichever row slid
+   *  into that index. Editing sets, reps or weight does not affect the check. */
+  const editRowAt = (
+    dayId: string,
+    shown: readonly PlanExercise[],
+    index: number,
+    around: -1 | 0 | 1,
+    change: (current: Plan, now: Date) => Plan,
+  ) =>
+    edit((current, now) => {
+      const stored = current.days.find((entry) => entry.id === dayId)?.exercises;
+      const same = (i: number) => stored?.[i]?.exerciseId === shown[i]?.exerciseId;
+
+      return stored && same(index) && (around === 0 || same(index + around))
+        ? change(current, now)
+        : current;
+    });
+
+  // One New plan per opening of the sheet: two quick taps (a template, then
+  // Blank, or the same one twice) must not create two plans. Held until the
+  // save settles, because the sheet stays tappable while it slides away.
+  const creating = useRef(false);
+
   const create = (template: string | null, name: string) => {
+    if (creating.current) return;
+
+    creating.current = true;
+
     const made =
       (template ? planFromTemplate(template, catalog) : null) ?? newPlan(name);
 
@@ -102,7 +140,32 @@ export function PlanView({
       ...current,
       plans: [...current.plans, made],
       activePlanId: made.id,
-    }));
+    })).finally(() => {
+      creating.current = false;
+    });
+  };
+
+  // Add day: keep the typed name until the day is really saved, and ignore a
+  // second tap while a save is running (it would add a second, default-named
+  // "Day" once the field cleared).
+  const addingDay = useRef(false);
+
+  const submitDay = async () => {
+    if (addingDay.current) return;
+
+    addingDay.current = true;
+
+    const name = addDayName;
+
+    try {
+      const ok = await save((current, now) => addDay(current, name, now));
+
+      // Clear only after success, and only if the field still holds what was
+      // submitted (the person may have started typing the next name).
+      if (ok) setAddDayName((typed) => (typed === name ? "" : typed));
+    } finally {
+      addingDay.current = false;
+    }
   };
 
   return (
@@ -228,10 +291,10 @@ export function PlanView({
                   </View>
                   <View style={s.rowActions}>
                     {index < day.exercises.length - 1 ? (
-                      <Action label={exercise.superset ? "Unlink" : "Superset"} onPress={() => edit((current, now) => updatePlanExercise(current, day.id, index, { superset: !exercise.superset }, now))} />
+                      <Action label={exercise.superset ? "Unlink" : "Superset"} onPress={() => editRowAt(day.id, day.exercises, index, 0, (current, now) => updatePlanExercise(current, day.id, index, { superset: !exercise.superset }, now))} />
                     ) : null}
-                    {index > 0 ? <Action label="↑" onPress={() => edit((current, now) => movePlanExerciseUp(current, day.id, index, now))} /> : null}
-                    <Action label="Remove" danger onPress={() => edit((current, now) => removePlanExercise(current, day.id, index, now))} />
+                    {index > 0 ? <Action label="↑" onPress={() => editRowAt(day.id, day.exercises, index, -1, (current, now) => movePlanExerciseUp(current, day.id, index, now))} /> : null}
+                    <Action label="Remove" danger onPress={() => editRowAt(day.id, day.exercises, index, 1, (current, now) => removePlanExercise(current, day.id, index, now))} />
                   </View>
                 </View>
               ))}
@@ -253,10 +316,7 @@ export function PlanView({
             <Button
               kind="ghost"
               label="Add day"
-              onPress={() => {
-                edit((current, now) => addDay(current, addDayName, now));
-                setAddDayName("");
-              }}
+              onPress={() => void submitDay()}
             />
           </FCard>
 

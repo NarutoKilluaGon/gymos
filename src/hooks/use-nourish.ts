@@ -211,9 +211,9 @@ export function useNourish() {
         slot: MealSlot;
         at: string | null;
         dayKey: string;
-      }) => act(() => saveDraft(input), "Couldn't save"),
+      }) => actOnce("logDraft", () => saveDraft(input), "Couldn't save"),
       addEntries: (entries: readonly NewMeal[]) =>
-        act(() => addMeals(entries), "Couldn't save"),
+        actOnce("addEntries", () => addMeals(entries), "Couldn't save"),
       editEntry: (
         meal: Meal,
         options: {
@@ -248,7 +248,12 @@ export function useNourish() {
       addCardio: (
         dayKey: string,
         entry: Omit<CardioLog, "id" | "loggedAt">,
-      ) => act(() => addCardioLog(dayKey, entry), "Couldn't save cardio"),
+      ) =>
+        actOnce(
+          "addCardio",
+          () => addCardioLog(dayKey, entry),
+          "Couldn't save cardio",
+        ),
       removeCardio: (dayKey: string, id: string) =>
         act(() => removeCardioLog(dayKey, id), "Couldn't remove"),
       saveSettings: (settings: NourishSettings) =>

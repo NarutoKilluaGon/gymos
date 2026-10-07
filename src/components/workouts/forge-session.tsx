@@ -348,7 +348,21 @@ export function ForgeSession({
     else setRestEnd(null);
   };
 
+  // Finishing stamps the end time, detects PRs and saves, so it must run once
+  // per intent. The sheet stays tappable while it slides away, so a ref (not
+  // state) blocks a second tap before React re-renders. It is released if the
+  // save fails (the workout is open again) or when the workout is reopened.
+  const finishing = useRef(false);
+
+  useEffect(() => {
+    if (!finished) finishing.current = false;
+  }, [finished]);
+
   const finishWith = async (mode: "keep" | "complete" | "drop") => {
+    if (finishing.current) return;
+
+    finishing.current = true;
+
     // Typed values must be in the session before it is finished and judged.
     drafts.flushAll();
     setSheet({ kind: "none" });
@@ -376,6 +390,8 @@ export function ForgeSession({
     } catch {
       // Not saved: `complete` already toasted and restored the open workout.
       // No summary, no reload as if it had finished.
+      finishing.current = false;
+
       return;
     }
 

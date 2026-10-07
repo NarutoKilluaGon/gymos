@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -54,6 +54,15 @@ export function ExercisePickerSheet({
   );
   const exact = catalog.some((entry) => entry.name.toLowerCase() === q);
 
+  // One pick (or create) per opening. The sheet stays tappable while it
+  // slides away and a create is async, so a second tap would otherwise add the
+  // exercise twice. A ref, not state, so it holds before React re-renders.
+  const picking = useRef(false);
+
+  useEffect(() => {
+    if (visible) picking.current = false;
+  }, [visible]);
+
   const close = () => {
     setQuery("");
     onClose();
@@ -85,6 +94,9 @@ export function ExercisePickerSheet({
           key={entry.id}
           accessibilityRole="button"
           onPress={() => {
+            if (picking.current) return;
+
+            picking.current = true;
             onPick(entry);
             close();
           }}
@@ -125,9 +137,17 @@ export function ExercisePickerSheet({
           <Button
             label="Add exercise"
             onPress={() => {
+              if (picking.current) return;
+
+              picking.current = true;
               void onCreate(query.trim(), makeMuscle, makeBodyweight).then(
                 (created) => {
-                  if (!created) return;
+                  if (!created) {
+                    // Nothing was added: let the person try again.
+                    picking.current = false;
+
+                    return;
+                  }
 
                   onPick(created);
                   close();
