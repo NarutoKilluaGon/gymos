@@ -14,6 +14,7 @@ export type EventType =
   | "workout.cardio.logged"
   | "workout.cardio.removed"
   | "workout.finished"
+  | "workout.deleted"
   | "routine.created"
   | "routine.updated"
   | "routine.deleted"
@@ -67,6 +68,8 @@ export type EventPayload = {
     workoutId: ID;
     cardioId: ID;
   };
+  /** Tombstone: hides the session's timeline entry. */
+  "workout.deleted": { workoutId: ID };
   "workout.finished": {
     workoutId: ID;
     durationMs: number;

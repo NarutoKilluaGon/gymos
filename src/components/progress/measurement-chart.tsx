@@ -3,10 +3,13 @@ import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { GymColors, Spacing, Typography } from "@/constants/theme";
-import { convertWeight, type WeightUnit } from "@/storage/repositories/preferences";
-import type { Measurement } from "@/types/gymos";
+import { measurementChartSeries } from "@/services/progress-chart";
+import type { Measurement, MeasurementType } from "@/types/gymos";
+import { dateFromKey } from "@/utils/date";
 
 type MeasurementChartProps = {
+  /** Which measurement this is; "weight" gets the date-accurate series. */
+  type?: MeasurementType;
   measurements: Measurement[];
   height?: number;
   hasHistoricalData?: boolean;
@@ -19,29 +22,19 @@ const PADDING_TOP = 18;
 const PADDING_BOTTOM = 28;
 
 export function MeasurementChart({
+  type,
   measurements,
   height = 180,
   hasHistoricalData = false,
 }: MeasurementChartProps) {
   const chart = useMemo(() => {
-    if (measurements.length === 0) {
+    const series = measurementChartSeries(type, measurements);
+
+    if (!series) {
       return null;
     }
 
-    // Mixed kg/lb history: plot every reading in the latest reading's
-    // unit (the one shown next to CURRENT) so the line and the CHANGE
-    // are coherent. Stored values are never modified. Non-weight charts
-    // share one unit across the series, so convertWeight is an identity.
-    const referenceUnit =
-      measurements[measurements.length - 1].unit;
-
-    const values = measurements.map((measurement) =>
-      convertWeight(
-        measurement.value,
-        measurement.unit as WeightUnit,
-        referenceUnit as WeightUnit,
-      ),
-    );
+    const values = series.points.map((point) => point.value);
 
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
@@ -57,20 +50,18 @@ export function MeasurementChart({
 
     const chartHeight = height - PADDING_TOP - PADDING_BOTTOM;
 
-    const points = measurements.map((measurement, index) => {
-      const x =
-        measurements.length === 1
-          ? PADDING_LEFT + chartWidth / 2
-          : PADDING_LEFT + (index / (measurements.length - 1)) * chartWidth;
+    const points = series.points.map((point) => {
+      const x = PADDING_LEFT + point.x * chartWidth;
 
-      const normalized = (values[index] - minY) / (maxY - minY);
+      const normalized = (point.value - minY) / (maxY - minY);
 
       const y = PADDING_TOP + chartHeight - normalized * chartHeight;
 
       return {
         x,
         y,
-        value: values[index],
+        value: point.value,
+        key: point.key,
       };
     });
 
@@ -83,8 +74,9 @@ export function MeasurementChart({
       path,
       minY,
       maxY,
+      unit: series.unit,
     };
-  }, [measurements, height]);
+  }, [type, measurements, height]);
 
   if (!chart) {
     return (
@@ -104,12 +96,10 @@ export function MeasurementChart({
     );
   }
 
-  const firstMeasurement = measurements[0];
-  const lastMeasurement = measurements[measurements.length - 1];
+  const firstPoint = chart.points[0];
+  const lastPoint = chart.points[chart.points.length - 1];
 
-  const change =
-    chart.points[chart.points.length - 1].value -
-    chart.points[0].value;
+  const change = lastPoint.value - firstPoint.value;
 
   return (
     <View style={styles.container}>
@@ -118,17 +108,17 @@ export function MeasurementChart({
           <Text style={styles.currentLabel}>CURRENT</Text>
 
           <Text style={styles.currentValue}>
-            {lastMeasurement.value} {lastMeasurement.unit}
+            {lastPoint.value} {chart.unit}
           </Text>
         </View>
 
-        {measurements.length >= 2 && (
+        {chart.points.length >= 2 && (
           <View style={styles.changeContainer}>
             <Text style={styles.currentLabel}>CHANGE</Text>
 
             <Text style={styles.change}>
               {change > 0 ? "+" : ""}
-              {change.toFixed(1)} {lastMeasurement.unit}
+              {change.toFixed(1)} {chart.unit}
             </Text>
           </View>
         )}
@@ -188,7 +178,7 @@ export function MeasurementChart({
 
         {chart.points.map((point, index) => (
           <Circle
-            key={`${point.x}-${point.y}-${index}`}
+            key={`${point.key}-${index}`}
             cx={point.x}
             cy={point.y}
             r={5}
@@ -196,27 +186,27 @@ export function MeasurementChart({
           />
         ))}
 
-        {measurements.length >= 1 && (
+        {chart.points.length >= 1 && (
           <SvgText
-            x={chart.points[0].x}
+            x={firstPoint.x}
             y={height - 8}
             fill={GymColors.text.tertiary}
             fontSize={9}
             textAnchor="middle"
           >
-            {formatDate(firstMeasurement.timestamp)}
+            {formatDate(firstPoint.key)}
           </SvgText>
         )}
 
-        {measurements.length >= 2 && (
+        {chart.points.length >= 2 && (
           <SvgText
-            x={chart.points[chart.points.length - 1].x}
+            x={lastPoint.x}
             y={height - 8}
             fill={GymColors.text.tertiary}
             fontSize={9}
             textAnchor="middle"
           >
-            {formatDate(lastMeasurement.timestamp)}
+            {formatDate(lastPoint.key)}
           </SvgText>
         )}
       </Svg>
@@ -224,8 +214,8 @@ export function MeasurementChart({
   );
 }
 
-function formatDate(timestamp: string): string {
-  const date = new Date(timestamp);
+function formatDate(key: string): string {
+  const date = dateFromKey(key);
 
   return date.toLocaleDateString(undefined, {
     month: "short",

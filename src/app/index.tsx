@@ -1,6 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
 import { DailyTargetsCard } from "@/components/dashboard/daily-targets-card";
-import { NutritionTargetsSheet } from "@/components/dashboard/nutrition-targets-sheet";
 import { SupplementLogSheet } from "@/components/dashboard/supplement-log-sheet";
 import { Greeting } from "@/components/dashboard/greeting";
 import { NorthStarCard } from "@/components/dashboard/north-star-card";
@@ -10,24 +9,23 @@ import { WorkoutCard } from "@/components/dashboard/workout-card";
 import { GymFAB } from "@/components/fab/gym-fab";
 import { FadeIn } from "@/components/ui/fade-in";
 import { useModules } from "@/contexts/modules-context";
-import type { MealInput } from "@/components/quick-add/meal-sheet";
 import type { SleepInput } from "@/components/quick-add/sleep-sheet";
 import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { useTodayKey } from "@/hooks/use-today-key";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { addJournalEntry } from "@/storage/repositories/journal";
 import { addMeasurement } from "@/storage/repositories/measurements";
 import {
-  addMeal,
   getDailyMacroTotals,
   getTodayMeals,
 } from "@/storage/repositories/meals";
 import { getNorthStar } from "@/storage/repositories/north-star";
-import { getNutritionTargets } from "@/storage/repositories/nutrition-targets";
+import { getNourishSettings } from "@/storage/repositories/nourish-settings";
+import { getForgeSettings } from "@/storage/repositories/forge-settings";
 import {
   getEnabledSupplementProgress,
   type SupplementProgress,
 } from "@/storage/repositories/supplement-logs";
-import { getRoutines } from "@/storage/repositories/routines";
 import {
   deleteSleepSession,
   getTodaySleep,
@@ -36,17 +34,18 @@ import {
 import { getTodaySteps } from "@/storage/repositories/steps";
 import { addWater, getTodayWater } from "@/storage/repositories/water";
 import {
-  getTodayWorkouts,
-  startWorkout,
-} from "@/storage/repositories/workouts";
+  getActiveSession,
+  getAllSessions,
+} from "@/storage/repositories/workout-sessions";
+import { dayFor } from "@/services/forge/plan";
+import { activePlan } from "@/services/forge/settings";
 import { pickAndSavePhotoFromLibrary } from "@/services/progress-photos";
 import { getStreak, type Streak } from "@/services/streak";
-import { toCanonicalMealNutrition } from "@/services/meal-estimator";
+import type { PlanDay } from "@/types/forge";
 import type {
   JournalEntry,
   Meal,
   NorthStar,
-  Routine,
   SleepSession,
   WorkoutSession,
 } from "@/types/gymos";
@@ -149,6 +148,9 @@ function getSuggestion(
 export default function HomeScreen() {
   const { enabled } = useModules();
   const { unit: weightUnit } = useWeightUnit();
+  // Live local day: changes at midnight and on returning to the foreground,
+  // which re-runs the focus load below so Home never shows yesterday.
+  const todayKey = useTodayKey();
 
   const [water, setWater] = useState(DEFAULT_WATER);
 
@@ -157,8 +159,7 @@ export default function HomeScreen() {
   const [activeWorkout, setActiveWorkout] =
     useState<WorkoutSession | undefined>();
 
-  const [scheduledRoutine, setScheduledRoutine] =
-    useState<Routine | null>(null);
+  const [plannedDay, setPlannedDay] = useState<PlanDay | null>(null);
 
   const [meals, setMeals] = useState<Meal[]>([]);
 
@@ -166,7 +167,6 @@ export default function HomeScreen() {
 
   const [proteinTarget, setProteinTarget] = useState<number | undefined>();
 
-  const [targetsSheetOpen, setTargetsSheetOpen] = useState(false);
 
   const [supplementProgress, setSupplementProgress] =
     useState<SupplementProgress>({ total: 0, taken: 0 });
@@ -181,59 +181,68 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Set by the cleanup when this load is superseded (a new day, blur or
+      // unmount), so a slower older load can never overwrite a newer one.
+      let cancelled = false;
+
       async function loadHome() {
-        try {
-          const totalWaterMl = await getTodayWater();
+        // Each source loads on its own: one that fails (steps, streak,
+        // supplements, ...) must not stop the others, above all the workout
+        // cards, from loading and updating. A failure keeps that card's last
+        // value and is reported once, after everything has had its turn.
+        let failed = false;
 
-          setWater(totalWaterMl / 1000);
+        async function load<T>(read: () => Promise<T>, apply: (value: T) => void) {
+          if (cancelled) return;
 
-          const storedNorthStar = await getNorthStar();
+          try {
+            const value = await read();
 
-          setNorthStar(storedNorthStar);
-
-          const workouts = await getTodayWorkouts();
-
-          setActiveWorkout(
-            workouts.find((workout) => workout.endedAt === undefined),
-          );
-
-          const macros = await getDailyMacroTotals(
-            getTodayKey(),
-          );
-
-          setProtein(macros.protein);
-
-          setMeals(await getTodayMeals());
-
-          setSleep(await getTodaySleep());
-
-          setSteps(await getTodaySteps());
-
-          setStreak(await getStreak());
-
-          const nutritionTargets = await getNutritionTargets();
-
-          setProteinTarget(nutritionTargets.protein);
-
-          setSupplementProgress(
-            await getEnabledSupplementProgress(),
-          );
-
-          const routines = await getRoutines();
-
-          const dayOfWeek = new Date().getDay();
-
-          const scheduledIndex =
-            dayOfWeek === 0 || dayOfWeek === 6 ? 0 : dayOfWeek - 1;
-
-          setScheduledRoutine(routines[scheduledIndex] ?? routines[0] ?? null);
-        } catch {
-          showToast("Couldn't load today's data");
+            if (!cancelled) apply(value);
+          } catch {
+            failed = true;
+          }
         }
+
+        await load(getTodayWater, (totalWaterMl) => setWater(totalWaterMl / 1000));
+        await load(getNorthStar, setNorthStar);
+        // Same global rule as Forge Today and Start: the running workout
+        // is the unfinished session on any day, not just today's bucket.
+        await load(getActiveSession, (active) => setActiveWorkout(active ?? undefined));
+        await load(
+          () => getDailyMacroTotals(todayKey),
+          (macros) => setProtein(macros.protein),
+        );
+        await load(getTodayMeals, setMeals);
+        await load(getTodaySleep, setSleep);
+        await load(getTodaySteps, setSteps);
+        await load(getStreak, setStreak);
+        await load(getNourishSettings, (settings) => setProteinTarget(settings.protein));
+        await load(getEnabledSupplementProgress, setSupplementProgress);
+        // Same source and rule as Forge's Today tab: the active plan and
+        // dayFor, so Home and Workouts always name the same session.
+        await load(
+          () => Promise.all([getForgeSettings(), getAllSessions()]),
+          ([forgeSettings, allSessions]) =>
+            setPlannedDay(
+              dayFor(
+                activePlan(forgeSettings) ?? undefined,
+                todayKey,
+                todayKey,
+                allSessions,
+              ),
+            ),
+        );
+
+        if (failed && !cancelled) showToast("Couldn't load today's data");
       }
 
-      loadHome();
-    }, []),
+      void loadHome();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [todayKey]),
   );
 
   async function handleWaterAdd(amountLitres: number) {
@@ -258,42 +267,15 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleMealAdd(meal: MealInput): Promise<boolean> {
+  /** Food was logged from the quick-add sheet (which already saved it). */
+  async function handleMealLogged() {
     try {
-      const saved = await addMeal(
-        meal.name,
-        toCanonicalMealNutrition(meal),
-        meal.foods,
-      );
+      setMeals(await getTodayMeals());
 
-      // The primary write succeeded. Keep the meal visible even if the
-      // best-effort dashboard refresh below encounters a storage error.
-      setMeals((current) => [...current, saved]);
-
-      try {
-        setMeals(await getTodayMeals());
-
-        const macros = await getDailyMacroTotals(getTodayKey());
-        setProtein(macros.protein);
-      } catch {
-        // The meal is already persisted; do not report a save failure or
-        // invite the user to submit it a second time.
-      }
-
-      return true;
+      const macros = await getDailyMacroTotals(getTodayKey());
+      setProtein(macros.protein);
     } catch {
-      showToast("Couldn't save meal");
-      return false;
-    }
-  }
-
-  async function handleTargetsSaved() {
-    try {
-      const nutritionTargets = await getNutritionTargets();
-
-      setProteinTarget(nutritionTargets.protein);
-    } catch {
-      showToast("Couldn't load nutrition targets");
+      // The meal is already persisted; the next focus refresh catches up.
     }
   }
 
@@ -343,17 +325,10 @@ export default function HomeScreen() {
     );
   }
 
-  async function handleWorkoutStart() {
-    try {
-      await startWorkout(
-        scheduledRoutine?.name ?? "Workout",
-        scheduledRoutine?.id,
-      );
-
-      router.push("/workouts");
-    } catch {
-      showToast("Couldn't start workout");
-    }
+  /** Forge's Today tab owns starting a workout (plan day, blank, or
+   *  backdated), so Home just opens it. */
+  function handleWorkoutStart() {
+    router.push("/workouts");
   }
 
   async function handleJournalAdd(text: string, mood?: JournalEntry["mood"]) {
@@ -400,7 +375,7 @@ export default function HomeScreen() {
             <View style={styles.halfCard}>
               <WorkoutCard
                 workout={activeWorkout}
-                routine={scheduledRoutine}
+                plannedDay={plannedDay}
               />
             </View>
           )}
@@ -430,7 +405,9 @@ export default function HomeScreen() {
           steps={steps}
           stepsTarget={8000}
           nutritionEnabled={enabled.nutrition}
-          onEditTargets={() => setTargetsSheetOpen(true)}
+          onEditTargets={() =>
+            router.navigate({ pathname: "/nutrition", params: { view: "me" } })
+          }
           onSupplementsPress={() => setSupplementSheetOpen(true)}
           onSleepDeleteLongPress={handleSleepDeleteLongPress}
           compact
@@ -448,17 +425,11 @@ export default function HomeScreen() {
         weightUnit={weightUnit}
         onWaterAdd={handleWaterAdd}
         onWeightAdd={handleWeightAdd}
-        onMealAdd={handleMealAdd}
+        onMealLogged={handleMealLogged}
         onSleepAdd={handleSleepAdd}
         onWorkoutStart={handleWorkoutStart}
         onJournalAdd={handleJournalAdd}
         onProgressPhoto={handleProgressPhoto}
-      />
-
-      <NutritionTargetsSheet
-        visible={targetsSheetOpen}
-        onClose={() => setTargetsSheetOpen(false)}
-        onSaved={handleTargetsSaved}
       />
 
       <SupplementLogSheet

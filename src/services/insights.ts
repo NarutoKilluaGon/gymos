@@ -1,3 +1,5 @@
+import { isCompletedWorkout } from "@/services/forge/history";
+import { sessionVolumeKg } from "@/services/forge/load";
 import { getAllDailyActivities } from "@/storage/daily";
 import { getAllMeals } from "@/storage/repositories/meals";
 import {
@@ -98,7 +100,7 @@ export async function getHeatmap(
 
   for (const activity of Object.values(data)) {
     const completed = (activity.workouts ?? []).filter(
-      (workout) => workout.endedAt !== undefined,
+      isCompletedWorkout,
     ).length;
 
     if (completed > 0) {
@@ -180,7 +182,7 @@ export async function getWeekInsights(): Promise<WeekInsights> {
     }
 
     const completedWorkouts = (activity.workouts ?? []).filter(
-      (workout) => workout.endedAt !== undefined,
+      isCompletedWorkout,
     );
 
     if (completedWorkouts.length > 0) {
@@ -347,7 +349,7 @@ export async function getMonthlySummaries(
       };
 
     const completedWorkouts = (activity.workouts ?? []).filter(
-      (workout) => workout.endedAt !== undefined,
+      isCompletedWorkout,
     );
 
     if (completedWorkouts.length > 0) {
@@ -439,8 +441,9 @@ export async function getMonthlySummaries(
 }
 
 /**
- * Lifting volume (Σ weight × reps) per week, Mon-starting,
- * oldest first. Weeks with no completed weighted sets are 0.
+ * Lifting volume per week (kg), Mon-starting, oldest first, using the same
+ * definition as Forge and History (`sessionVolumeKg`). Weeks with no
+ * completed work sets are 0.
  */
 export async function getVolumeTrend(
   weeks: number = 12,
@@ -450,8 +453,9 @@ export async function getVolumeTrend(
   const dayVolume = new Map<string, number>();
 
   for (const activity of Object.values(data)) {
-    const completed = (activity.workouts ?? []).filter(
-      (workout) => workout.endedAt !== undefined,
+    // "Finished" as Forge defines it (`finishedSessions`): has `endedAt`.
+    const completed = (activity.workouts ?? []).filter((workout) =>
+      Boolean(workout?.endedAt),
     );
 
     if (completed.length === 0) {
@@ -461,18 +465,16 @@ export async function getVolumeTrend(
     let total = 0;
 
     for (const workout of completed) {
-      for (const exercise of workout.exercises ?? []) {
-        for (const set of exercise.sets ?? []) {
-          if (
-            !set.completed ||
-            typeof set.weight !== "number"
-          ) {
-            continue;
-          }
-
-          total += set.weight * set.reps;
-        }
-      }
+      // The same definition History and Forge use (kg, completed non-warm-up
+      // sets, unit-converted, bodyweight-aware). Missing arrays on a
+      // malformed record read as empty rather than throwing.
+      total += sessionVolumeKg({
+        ...workout,
+        exercises: (workout.exercises ?? []).map((exercise) => ({
+          ...exercise,
+          sets: exercise.sets ?? [],
+        })),
+      });
     }
 
     dayVolume.set(activity.date, total);

@@ -1,11 +1,30 @@
 import { Directory, File, Paths } from "expo-file-system";
 
+import { createMutex } from "@/storage/mutex";
 import { getStorage, setStorage } from "@/storage/storage";
 import type { ProgressPhoto } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
 import { createId } from "@/utils/id";
 
 const PHOTOS_KEY = "@gymos/progress-photos";
+
+/** Serializes every read -> modify -> write of PHOTOS_KEY so overlapping
+ *  add/delete calls can't each persist a stale snapshot (lost update or
+ *  resurrected record). getProgressPhotos() is a plain read and does not
+ *  take this lock, so it is safe to call from inside a task. */
+const photosMutex = createMutex();
+
+/** Best-effort removal of a file this call created. Never throws: cleanup
+ *  must not mask the error that triggered it. */
+function discardCreatedFile(file: File): void {
+  try {
+    if (file.exists) {
+      file.delete();
+    }
+  } catch (error) {
+    console.error("Couldn't clean up progress photo file", error);
+  }
+}
 
 function photosDirectory(): Directory {
   return new Directory(Paths.document, "progress-photos");
@@ -42,34 +61,52 @@ export async function addProgressPhoto(
 
   await source.copy(destination);
 
-  const photo: ProgressPhoto = {
-    id,
-    uri: destination.uri,
-    date: getTodayKey(),
-    timestamp: new Date().toISOString(),
-  };
+  // `destination` was created by the copy above, so it is ours to remove if
+  // the record never becomes durable (a file with no record is unreachable).
+  try {
+    const photo: ProgressPhoto = {
+      id,
+      uri: destination.uri,
+      date: getTodayKey(),
+      timestamp: new Date().toISOString(),
+    };
 
-  const current = await getProgressPhotos();
+    // The copy above stays outside the lock (it is slow and doesn't touch
+    // the list); only the record read-modify-write is serialized.
+    await photosMutex.runExclusive(async () => {
+      const current = await getProgressPhotos();
 
-  await setStorage(PHOTOS_KEY, [...current, photo]);
+      await setStorage(PHOTOS_KEY, [...current, photo]);
+    });
 
-  return photo;
+    return photo;
+  } catch (error) {
+    discardCreatedFile(destination);
+
+    throw error;
+  }
 }
 
 export async function deleteProgressPhoto(
   id: string,
 ): Promise<void> {
-  const current = await getProgressPhotos();
+  // The whole record mutation is one serialized transaction. The file is
+  // deleted after the lock is released: it needs no serialization.
+  const photo = await photosMutex.runExclusive(async () => {
+    const current = await getProgressPhotos();
 
-  const photo = current.find((item) => item.id === id);
+    const found = current.find((item) => item.id === id);
 
-  // Commit the metadata removal before touching the file: the record is
-  // the source of truth, so a failed write must leave record and file
-  // both intact (retryable) — never a record pointing at a deleted file.
-  await setStorage(
-    PHOTOS_KEY,
-    current.filter((item) => item.id !== id),
-  );
+    // Commit the metadata removal before touching the file: the record is
+    // the source of truth, so a failed write must leave record and file
+    // both intact (retryable) — never a record pointing at a deleted file.
+    await setStorage(
+      PHOTOS_KEY,
+      current.filter((item) => item.id !== id),
+    );
+
+    return found;
+  });
 
   if (photo) {
     const file = new File(photo.uri);

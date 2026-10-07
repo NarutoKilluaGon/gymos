@@ -1,3 +1,4 @@
+import { sessionVolumeKg } from "@/services/forge/load";
 import {
   getCompletedWorkouts,
 } from "@/storage/repositories/workouts";
@@ -10,26 +11,22 @@ export function setWeight(weight?: number): number {
   return weight ?? 0;
 }
 
-/** Total volume of a workout = Σ weight × reps over completed sets. */
+/**
+ * Total volume of a workout, in kg. Delegates to Forge's `sessionVolumeKg`
+ * so History, the Forge screens and Insights share one definition:
+ * Σ load × reps over completed, non-warm-up sets, with each set's weight
+ * converted from its own unit to kg and bodyweight exercises carrying body
+ * weight plus the extra load. Callers format it for display.
+ */
 export function workoutVolume(workout: WorkoutSession): number {
-  return workout.exercises.reduce(
-    (total, exercise) =>
-      total +
-      exercise.sets.reduce((sum, set) => {
-        if (!set.completed) {
-          return sum;
-        }
-
-        return sum + setWeight(set.weight) * set.reps;
-      }, 0),
-    0,
-  );
+  return sessionVolumeKg(workout);
 }
 
 /** Count of logged (non-empty) sets across the workout. */
 export function workoutSetCount(workout: WorkoutSession): number {
   return workout.exercises.reduce(
-    (total, exercise) => total + exercise.sets.length,
+    (total, exercise) =>
+      total + exercise.sets.filter((set) => !set.warmup).length,
     0,
   );
 }

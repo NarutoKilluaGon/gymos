@@ -8,7 +8,7 @@
  * review code.
  */
 
-import type { EstimatedFood } from "@/components/quick-add/meal-sheet";
+import type { EstimatedFood } from "@/types/gymos";
 import type { MacroTotals } from "@/storage/repositories/meals";
 import { NUTRIENT_KEYS } from "@/types/gymos";
 import { computeMealTotals } from "@/services/meal-nutrition-math";

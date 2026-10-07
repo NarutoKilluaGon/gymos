@@ -5,9 +5,7 @@ import {
 } from "@/services/food-db";
 import {
   computeMealTotals,
-  mealInputFromEstimate,
   resolveSegmentLocally,
-  type MealEstimate,
 } from "@/services/meal-estimator";
 import { MICRONUTRIENT_KEYS } from "@/types/gymos";
 import type { MealFood } from "@/types/gymos";
@@ -117,25 +115,5 @@ describe("DB nutrition with micros wins on exact local match", () => {
     expect(food.entryId).toBe("ghee");
     expect(food.vitaminA).toBe(200);
     expect(food.calories).toBe(270);
-  });
-});
-
-describe("mealInputFromEstimate carries micros", () => {
-  it("forwards micro totals to the save path", () => {
-    const input = mealInputFromEstimate({
-      foods: [],
-      totals: {
-        calories: 200,
-        protein: 10,
-        carbs: 20,
-        fat: 5,
-        fiber: 3,
-        vitaminC: 25,
-      },
-    });
-
-    expect(input.calories).toBe(200);
-    expect(input.fiber).toBe(3);
-    expect(input.vitaminC).toBe(25);
   });
 });
