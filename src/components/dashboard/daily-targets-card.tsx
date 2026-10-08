@@ -240,22 +240,25 @@ const styles = StyleSheet.create({
   },
 
   compactGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
+    flexDirection: "column",
+    gap: Spacing.one,
     marginTop: Spacing.one,
   },
 
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: Spacing.one,
+    minHeight: 36,
     width: "100%",
   },
 
   rowCompact: {
-    width: "48%",
-    paddingVertical: Spacing.half,
+    width: "100%",
+    paddingVertical: Spacing.one,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
 
   label: {

@@ -26,6 +26,7 @@ export function Skeleton({
   const opacity = useAnimatedValue(0.4);
 
   useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
