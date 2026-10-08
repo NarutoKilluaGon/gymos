@@ -243,6 +243,7 @@ export function ForgeSession({
 
     setRestEnd(null);
     setSummary({ prs: result.session.prs ?? [], trimmed: result.trimmed });
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onChanged();
   };
 

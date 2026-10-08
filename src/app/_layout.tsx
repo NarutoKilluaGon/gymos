@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
+import { ReduceMotion, ReducedMotionConfig } from 'react-native-reanimated';
 
 import AppTabs from '@/components/app-tabs';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -56,6 +57,7 @@ export default function TabLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ReducedMotionConfig mode={ReduceMotion.System} />
       <StatusBar style="light" />
       <AnimatedSplashOverlay />
       <ToastHost />

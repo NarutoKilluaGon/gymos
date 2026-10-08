@@ -1,5 +1,13 @@
 import { Check, RotateCcw } from "lucide-react-native";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect } from "react";
+import {
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  useAnimatedValue,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Font } from "@/constants/design";
@@ -28,12 +36,37 @@ export function BottomBar({
 }: BottomBarProps) {
   const insets = useSafeAreaInsets();
   const showRest = restLeft > 0 && !finished;
+  const slideAnim = useAnimatedValue(0);
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: showRest ? 1 : 0,
+      speed: 18,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  }, [showRest, slideAnim]);
 
   return (
     <View style={styles.container}>
-      {/* 1. REST TIMER PILL (floats above the bar) */}
+      {/* 1. REST TIMER PILL (floats above the bar with slide-up) */}
       {showRest ? (
-        <View style={styles.restPill}>
+        <Animated.View
+          style={[
+            styles.restPill,
+            {
+              opacity: slideAnim,
+              transform: [
+                {
+                  translateY: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Text style={styles.restClock}>
             {`Rest ${formatClock(restLeft * 1000)}`}
           </Text>
@@ -57,7 +90,7 @@ export function BottomBar({
               <Text style={styles.restBtnText}>Skip</Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       ) : null}
 
       {/* 2. DOCKED BAR CONTENT */}

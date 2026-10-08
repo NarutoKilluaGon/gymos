@@ -31,17 +31,17 @@ export function ProgressBar({
 }: ProgressBarProps) {
   const progress = Math.min(current / target, 1);
 
-  const width = useSharedValue(0);
+  const scale = useSharedValue(0);
 
   useEffect(() => {
-    width.value = withTiming(
+    scale.value = withTiming(
       progress,
       TimingConfig.medium,
     );
-  }, [progress, width]);
+  }, [progress, scale]);
 
   const fillStyle = useAnimatedStyle(() => ({
-    width: `${width.value * 100}%`,
+    transform: [{ scaleX: scale.value }],
   }));
 
   const status =
@@ -148,9 +148,11 @@ const styles = StyleSheet.create({
   },
 
   fill: {
+    width: '100%',
     height: '100%',
     backgroundColor: GymColors.semantic.accent,
     borderRadius: Radius.medium,
+    transformOrigin: 'left',
   },
 
   completedFill: {
@@ -192,9 +194,11 @@ const styles = StyleSheet.create({
   },
 
   fillCompact: {
+    width: '100%',
     height: '100%',
     backgroundColor: GymColors.semantic.accent,
     borderRadius: Radius.small,
+    transformOrigin: 'left',
   },
 
   completedFillCompact: {

@@ -1,6 +1,13 @@
 import * as Haptics from "expo-haptics";
 import { Check } from "lucide-react-native";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  useAnimatedValue,
+  View,
+} from "react-native";
 
 import { Font } from "@/constants/design";
 import { F } from "@/constants/forge-theme";
@@ -35,6 +42,7 @@ export function SetRow({
   onRepsCommit,
   onToggleDone,
 }: SetRowProps) {
+  const checkScale = useAnimatedValue(1);
   const weightPlaceholder = refSet?.weight
     ? String(round1(refSet.weight))
     : bodyweight
@@ -103,15 +111,35 @@ export function SetRow({
         accessibilityLabel={`Set ${setIndex + 1} done`}
         onPress={() => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          Animated.sequence([
+            Animated.timing(checkScale, {
+              toValue: 1.18,
+              duration: 100,
+              useNativeDriver: true,
+            }),
+            Animated.spring(checkScale, {
+              toValue: 1,
+              speed: 40,
+              bounciness: 6,
+              useNativeDriver: true,
+            }),
+          ]).start();
           onToggleDone();
         }}
-        style={[styles.check, set.completed && styles.checkOn]}
       >
-        <Check
-          size={20}
-          strokeWidth={2.5}
-          color={set.completed ? F.accInk : F.dim}
-        />
+        <Animated.View
+          style={[
+            styles.check,
+            set.completed && styles.checkOn,
+            { transform: [{ scale: checkScale }] },
+          ]}
+        >
+          <Check
+            size={20}
+            strokeWidth={2.5}
+            color={set.completed ? F.accInk : F.dim}
+          />
+        </Animated.View>
       </Pressable>
     </View>
   );

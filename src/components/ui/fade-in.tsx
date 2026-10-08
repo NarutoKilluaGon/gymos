@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Animated, {
-  FadeIn as ReanimatedFadeIn,
+  FadeInDown,
 } from "react-native-reanimated";
 
 import { TimingConfig } from "@/utils/motion";
@@ -12,8 +12,7 @@ type FadeInProps = {
 };
 
 /**
- * Fades children in on mount, using the Motion
- * medium timing by default.
+ * Fades children in on mount using staggered entry motion.
  */
 export function FadeIn({
   children,
@@ -22,7 +21,7 @@ export function FadeIn({
 }: FadeInProps) {
   return (
     <Animated.View
-      entering={ReanimatedFadeIn.duration(duration).delay(delay)}
+      entering={FadeInDown.duration(duration).delay(delay)}
     >
       {children}
     </Animated.View>

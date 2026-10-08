@@ -12,7 +12,15 @@ import {
   X,
 } from "lucide-react-native";
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  useAnimatedValue,
+  View,
+} from "react-native";
 
 import { JournalSheet } from "@/components/quick-add/journal-sheet";
 import { LogFoodSheet } from "@/components/nutrition/log-food-sheet";
@@ -80,21 +88,39 @@ export function GymFAB({
   const [sleepSheetOpen, setSleepSheetOpen] = useState(false);
   const [journalSheetOpen, setJournalSheetOpen] = useState(false);
 
+  const rotAnim = useAnimatedValue(0);
+
   async function openSheet() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
+    Animated.spring(rotAnim, {
+      toValue: 1,
+      speed: 20,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
     setOpen(true);
   }
 
   async function closeSheet() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
+    Animated.spring(rotAnim, {
+      toValue: 0,
+      speed: 20,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
     setOpen(false);
   }
 
   async function handleAction(label: string) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    Animated.spring(rotAnim, {
+      toValue: 0,
+      speed: 20,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
     setOpen(false);
 
     if (label === "Water") {
@@ -183,7 +209,20 @@ export function GymFAB({
         onPress={openSheet}
         style={styles.fab}
       >
-        <Plus size={28} color={GymColors.text.primary} />
+        <Animated.View
+          style={{
+            transform: [
+              {
+                rotate: rotAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["0deg", "45deg"],
+                }),
+              },
+            ],
+          }}
+        >
+          <Plus size={28} color={GymColors.text.primary} />
+        </Animated.View>
       </Pressable>
 
       {/* Main Quick Add Sheet */}

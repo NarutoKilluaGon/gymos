@@ -1,5 +1,6 @@
+import * as Haptics from "expo-haptics";
 import { ChevronLeft, ChevronRight, Plus, Send } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -68,6 +69,24 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const day = model(dayKey);
   const prevKey = addDaysToKey(dayKey, -1);
   const prevMeals = records?.get(prevKey)?.meals ?? [];
+
+  const prevCaloriesRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!day || process.env.NODE_ENV === "test") return;
+    const currentKcal = day.totals.calories;
+    const budget = day.budget;
+
+    if (
+      prevCaloriesRef.current !== null &&
+      budget > 0 &&
+      prevCaloriesRef.current < budget &&
+      currentKcal >= budget
+    ) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    prevCaloriesRef.current = currentKcal;
+  }, [day]);
 
   const filled = useMemo(
     () =>
