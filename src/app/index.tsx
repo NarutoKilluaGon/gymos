@@ -39,7 +39,6 @@ import {
 } from "@/storage/repositories/workout-sessions";
 import { dayFor } from "@/services/forge/plan";
 import { activePlan } from "@/services/forge/settings";
-import { pickAndSavePhotoFromLibrary } from "@/services/progress-photos";
 import { getStreak, type Streak } from "@/services/streak";
 import type { PlanDay } from "@/types/forge";
 import type {
@@ -339,10 +338,6 @@ export default function HomeScreen() {
     }
   }
 
-  function handleProgressPhoto() {
-    pickAndSavePhotoFromLibrary();
-  }
-
   const suggestion = getSuggestion(
     activeWorkout,
     meals,
@@ -429,7 +424,6 @@ export default function HomeScreen() {
         onSleepAdd={handleSleepAdd}
         onWorkoutStart={handleWorkoutStart}
         onJournalAdd={handleJournalAdd}
-        onProgressPhoto={handleProgressPhoto}
       />
 
       <SupplementLogSheet

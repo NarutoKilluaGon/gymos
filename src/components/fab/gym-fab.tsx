@@ -23,6 +23,7 @@ import {
 } from "@/components/quick-add/sleep-sheet";
 import { WeightSheet } from "@/components/quick-add/weight-sheet";
 import { useModules } from "@/contexts/modules-context";
+import { FEATURES } from "@/constants/features";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import type { ModuleId } from "@/storage/repositories/modules";
 import type { WeightUnit } from "@/storage/repositories/preferences";
@@ -54,7 +55,9 @@ const actions: FABAction[] = [
   { label: "Weight", icon: Scale },
   { label: "Measurements", icon: Ruler },
   { label: "Journal", icon: BookOpen },
-  { label: "Progress photo", icon: Camera },
+  ...(FEATURES.progress
+    ? [{ label: "Progress photo", icon: Camera }]
+    : []),
 ];
 
 export function GymFAB({

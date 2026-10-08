@@ -37,17 +37,6 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="progress">
-        <NativeTabs.Trigger.Label>Progress</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          md={{ default: "trending_up", selected: "trending_up" }}
-          sf={{
-            default: "chart.line.uptrend.xyaxis",
-            selected: "chart.line.uptrend.xyaxis",
-          }}
-        />
-      </NativeTabs.Trigger>
-
       <NativeTabs.Trigger name="hub">
         <NativeTabs.Trigger.Label>Hub</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

@@ -6,7 +6,7 @@ import {
   TabTrigger,
   TabTriggerSlotProps,
 } from "expo-router/ui";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { GymColors, Spacing } from "@/constants/theme";
 
@@ -27,10 +27,6 @@ export default function AppTabs() {
 
           <TabTrigger name="nutrition" href="/nutrition" asChild>
             <TabButton>Nutrition</TabButton>
-          </TabTrigger>
-
-          <TabTrigger name="progress" href="/progress" asChild>
-            <TabButton>Progress</TabButton>
           </TabTrigger>
 
           <TabTrigger name="hub" href="/hub" asChild>
@@ -72,8 +68,6 @@ export function CustomTabList(props: TabListProps) {
     </View>
   );
 }
-
-import { Text } from "react-native";
 
 const styles = StyleSheet.create({
   tabListContainer: {

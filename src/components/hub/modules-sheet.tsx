@@ -2,6 +2,7 @@ import { Dumbbell, LineChart, Utensils } from "lucide-react-native";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
 import { useModules } from "@/contexts/modules-context";
+import { FEATURES } from "@/constants/features";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import type { ModuleId } from "@/storage/repositories/modules";
 
@@ -23,12 +24,16 @@ const MODULES: {
     description: "Meals, protein, calories",
     Icon: Utensils,
   },
-  {
-    id: "progress",
-    name: "Progress",
-    description: "Charts and measurements",
-    Icon: LineChart,
-  },
+  ...(FEATURES.progress
+    ? [
+        {
+          id: "progress" as const,
+          name: "Progress",
+          description: "Charts and measurements",
+          Icon: LineChart,
+        },
+      ]
+    : []),
 ];
 
 type ModulesSheetProps = {

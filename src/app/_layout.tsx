@@ -37,7 +37,7 @@ export default function TabLayout() {
         }
       } catch {
         // Notifications are best-effort; never block app startup.
-        console.error("Failed to restore reminders");
+        console.warn("Failed to restore reminders");
       }
     })();
 

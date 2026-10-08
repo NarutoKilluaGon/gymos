@@ -7,6 +7,7 @@
  */
 
 import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
 import type {
   ReminderConfig,
@@ -51,6 +52,13 @@ let Notifications: any = null;
 let loadAttempted = false;
 
 async function loadModule(): Promise<boolean> {
+  if (
+    Platform.OS === "android" &&
+    Constants?.executionEnvironment === ExecutionEnvironment.StoreClient
+  ) {
+    return false;
+  }
+
   if (loadAttempted) return Notifications !== null;
   loadAttempted = true;
 
