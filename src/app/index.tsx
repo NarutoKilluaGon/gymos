@@ -8,9 +8,12 @@ import { NorthStarSetupCard } from "@/components/dashboard/north-star-setup-card
 import { WorkoutCard } from "@/components/dashboard/workout-card";
 import { GymFAB } from "@/components/fab/gym-fab";
 import { FadeIn } from "@/components/ui/fade-in";
+import { Screen } from "@/components/ds/screen";
+import { ScreenHeader } from "@/components/ds/screen-header";
 import { useModules } from "@/contexts/modules-context";
 import type { SleepInput } from "@/components/quick-add/sleep-sheet";
 import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { DAILY_TARGETS } from "@/constants/targets";
 import { useTodayKey } from "@/hooks/use-today-key";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { addJournalEntry } from "@/storage/repositories/journal";
@@ -102,8 +105,8 @@ function getSuggestion(
     return "Start your day with a glass of water.";
   }
 
-  if (waterLitres < 2) {
-    return `Stay hydrated — ${(2 - waterLitres).toFixed(1)}L to go today.`;
+  if (waterLitres < DAILY_TARGETS.waterL) {
+    return `Stay hydrated — ${(DAILY_TARGETS.waterL - waterLitres).toFixed(1)}L to go today.`;
   }
 
   if (meals.length === 0) {
@@ -346,16 +349,43 @@ export default function HomeScreen() {
     proteinTarget,
     supplementProgress,
     steps,
-    8000,
+    DAILY_TARGETS.steps,
     sleep,
     streak.days,
     enabled.nutrition,
   );
 
+  const now = new Date();
+  const dateFormatted = now
+    .toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+  const todayHeading = `GYMOS · ${dateFormatted}`;
+
   return (
-    <View style={styles.container}>
+    <Screen
+      bottomPadding={112}
+      floating={
+        <>
+          <GymFAB
+            weightUnit={weightUnit}
+            onWaterAdd={handleWaterAdd}
+            onWeightAdd={handleWeightAdd}
+            onMealLogged={handleMealLogged}
+            onSleepAdd={handleSleepAdd}
+            onWorkoutStart={handleWorkoutStart}
+            onJournalAdd={handleJournalAdd}
+          />
+
+          <SupplementLogSheet
+            visible={supplementSheetOpen}
+            onClose={() => setSupplementSheetOpen(false)}
+            onChanged={handleSupplementsChanged}
+          />
+        </>
+      }
+    >
       <FadeIn delay={0}>
-        <Greeting />
+        <ScreenHeader eyebrow={todayHeading} title={<Greeting />} />
       </FadeIn>
 
       <FadeIn delay={20}>
@@ -398,7 +428,7 @@ export default function HomeScreen() {
           supplementsTaken={supplementProgress.taken}
           supplementsTotal={supplementProgress.total}
           steps={steps}
-          stepsTarget={8000}
+          stepsTarget={DAILY_TARGETS.steps}
           nutritionEnabled={enabled.nutrition}
           onEditTargets={() =>
             router.navigate({ pathname: "/nutrition", params: { view: "me" } })
@@ -415,34 +445,11 @@ export default function HomeScreen() {
           <Text style={styles.suggestionText}>{suggestion}</Text>
         </View>
       </FadeIn>
-
-      <GymFAB
-        weightUnit={weightUnit}
-        onWaterAdd={handleWaterAdd}
-        onWeightAdd={handleWeightAdd}
-        onMealLogged={handleMealLogged}
-        onSleepAdd={handleSleepAdd}
-        onWorkoutStart={handleWorkoutStart}
-        onJournalAdd={handleJournalAdd}
-      />
-
-      <SupplementLogSheet
-        visible={supplementSheetOpen}
-        onClose={() => setSupplementSheetOpen(false)}
-        onChanged={handleSupplementsChanged}
-      />
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: GymColors.background.primary,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: 100, // Space for FAB
-  },
 
   streakWorkoutRow: {
     flexDirection: "row",

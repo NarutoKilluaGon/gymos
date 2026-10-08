@@ -4,7 +4,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 
@@ -14,7 +13,10 @@ import { MeView } from "@/components/nutrition/me-view";
 import { GuardSheet } from "@/components/nutrition/more-sheets";
 import { Pill } from "@/components/nutrition/nourish-ui";
 import { TodayView } from "@/components/nutrition/today-view";
-import { N, NSerif } from "@/constants/nourish-theme";
+import { NOURISH } from "@/constants/design";
+import { ThemeProvider } from "@/contexts/theme-context";
+import { Screen } from "@/components/ds/screen";
+import { ScreenHeader } from "@/components/ds/screen-header";
 import { useNourish } from "@/hooks/use-nourish";
 import {
   daysSinceLastChange,
@@ -93,71 +95,62 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
   }
 
   return (
-    <KeyboardAvoidingView
-      style={s.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <View style={s.header}>
-        {view === "today" ? (
-          <>
-            <Text style={s.title}>Nourish</Text>
-            <View style={s.nav}>
-              <Pill label="Insights" onPress={() => setView("insights")} />
-              <Pill label="Kitchen" onPress={() => setView("kitchen")} />
-              <Pill label="Me" onPress={() => setView("me")} />
-            </View>
-          </>
-        ) : (
-          <>
-            <Pill label="‹ Today" onPress={() => setView("today")} />
-            <Text style={s.title}>{TITLES[view]}</Text>
-          </>
-        )}
-      </View>
+    <ThemeProvider theme={NOURISH}>
+      <Screen scroll={false}>
+        <KeyboardAvoidingView
+          style={s.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          {view === "today" ? (
+            <ScreenHeader
+              eyebrow="NOURISH"
+              title="Nutrition"
+              right={
+                <View style={s.nav}>
+                  <Pill label="Insights" onPress={() => setView("insights")} />
+                  <Pill label="Kitchen" onPress={() => setView("kitchen")} />
+                  <Pill label="Me" onPress={() => setView("me")} />
+                </View>
+              }
+            />
+          ) : (
+            <ScreenHeader
+              eyebrow="NOURISH"
+              title={TITLES[view]}
+              onBack={() => setView("today")}
+            />
+          )}
 
-      {view === "today" ? <TodayView nourish={nourish} /> : null}
-      {view === "insights" ? (
-        <InsightsView nourish={nourish} onChangeSettings={requestChange} />
-      ) : null}
-      {view === "kitchen" ? <KitchenView nourish={nourish} /> : null}
-      {view === "me" ? (
-        <MeView nourish={nourish} onChangeSettings={requestChange} />
-      ) : null}
+          {view === "today" ? <TodayView nourish={nourish} /> : null}
+          {view === "insights" ? (
+            <InsightsView nourish={nourish} onChangeSettings={requestChange} />
+          ) : null}
+          {view === "kitchen" ? <KitchenView nourish={nourish} /> : null}
+          {view === "me" ? (
+            <MeView nourish={nourish} onChangeSettings={requestChange} />
+          ) : null}
 
-      <GuardSheet
-        visible={pending !== null}
-        daysAgo={
-          settings ? (daysSinceLastChange(settings.changeLog, new Date()) ?? 0) : 0
-        }
-        onKeep={() => setPending(null)}
-        onProceed={() => {
-          const change = pending;
+          <GuardSheet
+            visible={pending !== null}
+            daysAgo={
+              settings ? (daysSinceLastChange(settings.changeLog, new Date()) ?? 0) : 0
+            }
+            onKeep={() => setPending(null)}
+            onProceed={() => {
+              const change = pending;
 
-          setPending(null);
+              setPending(null);
 
-          if (change) void apply(change);
-        }}
-      />
-    </KeyboardAvoidingView>
+              if (change) void apply(change);
+            }}
+          />
+        </KeyboardAvoidingView>
+      </Screen>
+    </ThemeProvider>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: N.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 32,
-    paddingBottom: 4,
-  },
-  title: {
-    fontFamily: NSerif,
-    fontWeight: "300",
-    fontSize: 26,
-    color: N.ink,
-  },
+  flex: { flex: 1 },
   nav: { flexDirection: "row", gap: 6 },
 });

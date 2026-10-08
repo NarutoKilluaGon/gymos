@@ -3,9 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   BackHandler,
-  ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 
@@ -14,7 +12,11 @@ import { HistoryView } from "@/components/workouts/forge-history";
 import { PlanView } from "@/components/workouts/forge-plan";
 import { TodayView } from "@/components/workouts/forge-today";
 import { Seg } from "@/components/workouts/forge-ui";
-import { F, FSerif } from "@/constants/forge-theme";
+import { F } from "@/constants/forge-theme";
+import { FORGE } from "@/constants/design";
+import { ThemeProvider } from "@/contexts/theme-context";
+import { Screen } from "@/components/ds/screen";
+import { ScreenHeader } from "@/components/ds/screen-header";
 import { useForge } from "@/hooks/use-forge";
 import type { WorkoutSession } from "@/types/gymos";
 
@@ -93,33 +95,38 @@ export function ForgeApp() {
 
   if (!data) {
     return (
-      <View style={[s.root, s.center]}>
-        <ActivityIndicator color={F.acc} />
-      </View>
+      <ThemeProvider theme={FORGE}>
+        <Screen scroll={false}>
+          <View style={s.center}>
+            <ActivityIndicator color={F.acc} />
+          </View>
+        </Screen>
+      </ThemeProvider>
     );
   }
 
   if (open) {
     return (
-      <ForgeSession
-        key={open.id}
-        initial={open}
-        data={data}
-        unit={unit}
-        flushRef={flushRef}
-        onClose={() => void closeSession()}
-        onDelete={actions.remove}
-        onCreateExercise={actions.addCustom}
-        onChanged={() => void reload()}
-      />
+      <ThemeProvider theme={FORGE}>
+        <ForgeSession
+          key={open.id}
+          initial={open}
+          data={data}
+          unit={unit}
+          flushRef={flushRef}
+          onClose={() => void closeSession()}
+          onDelete={actions.remove}
+          onCreateExercise={actions.addCustom}
+          onChanged={() => void reload()}
+        />
+      </ThemeProvider>
     );
   }
 
   return (
-    <View style={s.root}>
-      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={s.eyebrow}>FORGE</Text>
-        <Text style={s.title}>Workouts</Text>
+    <ThemeProvider theme={FORGE}>
+      <Screen keyboardShouldPersistTaps="handled">
+        <ScreenHeader eyebrow="FORGE" title="Workouts" />
         <View style={s.tabs}>
           <Seg
             options={TABS}
@@ -157,16 +164,12 @@ export function ForgeApp() {
           />
         ) : null}
         {tab === "history" ? <HistoryView data={data} unit={unit} onOpen={(session) => void openSession(session)} /> : null}
-      </ScrollView>
-    </View>
+      </Screen>
+    </ThemeProvider>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: F.bg },
-  center: { alignItems: "center", justifyContent: "center" },
-  content: { paddingHorizontal: 20, paddingTop: 32, paddingBottom: 96 },
-  eyebrow: { color: F.acc, fontSize: 11, letterSpacing: 2 },
-  title: { color: F.ink, fontFamily: FSerif, fontSize: 34, fontWeight: "300", marginBottom: 14 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   tabs: { marginBottom: 16 },
 });

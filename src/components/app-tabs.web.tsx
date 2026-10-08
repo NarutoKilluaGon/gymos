@@ -8,12 +8,12 @@ import {
 } from "expo-router/ui";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { GymColors, Spacing } from "@/constants/theme";
+import { HOME, Metric, Radius, Space } from "@/constants/design";
 
 export default function AppTabs() {
   return (
-    <Tabs>
-      <TabSlot style={{ height: "100%" }} />
+    <Tabs style={styles.tabsRoot}>
+      <TabSlot style={styles.slot} />
 
       <TabList asChild>
         <CustomTabList>
@@ -70,33 +70,52 @@ export function CustomTabList(props: TabListProps) {
 }
 
 const styles = StyleSheet.create({
+  tabsRoot: {
+    flex: 1,
+    backgroundColor: HOME.bg,
+  },
+
+  slot: {
+    flex: 1,
+  },
+
   tabListContainer: {
-    position: "absolute",
     width: "100%",
-    padding: Spacing.three,
+    backgroundColor: HOME.bg,
+    borderTopWidth: 1,
+    borderTopColor: HOME.line,
+    paddingVertical: Space.xs,
+    paddingHorizontal: Space.m,
     justifyContent: "center",
     alignItems: "center",
     flexDirection: "row",
+    gap: Space.xs,
   },
 
   tabButton: {
-    backgroundColor: GymColors.background.card,
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    minHeight: Metric.touchMin,
+    minWidth: Metric.touchMin,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
+    paddingVertical: Space.xs,
+    paddingHorizontal: Space.m,
+    borderRadius: Radius.control,
   },
 
   tabButtonFocused: {
-    backgroundColor: GymColors.background.surface,
+    backgroundColor: HOME.card2,
   },
 
   tabText: {
-    color: GymColors.text.secondary,
-    fontSize: 13,
+    color: HOME.mute,
+    fontSize: 14,
+    fontWeight: "500",
   },
 
   tabTextFocused: {
-    color: GymColors.text.primary,
+    color: HOME.ink,
+    fontWeight: "600",
   },
 
   pressed: {

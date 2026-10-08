@@ -1,15 +1,15 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 
-import { GymColors } from "@/constants/theme";
+import { HOME } from "@/constants/design";
 
 export default function AppTabs() {
   return (
     <NativeTabs
-      backgroundColor={GymColors.background.primary}
-      indicatorColor={GymColors.background.surface}
+      backgroundColor={HOME.bg}
+      indicatorColor={HOME.card2}
       labelStyle={{
         selected: {
-          color: GymColors.text.primary,
+          color: HOME.ink,
         },
       }}
     >

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { GymCard } from "@/components/ui/gym-card";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { DAILY_TARGETS } from "@/constants/targets";
 
 type DailyTargetsCardProps = {
   water: number;
@@ -56,7 +57,7 @@ export function DailyTargetsCard({
     <ProgressBar
       key="water"
       current={water}
-      target={3.5}
+      target={DAILY_TARGETS.waterL}
       unit="L"
       compact={compact}
     />
