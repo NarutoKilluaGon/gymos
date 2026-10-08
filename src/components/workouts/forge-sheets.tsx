@@ -2,6 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowUp,
+  FileText,
+  Layers,
+  Link2,
+  Pause,
+  Play,
+  Trash2,
+  Unlink2,
+} from "lucide-react-native";
+
+import { ListRow } from "@/components/ds/list-row";
+import {
   Button,
   Field,
   Label,
@@ -424,6 +438,156 @@ export function ConfirmSheet({
         />
         <Button kind="ghost" label="Cancel" onPress={onClose} />
       </View>
+    </Sheet>
+  );
+}
+
+/** Overflow options for a specific exercise in ForgeSession. */
+export function ExerciseMenuSheet({
+  visible,
+  onClose,
+  exerciseName,
+  isBodyweight,
+  isSuperset,
+  canMoveUp,
+  canMoveDown,
+  onNote,
+  onSwap,
+  onPlates,
+  onToggleSuperset,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  exerciseName: string;
+  isBodyweight?: boolean;
+  isSuperset?: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onNote: () => void;
+  onSwap: () => void;
+  onPlates?: () => void;
+  onToggleSuperset: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title={exerciseName}>
+      <ListRow
+        icon={<FileText size={18} color={F.mute} />}
+        title="Note"
+        onPress={() => {
+          onClose();
+          onNote();
+        }}
+      />
+      <ListRow
+        icon={<ArrowLeftRight size={18} color={F.mute} />}
+        title="Swap exercise"
+        onPress={() => {
+          onClose();
+          onSwap();
+        }}
+      />
+      {!isBodyweight && onPlates ? (
+        <ListRow
+          icon={<Layers size={18} color={F.mute} />}
+          title="Plates calculator"
+          onPress={() => {
+            onClose();
+            onPlates();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={isSuperset ? <Unlink2 size={18} color={F.mute} /> : <Link2 size={18} color={F.mute} />}
+        title={isSuperset ? "Unlink superset" : "Superset with next"}
+        onPress={() => {
+          onClose();
+          onToggleSuperset();
+        }}
+      />
+      {canMoveUp && onMoveUp ? (
+        <ListRow
+          icon={<ArrowUp size={18} color={F.mute} />}
+          title="Move up"
+          onPress={() => {
+            onClose();
+            onMoveUp();
+          }}
+        />
+      ) : null}
+      {canMoveDown && onMoveDown ? (
+        <ListRow
+          icon={<ArrowDown size={18} color={F.mute} />}
+          title="Move down"
+          onPress={() => {
+            onClose();
+            onMoveDown();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Remove"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onRemove();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+/** Overflow options for the workout session. */
+export function WorkoutMenuSheet({
+  visible,
+  onClose,
+  paused,
+  onToggleClock,
+  onNote,
+  onDelete,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  paused: boolean;
+  onToggleClock: () => void;
+  onNote: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Workout options">
+      <ListRow
+        icon={<FileText size={18} color={F.mute} />}
+        title="Workout note"
+        onPress={() => {
+          onClose();
+          onNote();
+        }}
+      />
+      <ListRow
+        icon={paused ? <Play size={18} color={F.mute} /> : <Pause size={18} color={F.mute} />}
+        title={paused ? "Resume clock" : "Pause clock"}
+        onPress={() => {
+          onClose();
+          onToggleClock();
+        }}
+      />
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Delete workout"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onDelete();
+        }}
+      />
     </Sheet>
   );
 }

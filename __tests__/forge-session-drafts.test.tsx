@@ -32,6 +32,20 @@ jest.mock("@/components/workouts/forge-sheets", () => ({
 
     return null;
   },
+  ExerciseMenuSheet: (props: {
+    visible: boolean;
+    onRemove: () => void;
+  }) => {
+    if (!props.visible) return null;
+    const { createElement } = require("react");
+    const { Pressable, Text } = require("react-native");
+    return createElement(
+      Pressable,
+      { onPress: props.onRemove },
+      createElement(Text, null, "Remove"),
+    );
+  },
+  WorkoutMenuSheet: () => null,
 }));
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -247,6 +261,7 @@ describe("ForgeSession pending numeric drafts", () => {
     );
 
     await type(renderer, "Set 1 weight", "99"); // first match: Lift e1
+    await pressText(renderer, "⋯", 0);
     await pressText(renderer, "Remove", 0);
     await act(async () => {
       await flushRef.current?.();
