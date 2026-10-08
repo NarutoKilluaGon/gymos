@@ -3,7 +3,6 @@ import {
   Animated,
   StyleSheet,
   Text,
-  useAnimatedValue,
 } from "react-native";
 
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
@@ -11,7 +10,7 @@ import { dismissToast, useToast } from "@/utils/toast";
 
 export function ToastHost() {
   const toast = useToast();
-  const fadeAnim = useAnimatedValue(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const prevId = useRef<number | null>(null);
 
   useEffect(() => {
