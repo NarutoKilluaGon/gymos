@@ -1,12 +1,11 @@
 import { router } from "expo-router";
 import { CheckCircle2, Dumbbell, Play } from "lucide-react-native";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Animated,
   Pressable,
   StyleSheet,
   Text,
-  useAnimatedValue,
   View,
 } from "react-native";
 
@@ -71,7 +70,7 @@ function describeWorkout(workout: WorkoutSession): {
 }
 
 function PulsingPip() {
-  const pulse = useAnimatedValue(1);
+  const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (process.env.NODE_ENV === "test") return;

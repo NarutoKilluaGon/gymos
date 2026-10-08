@@ -1,11 +1,11 @@
 import * as Haptics from "expo-haptics";
 import { Check } from "lucide-react-native";
+import { useRef } from "react";
 import {
   Animated,
   Pressable,
   StyleSheet,
   Text,
-  useAnimatedValue,
   View,
 } from "react-native";
 
@@ -42,7 +42,7 @@ export function SetRow({
   onRepsCommit,
   onToggleDone,
 }: SetRowProps) {
-  const checkScale = useAnimatedValue(1);
+  const checkScale = useRef(new Animated.Value(1)).current;
   const weightPlaceholder = refSet?.weight
     ? String(round1(refSet.weight))
     : bodyweight

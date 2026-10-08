@@ -1,11 +1,10 @@
 import * as Haptics from "expo-haptics";
-import React from "react";
+import React, { useRef } from "react";
 import {
   Animated,
   Pressable,
   PressableProps,
   StyleProp,
-  useAnimatedValue,
   ViewStyle,
 } from "react-native";
 
@@ -29,8 +28,8 @@ export function PressableScale({
   style,
   ...rest
 }: PressableScaleProps) {
-  const scale = useAnimatedValue(1);
-  const opacity = useAnimatedValue(1);
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
 
   function handlePressIn(e: any) {
     if (!disabled) {

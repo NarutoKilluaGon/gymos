@@ -11,14 +11,13 @@ import {
   Utensils,
   X,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Animated,
   Modal,
   Pressable,
   StyleSheet,
   Text,
-  useAnimatedValue,
   View,
 } from "react-native";
 
@@ -88,7 +87,7 @@ export function GymFAB({
   const [sleepSheetOpen, setSleepSheetOpen] = useState(false);
   const [journalSheetOpen, setJournalSheetOpen] = useState(false);
 
-  const rotAnim = useAnimatedValue(0);
+  const rotAnim = useRef(new Animated.Value(0)).current;
 
   async function openSheet() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

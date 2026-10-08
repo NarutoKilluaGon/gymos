@@ -1,8 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Animated,
   StyleProp,
-  useAnimatedValue,
   View,
   ViewStyle,
 } from "react-native";
@@ -23,7 +22,7 @@ export function Skeleton({
   style,
 }: SkeletonProps) {
   const theme = useTheme();
-  const opacity = useAnimatedValue(0.4);
+  const opacity = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
     if (process.env.NODE_ENV === "test") return;

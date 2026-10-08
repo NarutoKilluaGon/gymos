@@ -1,11 +1,10 @@
 import { Check, RotateCcw } from "lucide-react-native";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Animated,
   Pressable,
   StyleSheet,
   Text,
-  useAnimatedValue,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -36,7 +35,7 @@ export function BottomBar({
 }: BottomBarProps) {
   const insets = useSafeAreaInsets();
   const showRest = restLeft > 0 && !finished;
-  const slideAnim = useAnimatedValue(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(slideAnim, {
