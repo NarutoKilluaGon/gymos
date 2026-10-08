@@ -1,15 +1,16 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Bar, FCard, Label, fmtInt, tap } from "@/components/workouts/forge-ui";
-import { F } from "@/constants/forge-theme";
+import { F, FSerif } from "@/constants/forge-theme";
 import type { ForgeData } from "@/hooks/use-forge";
 import { muscleBalance } from "@/services/forge/balance";
 import { historyGrid } from "@/services/forge/grid";
 import { completedSessions, sessionDate } from "@/services/forge/history";
 import { fromKg, sessionVolumeKg, type WeightUnit } from "@/services/forge/load";
+import { durationMs, formatClock } from "@/services/forge/timing";
 import { MONTH_SHORT } from "@/services/nourish/insights";
 import type { WorkoutSession } from "@/types/gymos";
-import { dateFromKey } from "@/utils/date";
+import { addDaysToKey, dateFromKey } from "@/utils/date";
 
 export function HistoryView({
   data,
@@ -23,7 +24,32 @@ export function HistoryView({
   const balance = muscleBalance(data.sessions, data.catalog, 30, new Date());
   const hasBalance = balance.some((entry) => entry.sets > 0);
   const grid = historyGrid(data.sessions, unit, 8);
-  const recent = [...completedSessions(data.sessions)].reverse().slice(0, 20);
+  const recent = [...completedSessions(data.sessions)].reverse().slice(0, 30);
+
+  // Group workouts by week (Monday-start)
+  const groupedWeeks = (() => {
+    const map = new Map<string, { title: string; sessions: WorkoutSession[] }>();
+
+    for (const session of recent) {
+      const dKey = sessionDate(session);
+      const d = dateFromKey(dKey);
+      // Day of week: 0=Sun, 1=Mon, ..., 6=Sat
+      const dayOfWeek = d.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const mondayKey = addDaysToKey(dKey, diffToMonday);
+      const monDate = dateFromKey(mondayKey);
+      const sunDate = dateFromKey(addDaysToKey(mondayKey, 6));
+
+      const title = `Week of ${monDate.getDate()} ${MONTH_SHORT[monDate.getMonth()]} – ${sunDate.getDate()} ${MONTH_SHORT[sunDate.getMonth()]}`;
+
+      if (!map.has(mondayKey)) {
+        map.set(mondayKey, { title, sessions: [] });
+      }
+      map.get(mondayKey)!.sessions.push(session);
+    }
+
+    return Array.from(map.values());
+  })();
 
   if (recent.length === 0) {
     return (
@@ -83,20 +109,42 @@ export function HistoryView({
       ) : null}
 
       <FCard style={s.gap}>
-        <Label>Recent workouts</Label>
-        {recent.map((session) => {
-          const date = dateFromKey(sessionDate(session));
+        <Label>Workouts</Label>
+        {groupedWeeks.map((week) => (
+          <View key={week.title} style={s.weekGroup}>
+            <Text style={s.weekHeader}>{week.title}</Text>
+            {week.sessions.map((session) => {
+              const date = dateFromKey(sessionDate(session));
+              const dur = session.backdated
+                ? "logged"
+                : formatClock(durationMs(session, 0));
 
-          return (
-            <Pressable key={session.id} accessibilityRole="button" onPress={() => { tap(); onOpen(session); }} style={s.recent}>
-              <View style={{ flexShrink: 1 }}>
-                <Text style={s.recentName}>{session.name}</Text>
-                <Text style={s.meta}>{`${date.getDate()} ${MONTH_SHORT[date.getMonth()]} · ${session.exercises.length} exercises`}</Text>
-              </View>
-              <Text style={s.recentVol}>{`${fmtInt(fromKg(sessionVolumeKg(session), unit))} ${unit}`}</Text>
-            </Pressable>
-          );
-        })}
+              return (
+                <Pressable
+                  key={session.id}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    tap();
+                    onOpen(session);
+                  }}
+                  style={s.workoutRow}
+                >
+                  <View style={s.rowLeft}>
+                    <Text style={s.workoutName} numberOfLines={1}>
+                      {session.name}
+                    </Text>
+                    <Text style={s.meta}>
+                      {`${date.getDate()} ${MONTH_SHORT[date.getMonth()]} · ${session.exercises.length} exercises · ${dur}`}
+                    </Text>
+                  </View>
+                  <Text style={s.workoutVol}>
+                    {`${fmtInt(fromKg(sessionVolumeKg(session), unit))} ${unit}`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </FCard>
     </View>
   );
@@ -115,7 +163,26 @@ const s = StyleSheet.create({
   gridCell: { width: 84, textAlign: "center" },
   gridText: { color: F.ink, fontSize: 13 },
   gridPr: { color: F.acc, fontWeight: "700" },
-  recent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: F.line },
-  recentName: { color: F.ink, fontSize: 16 },
-  recentVol: { color: F.mute, fontSize: 13 },
+  weekGroup: { marginTop: 6 },
+  weekHeader: {
+    color: F.mute,
+    fontFamily: FSerif,
+    fontSize: 16,
+    fontWeight: "300",
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  workoutRow: {
+    minHeight: 72,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: F.line,
+  },
+  rowLeft: { flex: 1, gap: 4 },
+  workoutName: { color: F.ink, fontSize: 16, fontWeight: "500" },
+  workoutVol: { color: F.mute, fontSize: 13, textAlign: "right" },
 });

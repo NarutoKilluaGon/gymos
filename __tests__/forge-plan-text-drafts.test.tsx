@@ -20,6 +20,7 @@ jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
 
 jest.mock("@/components/workouts/forge-sheets", () => ({
   ConfirmSheet: () => null,
+  DayMenuSheet: () => null,
   ExercisePickerSheet: () => null,
   NewPlanSheet: () => null,
 }));

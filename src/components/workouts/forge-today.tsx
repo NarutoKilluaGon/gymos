@@ -132,9 +132,14 @@ export function TodayView({
               {`${fmtInt(fromKg(sessionVolumeKg(session), unit))} ${unit} · ${session.exercises.length} exercises`}
             </Text>
             {session.exercises.slice(0, 4).map((exercise) => (
-              <Text key={exercise.id} style={s.line} numberOfLines={1}>
-                {`${exercise.name}  ${formatSets(exercise, unit)}`}
-              </Text>
+              <View key={exercise.id} style={s.exerciseRow}>
+                <Text style={s.exerciseName} numberOfLines={1}>
+                  {exercise.name}
+                </Text>
+                <Text style={s.exerciseSets}>
+                  {formatSets(exercise, unit)}
+                </Text>
+              </View>
             ))}
             {(session.prs ?? []).length > 0 ? <Text style={s.pr}>{`${session.prs?.length} new record${session.prs?.length === 1 ? "" : "s"}`}</Text> : null}
           </FCard>
@@ -171,22 +176,61 @@ export function TodayView({
           <Text style={s.bigName}>{planned ? planned.name : plan?.rotate && !isToday ? "Nothing logged" : "Rest day"}</Text>
           {planned ? (
             <>
-              <Text style={s.meta}>{planned.exercises.map((exercise) => exercise.name).join(" · ")}</Text>
-              <View style={s.gap}>
-                <Button label={`Start ${planned.name}`} onPress={() => start(planned.id)} />
+              <Text style={s.meta}>
+                {`${planned.exercises.length} exercise${planned.exercises.length === 1 ? "" : "s"} · ~${Math.max(20, planned.exercises.length * 10)} min`}
+              </Text>
+              <View style={s.previewList}>
+                {planned.exercises.map((exercise) => (
+                  <View key={exercise.exerciseId} style={s.exerciseRow}>
+                    <Text style={s.exerciseName} numberOfLines={1}>
+                      {exercise.name}
+                    </Text>
+                    <Text style={s.exerciseSets}>
+                      {`${exercise.sets} × ${exercise.reps}`}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={s.buttonRow}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label={`Start ${planned.name}`}
+                    onPress={() => start(planned.id)}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="Blank workout"
+                    kind="secondary"
+                    onPress={() => start(null)}
+                  />
+                </View>
               </View>
             </>
           ) : !plan || plan.days.length === 0 ? (
-            <View style={s.gap}>
-              <Button label="Build your plan" onPress={onGoPlan} />
+            <>
+              <View style={s.gap}>
+                <Button label="Build your plan" onPress={onGoPlan} />
+              </View>
+              <View style={s.pills}>
+                <Pill label="Blank workout" onPress={() => start(null)} />
+              </View>
+            </>
+          ) : (
+            <View style={s.pills}>
+              {others.map((day) => (
+                <Pill key={day.id} label={day.name} onPress={() => start(day.id)} />
+              ))}
+              <Pill label="Blank workout" onPress={() => start(null)} />
+            </View>
+          )}
+          {planned && others.length > 0 ? (
+            <View style={s.pills}>
+              {others.map((day) => (
+                <Pill key={day.id} label={day.name} onPress={() => start(day.id)} />
+              ))}
             </View>
           ) : null}
-          <View style={s.pills}>
-            {others.map((day) => (
-              <Pill key={day.id} label={day.name} onPress={() => start(day.id)} />
-            ))}
-            <Pill label="Blank workout" onPress={() => start(null)} />
-          </View>
           <Text style={[s.meta, { marginTop: 14 }]}>{`${lastWeek} workout${lastWeek === 1 ? "" : "s"} in the last 7 days`}</Text>
         </FCard>
       ) : !active ? (
@@ -237,4 +281,18 @@ const s = StyleSheet.create({
   cardioRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12, paddingVertical: 6 },
   cardioRight: { alignItems: "flex-end" },
   remove: { color: F.bad, fontSize: 12, marginTop: 2 },
+  exerciseRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 56,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: F.line,
+    gap: 12,
+  },
+  exerciseName: { color: F.ink, fontSize: 15, fontWeight: "500", flex: 1 },
+  exerciseSets: { color: F.mute, fontSize: 13, textAlign: "right" },
+  previewList: { marginTop: 12, borderBottomWidth: 1, borderBottomColor: F.line },
+  buttonRow: { flexDirection: "row", gap: 10, marginTop: 14 },
 });

@@ -9,6 +9,7 @@ import {
 } from "@/components/workouts/forge-session";
 import {
   ConfirmSheet,
+  DayMenuSheet,
   ExercisePickerSheet,
   NewPlanSheet,
 } from "@/components/workouts/forge-sheets";
@@ -68,6 +69,21 @@ export function PlanView({
   const [pickFor, setPickFor] = useState<string | null>(null);
   const [addDayName, setAddDayName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [menuDay, setMenuDay] = useState<string | null>(null);
+
+  const moveDay = (dayId: string, direction: -1 | 1) => {
+    edit((current, now) => {
+      const idx = current.days.findIndex((d) => d.id === dayId);
+      if (idx === -1) return current;
+      const targetIdx = idx + direction;
+      if (targetIdx < 0 || targetIdx >= current.days.length) return current;
+      const days = [...current.days];
+      const [moved] = days.splice(idx, 1);
+      if (!moved) return current;
+      days.splice(targetIdx, 0, moved);
+      return { ...current, days, updatedAt: now.toISOString() };
+    });
+  };
 
   /** Edit the active plan atomically against whatever is stored now.
    *  Resolves whether the change was saved (false when there is no plan). */
@@ -238,6 +254,15 @@ export function PlanView({
                   selectionColor={F.acc}
                   accessibilityLabel="Day name"
                 />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Day ${day.name} options`}
+                  hitSlop={8}
+                  style={s.menuBtn}
+                  onPress={() => setMenuDay(day.id)}
+                >
+                  <Text style={s.menuIcon}>⋯</Text>
+                </Pressable>
                 <Pressable accessibilityRole="button" onPress={() => edit((current, now) => removeDay(current, day.id, now))}>
                   <Text style={s.remove}>Delete day</Text>
                 </Pressable>
@@ -366,6 +391,25 @@ export function PlanView({
           if (id) void onSave((current) => ({ ...current, plans: current.plans.filter((entry) => entry.id !== id) }));
         }}
       />
+      <DayMenuSheet
+        visible={menuDay !== null}
+        onClose={() => setMenuDay(null)}
+        canMoveUp={plan !== null && plan.days.findIndex((d) => d.id === menuDay) > 0}
+        canMoveDown={
+          plan !== null &&
+          menuDay !== null &&
+          plan.days.findIndex((d) => d.id === menuDay) < plan.days.length - 1
+        }
+        onMoveUp={() => {
+          if (menuDay) moveDay(menuDay, -1);
+        }}
+        onMoveDown={() => {
+          if (menuDay) moveDay(menuDay, 1);
+        }}
+        onDelete={() => {
+          if (menuDay) edit((current, now) => removeDay(current, menuDay, now));
+        }}
+      />
     </View>
     </DraftScope>
   );
@@ -384,14 +428,22 @@ const s = StyleSheet.create({
   gap: { gap: 10 },
   pills: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   meta: { color: F.mute, fontSize: 13 },
-  dayHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  dayHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
   dayName: { color: F.ink, fontSize: 22, fontWeight: "300", flex: 1, paddingVertical: 4 },
+  menuBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
+  menuIcon: { color: F.mute, fontSize: 20 },
   remove: { color: F.bad, fontSize: 13 },
   exRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: F.line, gap: 8 },
   exName: { color: F.ink, fontSize: 16 },
   targets: { flexDirection: "row", alignItems: "center", gap: 8 },
   times: { color: F.mute },
-  reps: { width: 72, height: 44, borderRadius: 12, backgroundColor: F.card2, borderWidth: 1, borderColor: F.line, color: F.ink, textAlign: "center", fontSize: 16 },
+  reps: { width: 72, height: 48, borderRadius: 14, backgroundColor: F.card2, borderWidth: 1, borderColor: F.line, color: F.ink, textAlign: "center", fontSize: 17, fontWeight: "500" },
   rowActions: { flexDirection: "row", gap: 16 },
   action: { color: F.acc, fontSize: 14, fontWeight: "500" },
 });

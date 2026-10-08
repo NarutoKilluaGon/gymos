@@ -68,7 +68,7 @@ export function Button({
 }: {
   label: string;
   onPress: () => void;
-  kind?: "primary" | "ghost" | "danger";
+  kind?: "primary" | "secondary" | "ghost" | "danger";
   disabled?: boolean;
   busy?: boolean;
   style?: StyleProp<ViewStyle>;

@@ -19,6 +19,7 @@ const mockSheets: {
 
 jest.mock("@/components/workouts/forge-sheets", () => ({
   ConfirmSheet: () => null,
+  DayMenuSheet: () => null,
   ExercisePickerSheet: () => null,
   NewPlanSheet: (props: {
     onCreate: (template: string | null, name: string) => void;

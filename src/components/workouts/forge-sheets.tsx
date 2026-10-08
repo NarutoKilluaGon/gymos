@@ -592,6 +592,60 @@ export function WorkoutMenuSheet({
   );
 }
 
+/** Overflow options for a plan day (reorder days, delete day). */
+export function DayMenuSheet({
+  visible,
+  onClose,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Day options">
+      {canMoveUp && onMoveUp ? (
+        <ListRow
+          icon={<ArrowUp size={18} color={F.mute} />}
+          title="Move day up"
+          onPress={() => {
+            onClose();
+            onMoveUp();
+          }}
+        />
+      ) : null}
+      {canMoveDown && onMoveDown ? (
+        <ListRow
+          icon={<ArrowDown size={18} color={F.mute} />}
+          title="Move day down"
+          onPress={() => {
+            onClose();
+            onMoveDown();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Delete day"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onDelete();
+        }}
+      />
+    </Sheet>
+  );
+}
+
 const s = StyleSheet.create({
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   row: {
