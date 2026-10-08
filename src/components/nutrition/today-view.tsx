@@ -184,6 +184,8 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     }
   }
 
+  const firstEmptySlot = MEAL_SLOTS.find((slot) => day.bySlot[slot].length === 0);
+
   return (
     <View style={s.fill}>
       <ScrollView
@@ -191,7 +193,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={s.dayRow}>
+        <View style={s.dayStrip}>
           <Pressable
             accessibilityLabel="Previous day"
             hitSlop={12}
@@ -199,12 +201,13 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
               tap();
               stepDay(-1);
             }}
+            style={s.dayNavBtn}
           >
-            <ChevronLeft size={24} color={N.mute} />
+            <ChevronLeft size={20} color={N.ink} />
           </Pressable>
           <View style={s.dayTitleWrap}>
             <Text style={s.dayTitle}>{dayTitle(dayKey, todayKey)}</Text>
-            <Text style={s.mute}>{dayHeading(dayKey)}</Text>
+            <Text style={s.daySubtitle}> · {dayHeading(dayKey)}</Text>
           </View>
           <Pressable
             accessibilityLabel="Next day"
@@ -214,18 +217,18 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
               tap();
               stepDay(1);
             }}
-            style={isToday && s.hidden}
+            style={[s.dayNavBtn, isToday && s.hidden]}
           >
-            <ChevronRight size={24} color={N.mute} />
+            <ChevronRight size={20} color={N.ink} />
           </Pressable>
         </View>
 
         <NCard style={s.hero}>
-          <Ring value={totals.calories} max={day.budget} size={136}>
+          <Ring value={totals.calories} max={day.budget} size={132}>
             <Text style={[s.ringNumber, over && { color: N.bad }]}>
               {fmtInt(Math.abs(day.remaining))}
             </Text>
-            <Text style={s.mute}>{over ? "kcal over" : "kcal left"}</Text>
+            <Text style={s.ringSub}>{over ? "kcal over" : "kcal left"}</Text>
           </Ring>
           <View style={s.stats}>
             <Stat
@@ -281,19 +284,35 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           const entries = day.bySlot[slot];
           const kcal = entries.reduce((sum, m) => sum + (m.calories ?? 0), 0);
           const protein = entries.reduce((sum, m) => sum + (m.protein ?? 0), 0);
+          const isEmpty = entries.length === 0;
+          const showEmptyHint = slot === firstEmptySlot;
 
           return (
             <View key={slot} style={s.section}>
               <View style={s.sectionHead}>
-                <Text style={s.sectionTitle}>{slot}</Text>
-                <Text style={s.mute}>
-                  {entries.length > 0
-                    ? `${fmtInt(kcal)} kcal · ${Math.round(protein)}g protein`
-                    : ""}
-                </Text>
+                <View style={s.sectionTitleRow}>
+                  <Text style={s.sectionTitle}>{slot}</Text>
+                  {entries.length > 0 ? (
+                    <Text style={s.sectionSub}>
+                      {fmtInt(kcal)} kcal · {Math.round(protein)}g protein
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add food to ${slot}`}
+                  hitSlop={8}
+                  style={s.sectionAddBtn}
+                  onPress={() => {
+                    tap();
+                    logger.openManual(slot);
+                  }}
+                >
+                  <Plus size={16} color={N.ink} />
+                </Pressable>
               </View>
-              {entries.length === 0 ? (
-                <Text style={s.empty}>Nothing yet</Text>
+              {isEmpty ? (
+                showEmptyHint ? <Text style={s.empty}>Nothing yet</Text> : null
               ) : (
                 <NCard style={s.rows}>
                   {entries.map((meal, index) => (
@@ -507,7 +526,7 @@ function MacroRow({
     <View style={s.macro}>
       <View style={s.macroHead}>
         <Text style={s.macroLabel}>{label}</Text>
-        <Text style={s.mute}>
+        <Text style={s.macroValue}>
           {Math.round(value)} / {target}g
         </Text>
       </View>
@@ -554,19 +573,38 @@ function EntryRow({
 const s = StyleSheet.create({
   fill: { flex: 1 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  scroll: { paddingHorizontal: 20, paddingBottom: 110 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
   mute: { color: N.mute, fontSize: 13 },
   hidden: { opacity: 0 },
-  dayRow: {
+  dayStrip: {
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginVertical: 12,
+    marginVertical: 8,
   },
-  dayTitleWrap: { alignItems: "center" },
-  dayTitle: { fontFamily: NSerif, fontWeight: "300", fontSize: 32, color: N.ink },
+  dayNavBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayTitle: { fontFamily: NSerif, fontWeight: "400", fontSize: 18, color: N.ink },
+  daySubtitle: { fontSize: 14, color: N.mute },
   hero: { flexDirection: "row", alignItems: "center", gap: 20, marginBottom: 12 },
-  ringNumber: { fontFamily: NSerif, fontWeight: "300", fontSize: 30, color: N.ink },
+  ringNumber: {
+    fontFamily: NSerif,
+    fontWeight: "400",
+    fontSize: 28,
+    color: N.ink,
+    fontVariant: ["tabular-nums"],
+  },
+  ringSub: { color: N.mute, fontSize: 12, marginTop: 2 },
   stats: { flex: 1, gap: 10 },
   stat: {},
   statLabel: {
@@ -575,12 +613,22 @@ const s = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
   },
-  statValue: { color: N.ink, fontSize: 18, fontWeight: "500" },
+  statValue: {
+    color: N.ink,
+    fontSize: 18,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
   statNote: { color: N.mute, fontSize: 12, fontWeight: "400" },
   macros: { gap: 12, marginBottom: 12 },
   macro: {},
   macroHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
   macroLabel: { color: N.ink, fontSize: 14 },
+  macroValue: {
+    color: N.mute,
+    fontSize: 13,
+    fontVariant: ["tabular-nums"],
+  },
   microLink: { color: N.acc, fontSize: 13, alignSelf: "flex-end" },
   chips: { gap: 8, paddingVertical: 6, paddingRight: 20 },
   section: { marginTop: 18 },
@@ -590,7 +638,24 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 8,
   },
-  sectionTitle: { fontFamily: NSerif, fontWeight: "300", fontSize: 22, color: N.ink },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+    flex: 1,
+  },
+  sectionTitle: { fontFamily: NSerif, fontWeight: "400", fontSize: 20, color: N.ink },
+  sectionSub: {
+    color: N.mute,
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+  },
+  sectionAddBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   empty: { color: N.dim, fontSize: 14, paddingVertical: 6 },
   rows: { padding: 0, overflow: "hidden" },
   entry: {
@@ -605,7 +670,11 @@ const s = StyleSheet.create({
   entryName: { color: N.ink, fontSize: 15, fontWeight: "500" },
   entrySub: { flexDirection: "row", alignItems: "center", marginTop: 3 },
   dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  entryKcal: { color: N.ink, fontSize: 14 },
+  entryKcal: {
+    color: N.ink,
+    fontSize: 14,
+    fontVariant: ["tabular-nums"],
+  },
   remove: { color: N.dim, fontSize: 16, paddingHorizontal: 4 },
   feelRow: {
     flexDirection: "row",
@@ -633,9 +702,9 @@ const s = StyleSheet.create({
   },
   dockInput: { flex: 1, color: N.ink, fontSize: 15, paddingVertical: 8 },
   send: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: N.acc,
     alignItems: "center",
     justifyContent: "center",

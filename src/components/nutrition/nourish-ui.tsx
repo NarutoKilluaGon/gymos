@@ -121,18 +121,20 @@ export function Ring({
           strokeWidth={stroke}
           fill="none"
         />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={over ? N.bad : N.acc}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={`${circumference * ratio} ${circumference}`}
-          rotation={-90}
-          origin={`${size / 2}, ${size / 2}`}
-        />
+        {ratio > 0 ? (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={over ? N.bad : N.acc}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            fill="none"
+            strokeDasharray={`${circumference * ratio} ${circumference}`}
+            rotation={-90}
+            origin={`${size / 2}, ${size / 2}`}
+          />
+        ) : null}
       </Svg>
       <View style={s.ringCenter}>{children}</View>
     </View>

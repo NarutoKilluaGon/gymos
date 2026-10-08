@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BackHandler,
   KeyboardAvoidingView,
@@ -7,11 +7,13 @@ import {
   View,
 } from "react-native";
 
+import { useRouter } from "expo-router";
+
 import { InsightsView } from "@/components/nutrition/insights-view";
 import { KitchenView } from "@/components/nutrition/kitchen-view";
 import { MeView } from "@/components/nutrition/me-view";
 import { GuardSheet } from "@/components/nutrition/more-sheets";
-import { Pill } from "@/components/nutrition/nourish-ui";
+import { Seg } from "@/components/nutrition/nourish-ui";
 import { TodayView } from "@/components/nutrition/today-view";
 import { NOURISH } from "@/constants/design";
 import { ThemeProvider } from "@/contexts/theme-context";
@@ -28,11 +30,12 @@ import { showToast } from "@/utils/toast";
 
 export type NourishViewId = "today" | "insights" | "kitchen" | "me";
 
-const TITLES: Record<Exclude<NourishViewId, "today">, string> = {
-  insights: "Insights",
-  kitchen: "Kitchen",
-  me: "Me",
-};
+const NOURISH_TABS = [
+  { value: "today", label: "Today" },
+  { value: "insights", label: "Insights" },
+  { value: "kitchen", label: "Kitchen" },
+  { value: "me", label: "Me" },
+] as const;
 
 type PendingChange = {
   patch: Partial<NourishSettings>;
@@ -47,6 +50,13 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
   const [seenRequest, setSeenRequest] = useState(requestedView);
   const [pending, setPending] = useState<PendingChange | null>(null);
 
+  const router = useRouter();
+
+  const changeView = useCallback((next: NourishViewId) => {
+    setView(next);
+    router.setParams({ view: next });
+  }, [router]);
+
   if (requestedView !== seenRequest) {
     setSeenRequest(requestedView);
 
@@ -59,14 +69,14 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
-        setView("today");
+        changeView("today");
 
         return true;
       },
     );
 
     return () => subscription.remove();
-  }, [view]);
+  }, [changeView, view]);
 
   const settings = nourish.data?.settings;
 
@@ -101,25 +111,19 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
           style={s.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          {view === "today" ? (
-            <ScreenHeader
-              eyebrow="NOURISH"
-              title="Nutrition"
-              right={
-                <View style={s.nav}>
-                  <Pill label="Insights" onPress={() => setView("insights")} />
-                  <Pill label="Kitchen" onPress={() => setView("kitchen")} />
-                  <Pill label="Me" onPress={() => setView("me")} />
-                </View>
-              }
+          <ScreenHeader
+            eyebrow="NOURISH"
+            title="Nutrition"
+            onBack={view !== "today" ? () => changeView("today") : undefined}
+          />
+
+          <View style={s.tabs}>
+            <Seg
+              options={NOURISH_TABS}
+              value={view}
+              onChange={changeView}
             />
-          ) : (
-            <ScreenHeader
-              eyebrow="NOURISH"
-              title={TITLES[view]}
-              onBack={() => setView("today")}
-            />
-          )}
+          </View>
 
           {view === "today" ? <TodayView nourish={nourish} /> : null}
           {view === "insights" ? (
@@ -152,5 +156,5 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
 
 const s = StyleSheet.create({
   flex: { flex: 1 },
-  nav: { flexDirection: "row", gap: 6 },
+  tabs: { paddingHorizontal: 20, marginBottom: 12 },
 });
