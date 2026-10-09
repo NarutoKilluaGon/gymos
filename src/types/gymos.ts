@@ -29,6 +29,8 @@ export type WorkoutSet = {
   /** Warm-up sets are logged but never count toward volume, PRs or
    *  history. Absent on every record saved before Forge. */
   warmup?: boolean;
+  /** Whether this set was taken to muscular failure. */
+  toFailure?: boolean;
 };
 
 export type CardioActivity =

@@ -18,20 +18,67 @@ const DELOAD_SET_FACTOR = 0.6;
 const DELOAD_LOAD_FACTOR = 0.9;
 const DEFAULT_SETS = 3;
 const DEFAULT_REPS = 8;
+export const AMRAP_PROGRESSION_MARGIN = 2;
 
-/** Highest number in a rep target: "8-10" → 10, "5" → 5. */
+/**
+ * Parses rep target expressions into structured representation:
+ * - "8" -> { kind: "fixed", min: 8, max: 8 }
+ * - "8-10" -> { kind: "range", min: 8, max: 10 }
+ * - "8+" -> { kind: "amrap", min: 8 }
+ * - "AMRAP", "failure", "to failure", "F" -> { kind: "amrap" }
+ */
+export function parseRepTarget(text: string | undefined): {
+  kind: "fixed" | "range" | "amrap";
+  min?: number;
+  max?: number;
+} {
+  const clean = String(text ?? "").trim();
+  if (!clean) return { kind: "fixed", min: 0, max: 0 };
+
+  const lower = clean.toLowerCase();
+  if (lower === "amrap" || lower === "failure" || lower === "to failure" || lower === "f") {
+    return { kind: "amrap" };
+  }
+
+  // Check for "8+" or "8+ AMRAP"
+  const plusMatch = clean.match(/^(\d+)\s*\+$/);
+  if (plusMatch) {
+    const val = parseInt(plusMatch[1], 10);
+    return { kind: "amrap", min: val };
+  }
+
+  // Check for range "8-10" or "8 - 10"
+  if (clean.includes("-")) {
+    const parts = clean.split("-").map((p) => parseInt(p.trim(), 10));
+    const min = Number.isFinite(parts[0]) ? parts[0] : 0;
+    const max = Number.isFinite(parts[1]) ? parts[1] : min;
+    return { kind: "range", min, max };
+  }
+
+  // Fixed number "8"
+  const parsed = parseInt(clean, 10);
+  if (Number.isFinite(parsed)) {
+    return { kind: "fixed", min: parsed, max: parsed };
+  }
+
+  return { kind: "fixed", min: 0, max: 0 };
+}
+
+/** Highest number in a rep target: "8-10" → 10, "5" → 5, "8+" → 8. */
 export function topReps(target: string | undefined): number {
-  const parsed = parseInt(String(target ?? "").split("-").pop() ?? "", 10);
-
-  return Number.isFinite(parsed) ? parsed : 0;
+  const parsed = parseRepTarget(target);
+  if (parsed.kind === "range") return parsed.max ?? 0;
+  if (parsed.kind === "fixed") return parsed.max ?? 0;
+  if (parsed.kind === "amrap") return parsed.min ?? 0;
+  return 0;
 }
 
-/** Lowest number in a rep target: "8-10" → 8. */
+/** Lowest number in a rep target: "8-10" → 8, "8+" → 8, "5" → 5. */
 export function bottomReps(target: string | undefined): number {
-  const parsed = parseInt(String(target ?? ""), 10);
-
-  return Number.isFinite(parsed) ? parsed : 0;
+  const parsed = parseRepTarget(target);
+  return parsed.min ?? 0;
 }
+
 
 /**
  * One exercise for a new session, prefilled from the last time it was done
@@ -61,13 +108,17 @@ export function buildExercise(input: {
   const count = deload
     ? Math.max(2, Math.round(baseSets * DELOAD_SET_FACTOR))
     : baseSets;
-  const hi = target ? topReps(target.reps) : 0;
+  const repParsed = target ? parseRepTarget(target.reps) : null;
+  const targetThreshold =
+    repParsed?.kind === "amrap"
+      ? (repParsed.min !== undefined && repParsed.min > 0 ? repParsed.min + AMRAP_PROGRESSION_MARGIN : 0)
+      : (repParsed ? topReps(target?.reps) : 0);
   const bodyweight = exercise.bodyweight;
   const progressed =
     !deload &&
     prev !== null &&
-    hi > 0 &&
-    prev.every((set) => (bodyweight || (set.weight ?? 0)) && set.reps >= hi);
+    targetThreshold > 0 &&
+    prev.every((set) => (bodyweight || (set.weight ?? 0)) && set.reps >= targetThreshold);
   const step = STEP[unit];
   const targetWeight = target ? convert(target.weight, "kg", unit) : 0;
 

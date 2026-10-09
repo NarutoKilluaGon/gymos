@@ -93,6 +93,10 @@ export function addCustomExercise(
   name: string,
   muscleGroup: MuscleGroup,
   bodyweight: boolean,
+  extra?: {
+    loadType?: CustomExercise["loadType"];
+    primaryMuscles?: string[];
+  },
 ): Promise<CustomExercise | null> {
   const clean = name.trim();
 
@@ -106,11 +110,16 @@ export function addCustomExercise(
 
     if (existing) return existing;
 
+    const isBw = extra?.loadType === "bodyweight" || extra?.loadType === "assisted" || bodyweight;
     const created: CustomExercise = {
       id: `custom-${createId()}`,
       name: clean,
       muscleGroup,
-      bodyweight,
+      bodyweight: isBw,
+      ...(extra?.loadType ? { loadType: extra.loadType } : {}),
+      ...(extra?.primaryMuscles && extra.primaryMuscles.length > 0
+        ? { primaryMuscles: extra.primaryMuscles }
+        : {}),
     };
 
     await setStorage(CUSTOM_KEY, [...all, created]);

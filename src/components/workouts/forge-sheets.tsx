@@ -23,13 +23,30 @@ import {
   Sheet,
 } from "@/components/workouts/forge-ui";
 import { F } from "@/constants/forge-theme";
-import { MUSCLE_GROUPS, type MuscleGroup } from "@/data/exercises";
-import { MUSCLE_ORDER, normalizeName } from "@/services/forge/catalog";
+import { type MuscleGroup } from "@/data/exercises";
+import { MUSCLES_BY_GROUP } from "@/data/muscles";
+import {
+  exerciseMatchesQuery,
+  findSimilarExercise,
+  MUSCLE_ORDER,
+  normalizeName,
+} from "@/services/forge/catalog";
 import { round1, type WeightUnit } from "@/services/forge/load";
 import { DEFAULT_BAR, platesFor } from "@/services/forge/plates";
 import { PLAN_TEMPLATES } from "@/services/forge/plan";
-import type { CatalogExercise } from "@/types/forge";
+import type { CatalogExercise, LoadType } from "@/types/forge";
 import type { SessionPr } from "@/types/gymos";
+
+const LOAD_TYPES: readonly { type: LoadType; label: string }[] = [
+  { type: "barbell", label: "Barbell" },
+  { type: "dumbbell", label: "Dumbbell" },
+  { type: "machine", label: "Machine" },
+  { type: "cable", label: "Cable" },
+  { type: "bodyweight", label: "Bodyweight" },
+  { type: "assisted", label: "Assisted" },
+  { type: "timed", label: "Timed" },
+  { type: "other", label: "Other" },
+];
 
 /** Search the catalogue, filter by muscle, or add your own exercise. */
 export function ExercisePickerSheet({
@@ -48,38 +65,73 @@ export function ExercisePickerSheet({
     name: string,
     muscle: MuscleGroup,
     bodyweight: boolean,
+    extra?: {
+      loadType?: LoadType;
+      primaryMuscles?: string[];
+    },
   ) => Promise<CatalogExercise | null>;
   title?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
-  const [makeMuscle, setMakeMuscle] = useState<MuscleGroup>("Chest");
-  const [makeBodyweight, setMakeBodyweight] = useState(false);
+  const [filterMuscle, setFilterMuscle] = useState<MuscleGroup | null>(null);
 
-  const q = normalizeName(query);
+  // Create form state: No pre-selected Chest
+  const [createMuscleGroup, setCreateMuscleGroup] = useState<MuscleGroup | null>(null);
+  const [selectedSubMuscles, setSelectedSubMuscles] = useState<string[]>([]);
+  const [otherMuscleText, setOtherMuscleText] = useState("");
+  const [showOtherInput, setShowOtherInput] = useState(false);
+  const [createLoadType, setCreateLoadType] = useState<LoadType>("barbell");
+
   const shown = useMemo(
     () =>
       catalog.filter(
         (entry) =>
-          (!muscle || entry.muscleGroup === muscle) &&
-          (!q || entry.name.toLowerCase().includes(q)),
+          (!filterMuscle || entry.muscleGroup === filterMuscle) &&
+          exerciseMatchesQuery(entry, query),
       ),
-    [catalog, muscle, q],
+    [catalog, filterMuscle, query],
   );
-  const exact = catalog.some((entry) => entry.name.toLowerCase() === q);
 
-  // One pick (or create) per opening. The sheet stays tappable while it
-  // slides away and a create is async, so a second tap would otherwise add the
-  // exercise twice. A ref, not state, so it holds before React re-renders.
+  const exact = catalog.some(
+    (entry) =>
+      entry.name.toLowerCase() === query.trim().toLowerCase() ||
+      normalizeName(entry.name) === normalizeName(query),
+  );
+
+  const duplicateCandidate = useMemo(() => {
+    if (!query.trim() || exact) return undefined;
+    return findSimilarExercise(catalog, query);
+  }, [catalog, query, exact]);
+
+  // One pick (or create) per opening.
   const picking = useRef(false);
 
-  useEffect(() => {
-    if (visible) picking.current = false;
-  }, [visible]);
+  const resetCreateForm = () => {
+    setCreateMuscleGroup(null);
+    setSelectedSubMuscles([]);
+    setOtherMuscleText("");
+    setShowOtherInput(false);
+    setCreateLoadType("barbell");
+  };
 
   const close = () => {
     setQuery("");
+    resetCreateForm();
     onClose();
+  };
+
+  useEffect(() => {
+    if (visible) {
+      picking.current = false;
+    }
+  }, [visible]);
+
+  const isBw = createLoadType === "bodyweight" || createLoadType === "assisted";
+
+  const handleToggleSubMuscle = (sub: string) => {
+    setSelectedSubMuscles((prev) =>
+      prev.includes(sub) ? prev.filter((m) => m !== sub) : [...prev, sub],
+    );
   };
 
   return (
@@ -92,13 +144,13 @@ export function ExercisePickerSheet({
         returnKeyType="search"
       />
       <View style={s.wrap}>
-        <Pill label="All" active={!muscle} onPress={() => setMuscle(null)} />
+        <Pill label="All" active={!filterMuscle} onPress={() => setFilterMuscle(null)} />
         {MUSCLE_ORDER.map((group) => (
           <Pill
             key={group}
             label={group}
-            active={muscle === group}
-            onPress={() => setMuscle(muscle === group ? null : group)}
+            active={filterMuscle === group}
+            onPress={() => setFilterMuscle(filterMuscle === group ? null : group)}
           />
         ))}
       </View>
@@ -131,42 +183,112 @@ export function ExercisePickerSheet({
       {query.trim() && !exact ? (
         <View style={s.create}>
           <Label>{`Add "${query.trim()}"`}</Label>
+
+          {duplicateCandidate ? (
+            <View style={s.dupWarning}>
+              <Text style={s.dupText}>
+                Did you mean{" "}
+                <Text
+                  style={s.dupLink}
+                  onPress={() => {
+                    if (picking.current) return;
+                    picking.current = true;
+                    onPick(duplicateCandidate);
+                    close();
+                  }}
+                >
+                  {duplicateCandidate.name}
+                </Text>
+                ?
+              </Text>
+            </View>
+          ) : null}
+
+          {/* 1. Muscle Group (REQUIRED) */}
+          <Label>Muscle group *</Label>
           <View style={s.wrap}>
-            {MUSCLE_GROUPS.map((group) => (
+            {MUSCLE_ORDER.map((group) => (
               <Pill
                 key={group}
                 label={group}
-                active={makeMuscle === group}
-                onPress={() => setMakeMuscle(group)}
+                active={createMuscleGroup === group}
+                onPress={() => {
+                  setCreateMuscleGroup(group);
+                  setSelectedSubMuscles([]);
+                  setShowOtherInput(false);
+                  setOtherMuscleText("");
+                }}
               />
             ))}
           </View>
+
+          {/* 2. Specific Muscles Chips for selected group */}
+          {createMuscleGroup ? (
+            <View style={s.subMusclesBlock}>
+              <Label>Specific muscles</Label>
+              <View style={s.wrap}>
+                {MUSCLES_BY_GROUP[createMuscleGroup].map((sub) => (
+                  <Pill
+                    key={sub}
+                    label={sub}
+                    active={selectedSubMuscles.includes(sub)}
+                    onPress={() => handleToggleSubMuscle(sub)}
+                  />
+                ))}
+                <Pill
+                  label="Other..."
+                  active={showOtherInput}
+                  onPress={() => setShowOtherInput((prev) => !prev)}
+                />
+              </View>
+              {showOtherInput ? (
+                <Field
+                  placeholder="Additional muscle name"
+                  value={otherMuscleText}
+                  onChangeText={setOtherMuscleText}
+                  autoCorrect={false}
+                />
+              ) : null}
+            </View>
+          ) : null}
+
+          {/* 3. Load Type */}
+          <Label>Load type</Label>
           <View style={s.wrap}>
-            <Pill
-              label="Bodyweight"
-              active={makeBodyweight}
-              onPress={() => setMakeBodyweight((value) => !value)}
-            />
+            {LOAD_TYPES.map(({ type, label }) => (
+              <Pill
+                key={type}
+                label={label}
+                active={createLoadType === type}
+                onPress={() => setCreateLoadType(type)}
+              />
+            ))}
           </View>
+
           <Button
             label="Add exercise"
+            disabled={!createMuscleGroup}
             onPress={() => {
-              if (picking.current) return;
+              if (picking.current || !createMuscleGroup) return;
+
+              const allMuscles = [...selectedSubMuscles];
+              if (otherMuscleText.trim() && !allMuscles.includes(otherMuscleText.trim())) {
+                allMuscles.push(otherMuscleText.trim());
+              }
 
               picking.current = true;
-              void onCreate(query.trim(), makeMuscle, makeBodyweight).then(
-                (created) => {
-                  if (!created) {
-                    // Nothing was added: let the person try again.
-                    picking.current = false;
+              void onCreate(query.trim(), createMuscleGroup, isBw, {
+                loadType: createLoadType,
+                primaryMuscles: allMuscles.length > 0 ? allMuscles : undefined,
+              }).then((created) => {
+                if (!created) {
+                  picking.current = false;
+                  return;
+                }
 
-                    return;
-                  }
-
-                  onPick(created);
-                  close();
-                },
-              );
+                onPick(created);
+                close();
+              });
             }}
           />
         </View>
@@ -662,6 +784,17 @@ const s = StyleSheet.create({
   rowMeta: { color: F.mute, fontSize: 13 },
   empty: { color: F.mute, fontSize: 14, paddingVertical: 16 },
   create: { marginTop: 16 },
+  subMusclesBlock: { marginVertical: 4 },
+  dupWarning: {
+    backgroundColor: F.card2,
+    borderWidth: 1,
+    borderColor: F.line,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  dupText: { color: F.ink, fontSize: 14 },
+  dupLink: { color: F.acc, fontWeight: "600", textDecorationLine: "underline" },
   note: { minHeight: 96, textAlignVertical: "top" },
   big: { color: F.ink, fontSize: 34, fontWeight: "300" },
   plates: { marginTop: 16 },

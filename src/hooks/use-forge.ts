@@ -202,9 +202,13 @@ export function useForge() {
         name: string,
         muscle: MuscleGroup,
         bodyweight: boolean,
+        extra?: {
+          loadType?: CustomExercise["loadType"];
+          primaryMuscles?: string[];
+        },
       ): Promise<CustomExercise | null> => {
         try {
-          const created = await addCustomExercise(name, muscle, bodyweight);
+          const created = await addCustomExercise(name, muscle, bodyweight, extra);
 
           await reload();
 
