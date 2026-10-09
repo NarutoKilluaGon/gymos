@@ -1,12 +1,11 @@
-import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
-const DURATION = 600;
+const DURATION = 400;
 
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
@@ -16,24 +15,19 @@ export function AnimatedSplashOverlay() {
 
   const splashKeyframe = new Keyframe({
     0: {
-      transform: [{ scale: 1 }],
       opacity: 1,
-    },
-    20: {
-      opacity: 1,
-    },
-    70: {
-      opacity: 0,
-      easing: Easing.elastic(0.7),
     },
     100: {
       opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.elastic(0.7),
+      easing: Easing.out(Easing.ease),
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  const content = (
+    <View style={styles.splashCenter}>
+      <Text style={styles.splashBrand}>GymOS</Text>
+    </View>
+  );
 
   return animate ? (
     <Animated.View
@@ -44,7 +38,7 @@ export function AnimatedSplashOverlay() {
         }
       })}
       style={styles.splashOverlay}>
-      {image}
+      {content}
     </Animated.View>
   ) : (
     <View
@@ -54,7 +48,7 @@ export function AnimatedSplashOverlay() {
         });
       }}
       style={styles.splashOverlay}>
-      {image}
+      {content}
     </View>
   );
 }
@@ -140,9 +134,20 @@ const styles = StyleSheet.create({
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#0D0E12',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
+  },
+  splashCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashBrand: {
+    fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }),
+    fontSize: 42,
+    fontWeight: '300',
+    letterSpacing: 2,
+    color: '#F4F4F6',
   },
 });

@@ -1,8 +1,7 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { DarkTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
 import { ReduceMotion, ReducedMotionConfig } from 'react-native-reanimated';
 
 import AppTabs from '@/components/app-tabs';
@@ -18,7 +17,6 @@ import { getReminderPrefs } from '@/storage/repositories/reminders';
 SplashScreen.preventAutoHideAsync();
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
@@ -56,7 +54,7 @@ export default function TabLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DarkTheme}>
       <ReducedMotionConfig mode={ReduceMotion.System} />
       <StatusBar style="light" />
       <AnimatedSplashOverlay />

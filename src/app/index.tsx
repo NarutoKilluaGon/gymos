@@ -17,6 +17,7 @@ import {
 } from "react-native";
 
 import { DailyTargetsCard } from "@/components/dashboard/daily-targets-card";
+import { FirstRunChecklistCard } from "@/components/dashboard/first-run-checklist";
 import { Greeting } from "@/components/dashboard/greeting";
 import { NorthStarCard } from "@/components/dashboard/north-star-card";
 import { NorthStarSetupCard } from "@/components/dashboard/north-star-setup-card";
@@ -47,6 +48,10 @@ import {
 } from "@/storage/repositories/meals";
 import { addMeasurement } from "@/storage/repositories/measurements";
 import { getNorthStar } from "@/storage/repositories/north-star";
+import {
+  getChecklistDismissed,
+  setChecklistDismissed,
+} from "@/storage/repositories/onboarding";
 import { getNourishSettings } from "@/storage/repositories/nourish-settings";
 import {
   deleteSleepSession,
@@ -214,6 +219,7 @@ export default function HomeScreen() {
   const [steps, setSteps] = useState(0);
   const [sleep, setSleep] = useState<SleepSession[]>([]);
   const [streak, setStreak] = useState<Streak>({ days: 0, todayActive: false });
+  const [checklistDismissed, setChecklistDismissedState] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -251,6 +257,7 @@ export default function HomeScreen() {
         await load(getTodaySleep, setSleep);
         await load(getTodaySteps, setSteps);
         await load(getStreak, setStreak);
+        await load(getChecklistDismissed, setChecklistDismissedState);
         await load(getNourishSettings, (settings) => {
           setProteinTarget(settings.protein);
           setCalorieTarget(settings.kcal);
@@ -357,6 +364,15 @@ export default function HomeScreen() {
       .catch(() => {
         showToast("Couldn't delete sleep");
       });
+  }
+
+  async function handleDismissChecklist() {
+    setChecklistDismissedState(true);
+    try {
+      await setChecklistDismissed(true);
+    } catch {
+      // Non-fatal
+    }
   }
 
   function handleWorkoutStart() {
@@ -481,7 +497,22 @@ export default function HomeScreen() {
         />
       </FadeIn>
 
-      {/* 2. DYNAMIC HERO CARD (Forge Workout) */}
+      {/* 2. FIRST-RUN CHECKLIST */}
+      {!checklistDismissed && (
+        <FadeIn delay={10}>
+          <FirstRunChecklistCard
+            mealsCount={meals.length}
+            hasWorkout={Boolean(finishedWorkout || activeWorkout)}
+            waterMl={water * 1000}
+            onLogMeal={() => router.push("/nutrition")}
+            onStartWorkout={handleWorkoutStart}
+            onAddWater={() => void handleWaterAdd(0.25)}
+            onDismiss={handleDismissChecklist}
+          />
+        </FadeIn>
+      )}
+
+      {/* 3. DYNAMIC HERO CARD (Forge Workout) */}
       {enabled.workouts && (
         <FadeIn delay={20}>
           <WorkoutCard
