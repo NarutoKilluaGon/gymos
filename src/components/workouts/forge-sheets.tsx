@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import {
   ArrowDown,
@@ -21,6 +29,7 @@ import {
   Plus,
   Target,
   Trash2,
+  Trophy,
   Unlink2,
 } from "lucide-react-native";
 
@@ -47,6 +56,7 @@ import {
   getMonthGrid,
   getMonthStats,
   type CalendarDaySummary,
+  type MonthCell,
 } from "@/services/forge/calendar";
 import { dateFromKey } from "@/utils/date";
 import { dayFor, PLAN_TEMPLATES } from "@/services/forge/plan";
@@ -513,6 +523,43 @@ export function SummarySheet({
   trimmed: boolean;
   formatPr: (pr: SessionPr) => string;
 }) {
+  const trophyScale = useRef(new Animated.Value(1)).current;
+  const isReduced = useRef(process.env.NODE_ENV === "test");
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    try {
+      AccessibilityInfo.isReduceMotionEnabled()
+        ?.then((e) => {
+          isReduced.current = e;
+        })
+        ?.catch(() => {});
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (isReduced.current || process.env.NODE_ENV === "test") {
+      trophyScale.setValue(1);
+      return;
+    }
+    trophyScale.setValue(0.85);
+    Animated.sequence([
+      Animated.timing(trophyScale, {
+        toValue: 1.25,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(trophyScale, {
+        toValue: 1,
+        damping: 12,
+        stiffness: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [visible, trophyScale]);
+
   return (
     <Sheet
       visible={visible}
@@ -520,6 +567,11 @@ export function SummarySheet({
       title="Workout done"
       footer={<Button label="Done" onPress={onClose} />}
     >
+      <View style={s.summaryHeaderRow}>
+        <Animated.View style={{ transform: [{ scale: trophyScale }] }}>
+          <Trophy size={36} color={F.acc} />
+        </Animated.View>
+      </View>
       <View style={s.stats}>
         <Stat label="Time" value={durationLabel} />
         <Stat label="Volume" value={volumeLabel} />
@@ -533,15 +585,70 @@ export function SummarySheet({
       {prs.length > 0 ? (
         <View style={s.plates}>
           <Label>New records</Label>
-          {prs.map((pr) => (
-            <View key={pr.exerciseId} style={s.row}>
-              <Text style={s.rowName}>{names[pr.exerciseId] ?? pr.exerciseId}</Text>
-              <Text style={s.pr}>{formatPr(pr)}</Text>
-            </View>
+          {prs.map((pr, index) => (
+            <SummaryPrRow
+              key={pr.exerciseId}
+              name={names[pr.exerciseId] ?? pr.exerciseId}
+              prText={formatPr(pr)}
+              index={index}
+            />
           ))}
         </View>
       ) : null}
     </Sheet>
+  );
+}
+
+function SummaryPrRow({
+  name,
+  prText,
+  index,
+}: {
+  name: string;
+  prText: string;
+  index: number;
+}) {
+  const opacity = useRef(
+    new Animated.Value(process.env.NODE_ENV === "test" ? 1 : 0),
+  ).current;
+  const translateY = useRef(
+    new Animated.Value(process.env.NODE_ENV === "test" ? 0 : 12),
+  ).current;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    const delay = Math.min(index * 60, 400);
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [index, opacity, translateY]);
+
+  return (
+    <Animated.View
+      style={[
+        s.row,
+        {
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      <Text style={s.rowName}>{name}</Text>
+      <Text style={s.pr}>{prText}</Text>
+    </Animated.View>
   );
 }
 
@@ -1154,6 +1261,88 @@ export function TodayMenuSheet({
   );
 }
 
+function CalendarCellView({
+  cell,
+  index,
+  isInspected,
+  onPress,
+}: {
+  cell: MonthCell;
+  index: number;
+  isInspected: boolean;
+  onPress: () => void;
+}) {
+  const ringScale = useRef(new Animated.Value(isInspected ? 1 : 0.85)).current;
+  const dotOpacity = useRef(
+    new Animated.Value(process.env.NODE_ENV === "test" ? 1 : 0),
+  ).current;
+
+  useEffect(() => {
+    if (isInspected) {
+      if (process.env.NODE_ENV === "test") {
+        ringScale.setValue(1);
+        return;
+      }
+      ringScale.setValue(0.85);
+      Animated.spring(ringScale, {
+        toValue: 1,
+        damping: 14,
+        stiffness: 240,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isInspected, ringScale]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    const delay = index * 20;
+    const timer = setTimeout(() => {
+      Animated.timing(dotOpacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [index, dotOpacity]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Day ${cell.dayNumber}`}
+      onPress={onPress}
+      style={[
+        s.calCell,
+        !cell.isCurrentMonth && s.calCellFaded,
+        cell.isToday && s.calCellToday,
+        isInspected && s.calCellInspected,
+      ]}
+    >
+      <Animated.View
+        style={[
+          s.calCellContent,
+          isInspected && { transform: [{ scale: ringScale }] },
+        ]}
+      >
+        <Text
+          style={[
+            s.calCellNum,
+            !cell.isCurrentMonth && s.calCellNumFaded,
+            cell.isToday && s.calCellNumToday,
+            isInspected && s.calCellNumInspected,
+          ]}
+        >
+          {cell.dayNumber}
+        </Text>
+        <Animated.View style={[s.calDotsRow, { opacity: dotOpacity }]}>
+          {cell.hasStrength ? <View style={s.calStrengthDot} /> : null}
+          {cell.hasCardio ? <View style={s.calCardioDot} /> : null}
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export function CalendarSheet({
   visible,
   onClose,
@@ -1179,8 +1368,11 @@ export function CalendarSheet({
   const [viewYear, setViewYear] = useState(initialDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(initialDate.getMonth());
   const [inspectedKey, setInspectedKey] = useState<string | null>(selectedKey);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const monthDir = useRef<1 | -1>(1);
 
   const prevMonth = () => {
+    monthDir.current = -1;
     if (viewMonth === 0) {
       setViewYear((y) => y - 1);
       setViewMonth(11);
@@ -1190,6 +1382,7 @@ export function CalendarSheet({
   };
 
   const nextMonth = () => {
+    monthDir.current = 1;
     if (viewMonth === 11) {
       setViewYear((y) => y + 1);
       setViewMonth(0);
@@ -1197,6 +1390,17 @@ export function CalendarSheet({
       setViewMonth((m) => m + 1);
     }
   };
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    slideAnim.setValue(monthDir.current * 30);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [viewYear, viewMonth, slideAnim]);
 
   const grid = useMemo(
     () => getMonthGrid(viewYear, viewMonth, summaryMap, todayKey),
@@ -1265,46 +1469,28 @@ export function CalendarSheet({
       </View>
 
       {/* Month grid */}
-      <View style={s.calGrid}>
-        {grid.map((cell) => {
-          const isInspected = cell.key === inspectedKey;
-          return (
-            <Pressable
-              key={cell.key}
-              accessibilityRole="button"
-              accessibilityLabel={`Day ${cell.dayNumber}`}
-              onPress={() => {
-                setInspectedKey(cell.key);
-                if (cell.key <= todayKey && (cell.hasStrength || cell.hasCardio)) {
-                  onSelectDate(cell.key);
-                  onClose();
-                }
-              }}
-              style={[
-                s.calCell,
-                !cell.isCurrentMonth && s.calCellFaded,
-                cell.isToday && s.calCellToday,
-                isInspected && s.calCellInspected,
-              ]}
-            >
-              <Text
-                style={[
-                  s.calCellNum,
-                  !cell.isCurrentMonth && s.calCellNumFaded,
-                  cell.isToday && s.calCellNumToday,
-                  isInspected && s.calCellNumInspected,
-                ]}
-              >
-                {cell.dayNumber}
-              </Text>
-              <View style={s.calDotsRow}>
-                {cell.hasStrength ? <View style={s.calStrengthDot} /> : null}
-                {cell.hasCardio ? <View style={s.calCardioDot} /> : null}
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
+      <Animated.View
+        style={[
+          s.calGrid,
+          { transform: [{ translateX: slideAnim }] },
+        ]}
+      >
+        {grid.map((cell, index) => (
+          <CalendarCellView
+            key={cell.key}
+            cell={cell}
+            index={index}
+            isInspected={cell.key === inspectedKey}
+            onPress={() => {
+              setInspectedKey(cell.key);
+              if (cell.key <= todayKey && (cell.hasStrength || cell.hasCardio)) {
+                onSelectDate(cell.key);
+                onClose();
+              }
+            }}
+          />
+        ))}
+      </Animated.View>
 
       {/* Day inspection panel */}
       {inspectedKey ? (
@@ -1475,4 +1661,6 @@ const s = StyleSheet.create({
   calInspectDate: { color: F.ink, fontSize: 15, fontWeight: "600" },
   calInspectMeta: { color: F.mute, fontSize: 13 },
   calInspectActions: { gap: 10 },
+  summaryHeaderRow: { alignItems: "center", marginBottom: 12 },
+  calCellContent: { alignItems: "center", justifyContent: "center" },
 });

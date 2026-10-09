@@ -1,7 +1,17 @@
 import { useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import Reanimated from "react-native-reanimated";
 import { Plus } from "lucide-react-native";
 
+import { Crossfade } from "@/components/ds/seg";
 import {
   DraftScope,
   DraftTextField,
@@ -22,6 +32,8 @@ import { Font } from "@/constants/design";
 import { F } from "@/constants/forge-theme";
 import type { MuscleGroup } from "@/data/exercises";
 import type { ForgeData } from "@/hooks/use-forge";
+import { hapticLight } from "@/utils/haptics";
+import { listLayout } from "@/utils/motion";
 import { parseRepTarget } from "@/services/forge/build";
 import { convert, round1, toKg, type WeightUnit } from "@/services/forge/load";
 import {
@@ -335,7 +347,8 @@ export function PlanView({
 
             {/* ACTIVE DAY VIEW */}
             {currentDay ? (
-              <FCard key={currentDay.id} style={s.gap}>
+              <Crossfade triggerKey={currentDay.id} duration={160}>
+                <FCard key={currentDay.id} style={s.gap}>
                 <View style={s.dayHead}>
                   <DraftTextField
                     value={currentDay.name}
@@ -405,36 +418,69 @@ export function PlanView({
                         : `${repParsed.min || 8} reps`;
 
                   return (
-                    <View
+                    <PlanExerciseRow
                       key={`${exercise.exerciseId}-${index}`}
-                      style={[
-                        s.exRow,
-                        inSuperset && s.exRowSuperset,
-                      ]}
+                      inSuperset={Boolean(inSuperset)}
+                      onMoveUp={
+                        index > 0
+                          ? () => {
+                              void hapticLight();
+                              editRowAt(
+                                currentDay.id,
+                                currentDay.exercises,
+                                index,
+                                -1,
+                                (current, now) =>
+                                  movePlanExerciseUp(current, currentDay.id, index, now),
+                              );
+                            }
+                          : undefined
+                      }
+                      onMoveDown={
+                        index < currentDay.exercises.length - 1
+                          ? () => {
+                              void hapticLight();
+                              editRowAt(
+                                currentDay.id,
+                                currentDay.exercises,
+                                index,
+                                1,
+                                (current, now) =>
+                                  movePlanExerciseDown(current, currentDay.id, index, now),
+                              );
+                            }
+                          : undefined
+                      }
                     >
-                      {/* Superset header rail indicator if leader */}
-                      {isSupersetLeader ? (
-                        <View style={s.supersetTagRow}>
-                          <View style={s.supersetBadge}>
-                            <Text style={s.supersetBadgeText}>SUPERSET</Text>
-                          </View>
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel="What's a superset?"
-                            onPress={() => setSupersetInfoOpen(true)}
-                            hitSlop={6}
-                          >
-                            <Text style={s.supersetHelpLink}>{"What's this?"}</Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
+                      {(panHandlers) => (
+                        <>
+                          {/* Superset header rail indicator if leader */}
+                          {isSupersetLeader ? (
+                            <View style={s.supersetTagRow}>
+                              <View style={s.supersetBadge}>
+                                <Text style={s.supersetBadgeText}>SUPERSET</Text>
+                              </View>
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel="What's a superset?"
+                                onPress={() => setSupersetInfoOpen(true)}
+                                hitSlop={6}
+                              >
+                                <Text style={s.supersetHelpLink}>{"What's this?"}</Text>
+                              </Pressable>
+                            </View>
+                          ) : null}
 
-                      {/* Header line: index badge, editable name, overflow menu */}
-                      <View style={s.exHeaderLine}>
-                        <View style={s.indexBadge}>
-                          <Text style={s.indexBadgeText}>{index + 1}</Text>
-                        </View>
-                        <View style={s.nameWrapper}>
+                          {/* Header line: index badge, editable name, overflow menu */}
+                          <View style={s.exHeaderLine}>
+                            <View
+                              {...panHandlers}
+                              style={s.indexBadge}
+                              accessibilityLabel={`Reorder ${exercise.name}`}
+                            >
+                              <Text style={s.indexBadgeText}>{index + 1}</Text>
+                            </View>
+                            <View style={s.nameWrapper}>
                           <DraftTextField
                             accessibilityLabel={`${exercise.name} name`}
                             value={exercise.name}
@@ -562,7 +608,8 @@ export function PlanView({
                         {index > 0 ? (
                           <Action
                             label="↑"
-                            onPress={() =>
+                            onPress={() => {
+                              void hapticLight();
                               editRowAt(
                                 currentDay.id,
                                 currentDay.exercises,
@@ -570,8 +617,8 @@ export function PlanView({
                                 -1,
                                 (current, now) =>
                                   movePlanExerciseUp(current, currentDay.id, index, now),
-                              )
-                            }
+                              );
+                            }}
                           />
                         ) : null}
                         <Action
@@ -609,9 +656,11 @@ export function PlanView({
                           }}
                         />
                       </View>
-                    </View>
-                  );
-                })}
+                    </>
+                  )}
+                </PlanExerciseRow>
+              );
+            })}
 
                 {/* Dashed Add exercise row at the end of the day */}
                 <Pressable
@@ -628,7 +677,8 @@ export function PlanView({
                   <Pill label="+ Exercise" onPress={() => setPickFor(currentDay.id)} />
                 </View>
               </FCard>
-            ) : null}
+            </Crossfade>
+          ) : null}
 
             {/* ADD DAY INPUT CARD */}
             <FCard style={s.gap}>
@@ -914,6 +964,81 @@ export function PlanView({
         ) : null}
       </View>
     </DraftScope>
+  );
+}
+
+function PlanExerciseRow({
+  children,
+  inSuperset,
+  onMoveUp,
+  onMoveDown,
+}: {
+  children: (panHandlers: object, isDragging: boolean) => React.ReactNode;
+  inSuperset: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [isDragging, setIsDragging] = useState(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
+      onPanResponderGrant: () => {
+        setIsDragging(true);
+        void hapticLight();
+        Animated.spring(scaleAnim, {
+          toValue: 1.02,
+          damping: 18,
+          stiffness: 220,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderRelease: (_, gesture) => {
+        setIsDragging(false);
+        void hapticLight();
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          damping: 18,
+          stiffness: 220,
+          useNativeDriver: true,
+        }).start();
+
+        if (gesture.dy < -35 && onMoveUp) {
+          onMoveUp();
+        } else if (gesture.dy > 35 && onMoveDown) {
+          onMoveDown();
+        }
+      },
+      onPanResponderTerminate: () => {
+        setIsDragging(false);
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          damping: 18,
+          stiffness: 220,
+          useNativeDriver: true,
+        }).start();
+      },
+    }),
+  ).current;
+
+  return (
+    <Reanimated.View layout={listLayout}>
+      <Animated.View
+        style={[
+          s.exRow,
+          inSuperset && s.exRowSuperset,
+          {
+            transform: [{ scale: scaleAnim }],
+            zIndex: isDragging ? 10 : 1,
+            elevation: isDragging ? 6 : 0,
+          },
+        ]}
+      >
+        {children(panResponder.panHandlers, isDragging)}
+      </Animated.View>
+    </Reanimated.View>
   );
 }
 

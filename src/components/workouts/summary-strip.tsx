@@ -1,9 +1,9 @@
-import * as Haptics from "expo-haptics";
 import { Clock } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Font } from "@/constants/design";
 import { F } from "@/constants/forge-theme";
+import { hapticLight } from "@/utils/haptics";
 
 type SummaryStripProps = {
   clock: string;
@@ -51,7 +51,7 @@ export function SummaryStrip({
           accessibilityLabel={paused ? "Resume clock" : "Pause clock"}
           disabled={disabled || backdated}
           onPress={() => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            void hapticLight();
             onToggleClock();
           }}
           style={styles.item}

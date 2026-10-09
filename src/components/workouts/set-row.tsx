@@ -1,4 +1,3 @@
-import * as Haptics from "expo-haptics";
 import { Check } from "lucide-react-native";
 import { useRef } from "react";
 import {
@@ -8,6 +7,8 @@ import {
   Text,
   View,
 } from "react-native";
+
+import { hapticLight, hapticMedium } from "@/utils/haptics";
 
 import { Font } from "@/constants/design";
 import { F } from "@/constants/forge-theme";
@@ -90,7 +91,7 @@ export function SetRow({
               : "Tap to mark as warm-up"
         }
         onPress={() => {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          void hapticLight();
           onToggleWarmup();
         }}
         onLongPress={onRemove}
@@ -144,7 +145,7 @@ export function SetRow({
           if (refSet?.reps !== undefined) {
             onRepsCommit(refSet.reps);
           }
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          void hapticLight();
         }}
         onLongPress={onMenu}
         style={styles.prevWrap}
@@ -160,7 +161,7 @@ export function SetRow({
         accessibilityState={{ checked: set.completed }}
         accessibilityLabel={`Set ${setIndex + 1} done`}
         onPress={() => {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          void hapticLight();
           Animated.sequence([
             Animated.timing(checkScale, {
               toValue: 1.18,
@@ -180,7 +181,7 @@ export function SetRow({
           if (onMenu) {
             onMenu();
           } else if (onToggleFailure) {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            void hapticMedium();
             onToggleFailure();
           }
         }}

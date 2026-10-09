@@ -14,3 +14,4 @@ export * from "./empty-state";
 export * from "./skeleton";
 export * from "./bar";
 export * from "./field";
+export * from "./count-up";

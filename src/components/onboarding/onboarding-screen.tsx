@@ -7,9 +7,12 @@ import {
   Plus,
   TrendingUp,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
+  Animated,
   BackHandler,
+  Easing,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,9 +23,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Card } from "@/components/ds/card";
+import { CountUp } from "@/components/ds/count-up";
 import { PressableScale } from "@/components/ds/pressable-scale";
 import { Font, Metric, Radius, Space, Type } from "@/constants/design";
 import { useTheme } from "@/contexts/theme-context";
+import { hapticSuccess } from "@/utils/haptics";
 import { buildCatalog } from "@/services/forge/catalog";
 import { planFromTemplate } from "@/services/forge/plan";
 import {
@@ -247,6 +252,7 @@ export function OnboardingScreen({ onDone }: Props) {
       }
 
       // 5. Complete Onboarding
+      void hapticSuccess();
       await setOnboardingComplete(true);
       onDone();
     } catch {
@@ -255,7 +261,74 @@ export function OnboardingScreen({ onDone }: Props) {
     }
   }
 
-  const progressPercent = ((step + 1) / TOTAL_STEPS) * 100;
+  const [reducedMotion, setReducedMotion] = useState(
+    process.env.NODE_ENV === "test",
+  );
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    try {
+      AccessibilityInfo.isReduceMotionEnabled()
+        ?.then((enabled) => setReducedMotion(enabled))
+        ?.catch(() => {});
+      const sub = AccessibilityInfo.addEventListener?.(
+        "reduceMotionChanged",
+        (enabled) => setReducedMotion(enabled),
+      );
+      return () => sub?.remove?.();
+    } catch {}
+  }, []);
+
+  const progressScale = useRef(
+    new Animated.Value((step + 1) / TOTAL_STEPS),
+  ).current;
+  const stepOpacity = useRef(new Animated.Value(1)).current;
+  const stepTranslateX = useRef(new Animated.Value(0)).current;
+  const prevStepRef = useRef(step);
+
+  useEffect(() => {
+    const targetScale = (step + 1) / TOTAL_STEPS;
+    if (reducedMotion || process.env.NODE_ENV === "test") {
+      progressScale.setValue(targetScale);
+    } else {
+      Animated.timing(progressScale, {
+        toValue: targetScale,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [step, progressScale, reducedMotion]);
+
+  useEffect(() => {
+    if (prevStepRef.current === step) return;
+    const dir = step > prevStepRef.current ? 1 : -1;
+    prevStepRef.current = step;
+
+    if (reducedMotion || process.env.NODE_ENV === "test") {
+      stepOpacity.setValue(1);
+      stepTranslateX.setValue(0);
+      return;
+    }
+
+    stepOpacity.setValue(0);
+    stepTranslateX.setValue(dir * 24);
+
+    Animated.parallel([
+      Animated.timing(stepOpacity, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(stepTranslateX, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [step, stepOpacity, stepTranslateX, reducedMotion]);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.bg }]}>
@@ -266,10 +339,13 @@ export function OnboardingScreen({ onDone }: Props) {
           { top: insets.top, backgroundColor: theme.line },
         ]}
       >
-        <View
+        <Animated.View
           style={[
             styles.progressFill,
-            { width: `${progressPercent}%`, backgroundColor: theme.acc },
+            {
+              backgroundColor: theme.acc,
+              transform: [{ scaleX: progressScale }],
+            },
           ]}
         />
       </View>
@@ -310,6 +386,12 @@ export function OnboardingScreen({ onDone }: Props) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <Animated.View
+          style={{
+            opacity: stepOpacity,
+            transform: [{ translateX: stepTranslateX }],
+          }}
+        >
         {/* STEP 0: WELCOME */}
         {step === 0 && (
           <View style={styles.welcomeWrap}>
@@ -762,7 +844,8 @@ export function OnboardingScreen({ onDone }: Props) {
                 {goalOption.label}
               </Text>
               <Text style={[Type.body, { color: theme.mute, marginBottom: 12 }]}>
-                {targets.kcal} kcal · {targets.protein}g protein ·{" "}
+                <CountUp value={targets.kcal} /> kcal ·{" "}
+                <CountUp value={targets.protein} />g protein ·{" "}
                 {selectedPlan}
               </Text>
               <Text style={[Type.meta, { color: theme.mute }]}>
@@ -771,6 +854,7 @@ export function OnboardingScreen({ onDone }: Props) {
             </Card>
           </View>
         )}
+        </Animated.View>
       </ScrollView>
 
       {/* Docked 56 dp Primary Action */}
@@ -837,6 +921,8 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: "100%",
+    width: "100%",
+    transformOrigin: "left",
   },
   topBar: {
     flexDirection: "row",

@@ -1,4 +1,3 @@
-import * as Haptics from "expo-haptics";
 import React, { useRef } from "react";
 import {
   Animated,
@@ -7,6 +6,8 @@ import {
   StyleProp,
   ViewStyle,
 } from "react-native";
+
+import { hapticLight } from "@/utils/haptics";
 
 export type PressableScaleProps = Omit<PressableProps, "style"> & {
   children?: React.ReactNode;
@@ -72,7 +73,7 @@ export function PressableScale({
   function handlePress(e: any) {
     if (disabled) return;
     if (haptic) {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void hapticLight();
     }
     onPress?.(e);
   }

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Font } from "@/constants/design";
 import { N } from "@/constants/nourish-theme";
+import { hapticLight } from "@/utils/haptics";
 import { dismissToast, useToast } from "@/utils/toast";
 
 function useGuardedInsets() {
@@ -72,7 +73,7 @@ export function ToastHost() {
     if (timerRef.current) clearTimeout(timerRef.current);
     Animated.timing(fadeAnim, {
       toValue: 0,
-      duration: 180,
+      duration: 160,
       useNativeDriver: true,
     }).start(() => {
       if (currentToastRef.current?.id === t.id) {
@@ -93,6 +94,8 @@ export function ToastHost() {
           easing: Easing.linear,
           useNativeDriver: true,
         }).start();
+      } else {
+        progressAnim.setValue(1);
       }
 
       timerRef.current = setTimeout(() => {
@@ -125,6 +128,7 @@ export function ToastHost() {
   const handleUndo = useCallback(() => {
     if (undoneRef.current) return;
     undoneRef.current = true;
+    void hapticLight();
     if (timerRef.current) clearTimeout(timerRef.current);
     progressAnim.stopAnimation();
 
@@ -197,7 +201,7 @@ export function ToastHost() {
 
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 200,
+      duration: 220,
       useNativeDriver: true,
     }).start();
 
@@ -225,6 +229,13 @@ export function ToastHost() {
   const dotColor = isError ? N.bad : isSuccess ? N.ok : "#d4a24c";
   const bottomOffset = Math.max(16, insets.bottom) + 64;
 
+  const translateY = reducedMotion
+    ? 0
+    : fadeAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [40, 0],
+      });
+
   return (
     <Animated.View
       style={[
@@ -234,12 +245,7 @@ export function ToastHost() {
           borderColor,
           opacity: fadeAnim,
           transform: [
-            {
-              translateY: fadeAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [40, 0],
-              }),
-            },
+            { translateY },
             { translateX: panX },
           ],
         },

@@ -4,8 +4,24 @@ jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
 );
 
+jest.mock("@/global.css", () => ({}));
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require("react-native-gesture-handler/jestSetup");
+
+jest.mock("react-native-worklets", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("react-native-worklets/src/mock");
+});
+
+jest.mock("react-native-reanimated", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const reanimated = require("react-native-reanimated/mock");
+  return {
+    ...reanimated,
+    useReducedMotion: () => false,
+  };
+});
 
 type Insets = { top: number; right: number; bottom: number; left: number };
 const mockInsets: Insets = { top: 0, right: 0, bottom: 0, left: 0 };

@@ -1,5 +1,5 @@
-import * as Haptics from "expo-haptics";
 import { Plus } from "lucide-react-native";
+import { hapticSuccess } from "@/utils/haptics";
 import {
   useCallback,
   useEffect,
@@ -177,7 +177,7 @@ export function ForgeSession({
 
   useEffect(() => {
     if (restDone) {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void hapticSuccess();
     }
   }, [restDone]);
 
@@ -252,7 +252,7 @@ export function ForgeSession({
 
     setRestEnd(null);
     setSummary({ prs: result.session.prs ?? [], trimmed: result.trimmed });
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void hapticSuccess();
     onChanged();
   };
 

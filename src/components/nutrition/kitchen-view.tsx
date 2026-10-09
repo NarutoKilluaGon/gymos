@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   View,
 } from "react-native";
 
+import { CountUp } from "@/components/ds/count-up";
 import { Sheet } from "@/components/ds/sheet";
 import {
   Button,
@@ -15,7 +17,6 @@ import {
   Label,
   Pill,
   Seg,
-  fmtInt,
   tap,
 } from "@/components/nutrition/nourish-ui";
 import { N, NRadius } from "@/constants/nourish-theme";
@@ -44,6 +45,55 @@ const MEAL_SLOTS: readonly MealSlot[] = [
   "Snacks",
   "Dinner",
 ];
+
+function IngredientStatusChip({
+  status,
+}: {
+  status: "needs-input" | "matched" | "estimated";
+}) {
+  const isNeedsInput = status === "needs-input";
+  const isMatched = status === "matched";
+  const isEstimated = status === "estimated";
+
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const prevStatus = useRef(status);
+
+  useEffect(() => {
+    if (prevStatus.current !== status) {
+      prevStatus.current = status;
+      if (process.env.NODE_ENV === "test") return;
+      fadeAnim.setValue(0.2);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [status, fadeAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        s.statusChip,
+        isMatched && s.chipMatched,
+        isEstimated && s.chipEstimated,
+        isNeedsInput && s.chipNeedsInput,
+        { opacity: fadeAnim },
+      ]}
+    >
+      <Text
+        style={[
+          s.statusText,
+          isMatched && s.statusTextMatched,
+          isEstimated && s.statusTextEstimated,
+          isNeedsInput && s.statusTextNeedsInput,
+        ]}
+      >
+        {isMatched ? "Matched" : isEstimated ? "Estimated" : "Needs input"}
+      </Text>
+    </Animated.View>
+  );
+}
 
 export function KitchenView({ nourish }: { nourish: Nourish }) {
   const { data, actions } = nourish;
@@ -762,8 +812,6 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
               {recipeResolutions.map((res, idx) => {
                 const item = res.item;
                 const isNeedsInput = res.status === "needs-input";
-                const isMatched = res.status === "matched";
-                const isEstimated = res.status === "estimated";
 
                 return (
                   <View key={idx} style={s.ingredientRow}>
@@ -772,29 +820,7 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
                         <Text style={s.ingName}>
                           {item?.name || res.segment}
                         </Text>
-                        <View
-                          style={[
-                            s.statusChip,
-                            isMatched && s.chipMatched,
-                            isEstimated && s.chipEstimated,
-                            isNeedsInput && s.chipNeedsInput,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              s.statusText,
-                              isMatched && s.statusTextMatched,
-                              isEstimated && s.statusTextEstimated,
-                              isNeedsInput && s.statusTextNeedsInput,
-                            ]}
-                          >
-                            {isMatched
-                              ? "Matched"
-                              : isEstimated
-                                ? "Estimated"
-                                : "Needs input"}
-                          </Text>
-                        </View>
+                        <IngredientStatusChip status={res.status} />
                       </View>
 
                       <Text style={s.ingQty}>{item?.qty ?? "1 serving"}</Text>
@@ -843,12 +869,12 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
             <View style={s.result}>
               <Text style={s.resultTitle}>Per serving</Text>
               <Text style={s.resultKcal}>
-                {fmtInt(recipePerServ.calories)} kcal
+                <CountUp value={Math.round(recipePerServ.calories)} /> kcal
               </Text>
               <Text style={s.mute}>
-                P {Math.round(recipePerServ.protein)} · C{" "}
-                {Math.round(recipePerServ.carbs)} · F{" "}
-                {Math.round(recipePerServ.fat)}
+                P <CountUp value={Math.round(recipePerServ.protein)} /> · C{" "}
+                <CountUp value={Math.round(recipePerServ.carbs)} /> · F{" "}
+                <CountUp value={Math.round(recipePerServ.fat)} />
               </Text>
               <View style={s.top}>
                 <Button
@@ -985,17 +1011,24 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
               <View style={s.result}>
                 <Text style={s.resultTitle}>Meal Totals</Text>
                 <Text style={s.resultKcal}>
-                  {mealItems.reduce((sum, i) => sum + i.calories, 0)} kcal
+                  <CountUp value={mealItems.reduce((sum, i) => sum + i.calories, 0)} /> kcal
                 </Text>
                 <Text style={s.mute}>
                   P{" "}
-                  {Math.round(
-                    mealItems.reduce((sum, i) => sum + i.protein, 0),
-                  )}
+                  <CountUp
+                    value={Math.round(
+                      mealItems.reduce((sum, i) => sum + i.protein, 0),
+                    )}
+                  />
                   g · C{" "}
-                  {Math.round(mealItems.reduce((sum, i) => sum + i.carbs, 0))}
+                  <CountUp
+                    value={Math.round(mealItems.reduce((sum, i) => sum + i.carbs, 0))}
+                  />
                   g · F{" "}
-                  {Math.round(mealItems.reduce((sum, i) => sum + i.fat, 0))}g
+                  <CountUp
+                    value={Math.round(mealItems.reduce((sum, i) => sum + i.fat, 0))}
+                  />
+                  g
                 </Text>
               </View>
 
