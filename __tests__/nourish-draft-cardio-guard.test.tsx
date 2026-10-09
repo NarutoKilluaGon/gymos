@@ -10,7 +10,7 @@ import type { DraftItem } from "@/types/nourish";
 import { getTodayKey } from "@/utils/date";
 import { showToast } from "@/utils/toast";
 
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 // Run the focus effect once on mount so the hook loads like it does on screen.
 jest.mock("expo-router", () => ({

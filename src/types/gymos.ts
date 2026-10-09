@@ -1,3 +1,5 @@
+import type { LoadType } from "./forge";
+
 export type ID = string;
 
 export type Timestamp = string;
@@ -29,16 +31,37 @@ export type WorkoutSet = {
   /** Warm-up sets are logged but never count toward volume, PRs or
    *  history. Absent on every record saved before Forge. */
   warmup?: boolean;
+  /** Whether this set was taken to muscular failure. */
+  toFailure?: boolean;
 };
 
 export type CardioActivity =
   | "running"
   | "walking"
+  | "jogging"
+  | "treadmill"
   | "cycling"
+  | "spinning"
   | "swimming"
   | "stairmaster"
   | "rowing"
   | "elliptical"
+  | "hiking"
+  | "hiit"
+  | "jump_rope"
+  | "aerobics"
+  | "yoga"
+  | "pilates"
+  | "boxing"
+  | "football"
+  | "cricket"
+  | "badminton"
+  | "tennis"
+  | "table_tennis"
+  | "basketball"
+  | "skating"
+  | "climbing"
+  | "other"
   | "custom";
 
 export type CardioEntry = {
@@ -59,6 +82,7 @@ export type WorkoutExercise = {
   sets: WorkoutSet[];
   /** Load is body weight plus the set's (extra) weight. */
   bodyweight?: boolean;
+  loadType?: LoadType;
   note?: string;
   /** Coaching cue carried over from the plan. */
   tip?: string;
@@ -67,6 +91,8 @@ export type WorkoutExercise = {
   /** The last session hit the top of the rep range on every set, so the
    *  planned weight was nudged up. */
   progressed?: boolean;
+  /** Planned rep target expression (e.g. "8-10", "8+", "AMRAP"). */
+  repTarget?: string;
 };
 
 export type SessionPr = {

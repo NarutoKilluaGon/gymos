@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { GymCard } from "@/components/ui/gym-card";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { DAILY_TARGETS } from "@/constants/targets";
+import { formatNumber } from "@/utils/format";
 
 type DailyTargetsCardProps = {
   water: number;
@@ -15,6 +17,7 @@ type DailyTargetsCardProps = {
   supplementsTaken?: number;
   supplementsTotal?: number;
   nutritionEnabled?: boolean;
+  showNutrition?: boolean;
   onEditTargets?: () => void;
   onSupplementsPress?: () => void;
   onSleepDeleteLongPress?: () => void;
@@ -32,11 +35,13 @@ export function DailyTargetsCard({
   supplementsTaken,
   supplementsTotal,
   nutritionEnabled = true,
+  showNutrition,
   onEditTargets,
   onSupplementsPress,
   onSleepDeleteLongPress,
   compact = false,
 }: DailyTargetsCardProps) {
+  const shouldShowNutrition = showNutrition ?? !nutritionEnabled;
   const hasProteinTarget =
     typeof proteinTarget === "number" && proteinTarget > 0;
 
@@ -56,14 +61,14 @@ export function DailyTargetsCard({
     <ProgressBar
       key="water"
       current={water}
-      target={3.5}
+      target={DAILY_TARGETS.waterL}
       unit="L"
       compact={compact}
     />
   );
 
-  // Protein - either progress bar or target row
-  if (nutritionEnabled) {
+  // Protein - only shown when Nourish card is not present on screen
+  if (shouldShowNutrition) {
     if (hasProteinTarget) {
       items.push(
         <ProgressBar
@@ -79,7 +84,7 @@ export function DailyTargetsCard({
         <TargetRow
           key="protein"
           label="Protein"
-          value={`${Math.round(protein ?? 0)}g`}
+          value={`${formatNumber(Math.round(protein ?? 0))}g`}
           compact={compact}
         />
       );
@@ -129,7 +134,7 @@ export function DailyTargetsCard({
         <TargetRow
           key="steps"
           label="Steps"
-          value={steps.toLocaleString()}
+          value={formatNumber(steps)}
           compact={compact}
         />
       );
@@ -137,7 +142,7 @@ export function DailyTargetsCard({
   }
 
   // Meals logged
-  if (nutritionEnabled) {
+  if (shouldShowNutrition) {
     items.push(
       <TargetRow
         key="meals"
@@ -239,22 +244,25 @@ const styles = StyleSheet.create({
   },
 
   compactGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
+    flexDirection: "column",
+    gap: Spacing.one,
     marginTop: Spacing.one,
   },
 
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: Spacing.one,
+    minHeight: 36,
     width: "100%",
   },
 
   rowCompact: {
-    width: "48%",
-    paddingVertical: Spacing.half,
+    width: "100%",
+    paddingVertical: Spacing.one,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
 
   label: {

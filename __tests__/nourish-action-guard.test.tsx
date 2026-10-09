@@ -15,7 +15,7 @@ jest.mock("expo-haptics", () => ({
   ImpactFeedbackStyle: { Light: "light" },
 }));
 
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 // Run the focus effect once on mount so the hook loads like it does on screen.
 jest.mock("expo-router", () => ({
@@ -30,6 +30,10 @@ jest.mock("lucide-react-native", () => ({
   ChevronRight: () => null,
   Plus: () => null,
   Send: () => null,
+  RotateCcw: () => null,
+  Bookmark: () => null,
+  Utensils: () => null,
+  Sparkles: () => null,
 }));
 
 jest.mock("@/components/nutrition/nourish-ui", () => ({

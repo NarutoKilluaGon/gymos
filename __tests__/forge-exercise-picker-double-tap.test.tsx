@@ -59,9 +59,10 @@ function setup(onCreate: jest.Mock = jest.fn()) {
   });
 
   const press = (label: string) => {
-    const hit = renderer.root.findAll(
+    const hits = renderer.root.findAll(
       (n) => n.children?.length === 1 && n.children[0] === label,
-    )[0];
+    );
+    const hit = hits[hits.length - 1];
     let node: Node | null = hit ?? null;
 
     while (node && typeof node.props.onPress !== "function") node = node.parent;
@@ -109,6 +110,7 @@ describe("ExercisePickerSheet duplicate taps", () => {
     const { onCreate, onPick, press, type } = setup(jest.fn(() => pending.promise));
 
     type("Zercher");
+    press("Chest");
     press("Add exercise");
     press("Add exercise");
 
@@ -128,6 +130,7 @@ describe("ExercisePickerSheet duplicate taps", () => {
     const { onPick, press, type } = setup(onCreate);
 
     type("Zercher");
+    press("Chest");
     press("Add exercise");
     await act(async () => {
       await Promise.resolve();

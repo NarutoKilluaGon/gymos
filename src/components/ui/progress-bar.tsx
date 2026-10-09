@@ -7,6 +7,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { GymColors, Radius, Spacing, Typography } from '@/constants/theme';
+import { formatNumber } from '@/utils/format';
 import { TimingConfig } from '@/utils/motion';
 
 type ProgressBarProps = {
@@ -31,17 +32,17 @@ export function ProgressBar({
 }: ProgressBarProps) {
   const progress = Math.min(current / target, 1);
 
-  const width = useSharedValue(0);
+  const scale = useSharedValue(0);
 
   useEffect(() => {
-    width.value = withTiming(
+    scale.value = withTiming(
       progress,
       TimingConfig.medium,
     );
-  }, [progress, width]);
+  }, [progress, scale]);
 
   const fillStyle = useAnimatedStyle(() => ({
-    width: `${width.value * 100}%`,
+    transform: [{ scaleX: scale.value }],
   }));
 
   const status =
@@ -57,7 +58,7 @@ export function ProgressBar({
         {!hideHeader && (
           <View style={styles.headerCompact}>
             <Text style={styles.valueCompact}>
-              {current.toFixed(current >= 10 ? 0 : 1)} / {target.toFixed(target >= 10 ? 0 : 1)} {unit}
+              {formatNumber(current)} / {formatNumber(target)} {unit}
             </Text>
 
             <Text
@@ -88,7 +89,7 @@ export function ProgressBar({
       {!hideHeader && (
         <View style={styles.header}>
           <Text style={styles.value}>
-            {current.toFixed(1)} / {target.toFixed(1)} {unit}
+            {formatNumber(current)} / {formatNumber(target)} {unit}
           </Text>
 
           <Text
@@ -148,9 +149,11 @@ const styles = StyleSheet.create({
   },
 
   fill: {
+    width: '100%',
     height: '100%',
     backgroundColor: GymColors.semantic.accent,
     borderRadius: Radius.medium,
+    transformOrigin: 'left',
   },
 
   completedFill: {
@@ -192,9 +195,11 @@ const styles = StyleSheet.create({
   },
 
   fillCompact: {
+    width: '100%',
     height: '100%',
     backgroundColor: GymColors.semantic.accent,
     borderRadius: Radius.small,
+    transformOrigin: 'left',
   },
 
   completedFillCompact: {

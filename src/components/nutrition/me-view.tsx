@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { Button, Field, Label, NCard, Seg } from "@/components/nutrition/nourish-ui";
+import { ChangeLogSheet } from "@/components/nutrition/more-sheets";
+import { Button, Field, Label, NCard, Seg, tap } from "@/components/nutrition/nourish-ui";
 import { N, NRadius } from "@/constants/nourish-theme";
 import type { useNourish } from "@/hooks/use-nourish";
 import { dayTitle } from "@/services/nourish/format";
@@ -64,6 +65,7 @@ function MeForm({
     String(Math.round(fromKg(settings.weeklyRate, weightUnit) * 100) / 100),
   );
   const [prefs, setPrefs] = useState(settings.prefs);
+  const [changeLogOpen, setChangeLogOpen] = useState(false);
   const todayKey = getTodayKey();
 
   function save() {
@@ -128,6 +130,22 @@ function MeForm({
           keyboardType="numbers-and-punctuation"
         />
         <Button label="Save targets" onPress={save} />
+        <View style={s.guardBox}>
+          <Text style={s.guardText}>
+            Targets are guarded: changes are tracked and editing within 14 days asks for confirmation so your metabolism has time to adapt before shifting targets again.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Why did my targets change?"
+            onPress={() => {
+              tap();
+              setChangeLogOpen(true);
+            }}
+            style={s.whyBtn}
+          >
+            <Text style={s.whyLink}>Why did my targets change? ›</Text>
+          </Pressable>
+        </View>
       </NCard>
 
       <NCard style={s.gap}>
@@ -170,12 +188,18 @@ function MeForm({
         Backup and restore live in Hub › Export, which includes everything
         here.
       </Text>
+
+      <ChangeLogSheet
+        visible={changeLogOpen}
+        onClose={() => setChangeLogOpen(false)}
+        changeLog={settings.changeLog}
+      />
     </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 20, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 0, paddingVertical: 8, paddingBottom: 40 },
   gap: { marginBottom: 12 },
   mute: { color: N.mute, fontSize: 13, lineHeight: 18 },
   body: { color: N.ink, fontSize: 14, lineHeight: 20 },
@@ -191,5 +215,25 @@ const s = StyleSheet.create({
     padding: 14,
     textAlignVertical: "top",
     marginBottom: 12,
+  },
+  guardBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: N.line,
+  },
+  guardText: {
+    color: N.mute,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  whyBtn: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+  },
+  whyLink: {
+    color: N.acc,
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

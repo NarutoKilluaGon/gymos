@@ -42,7 +42,7 @@ jest.mock("@/storage/repositories/workout-sessions", () => ({
   deleteSession: jest.fn(),
 }));
 
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 const mockSave = saveSession as jest.MockedFunction<typeof saveSession>;
 const mockGetAll = getAllSessions as jest.MockedFunction<typeof getAllSessions>;

@@ -1,6 +1,6 @@
 import { BarChart3, Bell, BookOpen, Dumbbell, FileDown, FolderInput, History, Info, Pill, Scale, SlidersHorizontal, Trophy, Utensils } from "lucide-react-native";
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AboutSheet } from "@/components/hub/about-sheet";
 import { ExportSheet } from "@/components/hub/export-sheet";
@@ -20,6 +20,9 @@ import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { applyReminders } from "@/services/notifications";
 import type { ReminderPrefs } from "@/storage/repositories/reminders";
+
+import { Screen } from "@/components/ds/screen";
+import { ScreenHeader } from "@/components/ds/screen-header";
 
 export default function HubScreen() {
   const { unit: weightUnit, toggle: toggleWeightUnit } = useWeightUnit();
@@ -46,13 +49,9 @@ export default function HubScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.eyebrow}>HUB</Text>
-        <Text style={styles.title}>Hub</Text>
+    <>
+      <Screen>
+        <ScreenHeader eyebrow="HUB" title="Hub" />
 
         <GymCard style={styles.card}>
           <HubSectionRow
@@ -175,7 +174,7 @@ export default function HubScreen() {
             onPress={() => setAboutOpen(true)}
           />
         </GymCard>
-      </ScrollView>
+      </Screen>
 
       <Modal
         visible={modulesOpen}
@@ -349,35 +348,11 @@ export default function HubScreen() {
           <InsightsSheet onClose={() => setInsightsOpen(false)} />
         </View>
       </Modal>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: GymColors.background.primary,
-  },
-
-  content: {
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.five,
-    paddingBottom: Spacing.six,
-  },
-
-  eyebrow: {
-    color: GymColors.text.tertiary,
-    fontSize: Typography.caption,
-  },
-
-  title: {
-    color: GymColors.text.primary,
-    fontSize: Typography.h1,
-    fontWeight: "700",
-    marginTop: Spacing.one,
-    marginBottom: Spacing.four,
-  },
-
   card: {
     gap: 0,
   },

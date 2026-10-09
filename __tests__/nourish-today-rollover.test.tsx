@@ -16,7 +16,7 @@ jest.mock("expo-haptics", () => ({
   ImpactFeedbackStyle: { Light: "light" },
 }));
 
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 // lucide-react-native ships ESM that Jest's transform ignores; the icons are
 // decoration only, so stand in null components for the four TodayView uses.
@@ -25,6 +25,10 @@ jest.mock("lucide-react-native", () => ({
   ChevronRight: () => null,
   Plus: () => null,
   Send: () => null,
+  RotateCcw: () => null,
+  Bookmark: () => null,
+  Utensils: () => null,
+  Sparkles: () => null,
 }));
 
 // The ring/bars draw with react-native-svg; they are irrelevant to day binding.

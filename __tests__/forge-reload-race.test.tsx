@@ -15,7 +15,7 @@ const act: (callback: () => unknown) => Promise<void> = TestRenderer.act;
 
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
 jest.mock("@/hooks/use-weight-unit", () => ({ useWeightUnit: () => ({ unit: "kg" }) }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 // `buildCatalog` runs only when a reload commits, so it marks a commit.
 jest.mock("@/services/forge/catalog", () => {

@@ -16,10 +16,11 @@ jest.mock("expo-haptics", () => ({
 
 // Same isolation the other Forge suites use (forge-number-field).
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 jest.mock("@/components/workouts/forge-sheets", () => ({
   ConfirmSheet: () => null,
+  DayMenuSheet: () => null,
   ExercisePickerSheet: () => null,
   NewPlanSheet: () => null,
 }));

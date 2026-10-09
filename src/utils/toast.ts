@@ -1,11 +1,30 @@
 import { useEffect, useState } from "react";
 
-export type ToastVariant = "error" | "success";
+export type ToastVariant = "error" | "success" | "undo";
+
+export type ToastAction = {
+  label: string;
+  onPress: () => void | Promise<void>;
+};
+
+export type ToastOptions = {
+  duration?: number;
+  action?: ToastAction;
+};
+
+export type UndoToastOptions = {
+  message: string;
+  onUndo: () => void | Promise<void>;
+  duration?: number;
+};
 
 export type ToastMessage = {
   id: number;
   message: string;
   variant: ToastVariant;
+  onUndo?: () => void | Promise<void>;
+  duration?: number;
+  action?: ToastAction;
 };
 
 type ToastListener = (toast: ToastMessage | null) => void;
@@ -23,9 +42,31 @@ function publish() {
 export function showToast(
   message: string,
   variant: ToastVariant = "error",
-): void {
-  current = { id: nextId++, message, variant };
+  options?: ToastOptions,
+): number {
+  const id = nextId++;
+  current = {
+    id,
+    message,
+    variant,
+    duration: options?.duration ?? 4000,
+    action: options?.action,
+  };
   publish();
+  return id;
+}
+
+export function showUndoToast(options: UndoToastOptions): number {
+  const id = nextId++;
+  current = {
+    id,
+    message: options.message,
+    variant: "undo",
+    onUndo: options.onUndo,
+    duration: options.duration ?? 5000,
+  };
+  publish();
+  return id;
 }
 
 export function dismissToast(id: number): void {
@@ -33,6 +74,11 @@ export function dismissToast(id: number): void {
     return;
   }
 
+  current = null;
+  publish();
+}
+
+export function clearToast(): void {
   current = null;
   publish();
 }

@@ -5,6 +5,7 @@ import { Button, Field, Label, Pill, Sheet, tap } from "@/components/nutrition/n
 import { N, NRadius } from "@/constants/nourish-theme";
 import { parseClock, type FoodLogger } from "@/hooks/use-food-logger";
 import { confidenceLabel } from "@/services/nourish/nutrition";
+import { slotForTime } from "@/services/nourish/slots";
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
 
@@ -201,6 +202,14 @@ function num(value: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : Number.NaN;
 }
 
+function defaultSlotForManual(manualSlot?: MealSlot, at?: string): MealSlot {
+  if (manualSlot && MEAL_SLOTS.includes(manualSlot)) return manualSlot;
+  if (at && parseClock(at)) return slotForTime(at);
+  const now = new Date();
+  const hm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  return slotForTime(hm);
+}
+
 /** Add a food by typing its numbers (also where unreadable text lands). */
 export function ManualSheet({ logger }: { logger: FoodLogger }) {
   const { manual, setManual, busy } = logger;
@@ -209,12 +218,14 @@ export function ManualSheet({ logger }: { logger: FoodLogger }) {
     <Sheet
       visible={manual !== null}
       onClose={() => setManual(null)}
-      title="Add manually"
+      title="Add food"
     >
       {manual ? (
         <ManualForm
-          key={manual.name}
+          key={manual.name + (manual.slot ?? "")}
           initialName={manual.name}
+          initialSlot={manual.slot}
+          at={manual.at}
           busy={busy}
           onSave={(item, slot) => void logger.saveManual(item, slot)}
           onCancel={() => setManual(null)}
@@ -226,11 +237,15 @@ export function ManualSheet({ logger }: { logger: FoodLogger }) {
 
 function ManualForm({
   initialName,
+  initialSlot,
+  at,
   busy,
   onSave,
   onCancel,
 }: {
   initialName: string;
+  initialSlot?: MealSlot;
+  at?: string;
   busy: boolean;
   onSave: (item: DraftItem, slot: MealSlot) => void;
   onCancel: () => void;
@@ -241,7 +256,7 @@ function ManualForm({
   const [p, setP] = useState("");
   const [c, setC] = useState("");
   const [f, setF] = useState("");
-  const [slot, setSlot] = useState<MealSlot>("Snacks");
+  const [slot, setSlot] = useState<MealSlot>(() => defaultSlotForManual(initialSlot, at));
   const [touched, setTouched] = useState(false);
 
   const values = [kcal, p, c, f].map(num);
@@ -255,20 +270,75 @@ function ManualForm({
 
   return (
     <View>
-      <Field label="Food" value={name} onChangeText={setName} placeholder="Paneer bhurji" />
-      <Field label="Amount (optional)" value={qty} onChangeText={setQty} placeholder="1 plate" />
+      <Field
+        label="Food name"
+        value={name}
+        onChangeText={setName}
+        onBlur={() => setTouched(true)}
+        placeholder="Paneer bhurji"
+      />
+      <Field
+        label="Amount (optional)"
+        value={qty}
+        onChangeText={setQty}
+        onBlur={() => setTouched(true)}
+        placeholder="1 plate"
+      />
       <View style={s.grid}>
-        <Field label="Calories" value={kcal} onChangeText={setKcal} keyboardType="decimal-pad" placeholder="auto" style={s.half} />
-        <Field label="Protein g" value={p} onChangeText={setP} keyboardType="decimal-pad" style={s.half} />
+        <View style={s.half}>
+          <Field
+            label="Calories"
+            value={kcal}
+            onChangeText={setKcal}
+            onBlur={() => setTouched(true)}
+            keyboardType="decimal-pad"
+            placeholder="auto"
+            style={s.macroInput}
+          />
+        </View>
+        <View style={s.half}>
+          <Field
+            label="Protein (g)"
+            value={p}
+            onChangeText={setP}
+            onBlur={() => setTouched(true)}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            style={s.macroInput}
+          />
+        </View>
       </View>
       <View style={s.grid}>
-        <Field label="Carbs g" value={c} onChangeText={setC} keyboardType="decimal-pad" style={s.half} />
-        <Field label="Fat g" value={f} onChangeText={setF} keyboardType="decimal-pad" style={s.half} />
+        <View style={s.half}>
+          <Field
+            label="Carbs (g)"
+            value={c}
+            onChangeText={setC}
+            onBlur={() => setTouched(true)}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            style={s.macroInput}
+          />
+        </View>
+        <View style={s.half}>
+          <Field
+            label="Fat (g)"
+            value={f}
+            onChangeText={setF}
+            onBlur={() => setTouched(true)}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            style={s.macroInput}
+          />
+        </View>
       </View>
+      <Text style={s.helper}>
+        Calories are filled in from macros if you leave them blank
+      </Text>
       {touched && !ok ? (
         <Text style={s.error}>
           {name.trim() === ""
-            ? "Add a name."
+            ? "Add a food name."
             : invalid
               ? "Numbers only, zero or more."
               : "Add at least one number."}
@@ -363,7 +433,6 @@ function EditForm({
   const [factor, setFactor] = useState(1);
   const [slot, setSlot] = useState<MealSlot>(initialSlot);
   const [at, setAt] = useState(initialAt);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const timeOk = parseClock(at) !== null;
 
   return (
@@ -401,11 +470,7 @@ function EditForm({
           disabled={!timeOk}
           onPress={() => onSave(factor, slot, parseClock(at) ?? "")}
         />
-        {confirmDelete ? (
-          <Button label="Tap again to delete" kind="danger" onPress={onDelete} />
-        ) : (
-          <Button label="Delete" kind="ghost" onPress={() => setConfirmDelete(true)} />
-        )}
+        <Button label="Delete" kind="danger" onPress={onDelete} />
         <Button label="Cancel" kind="ghost" onPress={onCancel} />
       </View>
     </View>
@@ -460,4 +525,14 @@ const s = StyleSheet.create({
   half: { flex: 1 },
   manualButtons: { gap: 8, marginTop: 8 },
   gapBottom: { marginBottom: 12 },
+  helper: {
+    color: N.mute,
+    fontSize: 12,
+    marginBottom: 10,
+    marginTop: -4,
+  },
+  macroInput: {
+    minHeight: 48,
+    height: 48,
+  },
 });

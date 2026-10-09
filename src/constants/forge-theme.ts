@@ -11,7 +11,7 @@ export const F = {
   line: "rgba(255,240,225,0.09)",
   ink: "#efe8de",
   mute: "#9a9087",
-  dim: "#6f665e",
+  dim: "#887e74",
   acc: "#e0803f",
   accInk: "#1c0f06",
   warm: "#d9a441",

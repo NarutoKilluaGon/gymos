@@ -2,28 +2,31 @@ import "@/global.css";
 
 import { Platform } from "react-native";
 
+import { HOME } from "@/constants/design";
+
 /**
  * GymOS design tokens.
+ * @deprecated Use Theme / HOME from '@/constants/design' instead.
  */
 export const GymColors = {
   background: {
-    primary: "#0F0F10",
-    card: "#18181A",
-    surface: "#202023",
+    primary: HOME.bg,
+    card: HOME.card,
+    surface: HOME.card2,
   },
 
   text: {
-    primary: "#FFFFFF",
-    secondary: "#A0A0A5",
-    tertiary: "#6F7075",
-    disabled: "#4A4A4F",
+    primary: HOME.ink,
+    secondary: HOME.mute,
+    tertiary: HOME.dim,
+    disabled: HOME.dim,
   },
 
   semantic: {
-    success: "#4CAF50",
-    warning: "#D9A441",
-    error: "#D9534F",
-    accent: "#8B9EFF",
+    success: HOME.ok,
+    warning: HOME.warn,
+    error: HOME.bad,
+    accent: HOME.acc,
   },
 } as const;
 

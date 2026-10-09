@@ -1,6 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
+import {
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowUp,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Dumbbell,
+  FileText,
+  Flame,
+  HelpCircle,
+  Layers,
+  Link2,
+  Pause,
+  Pencil,
+  Play,
+  Plus,
+  Target,
+  Trash2,
+  Trophy,
+  Unlink2,
+} from "lucide-react-native";
+
+import { ListRow } from "@/components/ds/list-row";
 import {
   Button,
   Field,
@@ -9,13 +42,38 @@ import {
   Sheet,
 } from "@/components/workouts/forge-ui";
 import { F } from "@/constants/forge-theme";
-import { MUSCLE_GROUPS, type MuscleGroup } from "@/data/exercises";
-import { MUSCLE_ORDER, normalizeName } from "@/services/forge/catalog";
+import { type MuscleGroup } from "@/data/exercises";
+import { MUSCLES_BY_GROUP } from "@/data/muscles";
+import {
+  exerciseMatchesQuery,
+  findSimilarExercise,
+  MUSCLE_ORDER,
+  normalizeName,
+} from "@/services/forge/catalog";
 import { round1, type WeightUnit } from "@/services/forge/load";
 import { DEFAULT_BAR, platesFor } from "@/services/forge/plates";
-import { PLAN_TEMPLATES } from "@/services/forge/plan";
-import type { CatalogExercise } from "@/types/forge";
-import type { SessionPr } from "@/types/gymos";
+import {
+  getMonthGrid,
+  getMonthStats,
+  type CalendarDaySummary,
+  type MonthCell,
+} from "@/services/forge/calendar";
+import { dateFromKey } from "@/utils/date";
+import { dayFor, PLAN_TEMPLATES } from "@/services/forge/plan";
+import { displayName, plural } from "@/utils/format";
+import type { CatalogExercise, LoadType, Plan } from "@/types/forge";
+import type { SessionPr, WorkoutSession } from "@/types/gymos";
+
+const LOAD_TYPES: readonly { type: LoadType; label: string }[] = [
+  { type: "barbell", label: "Barbell" },
+  { type: "dumbbell", label: "Dumbbell" },
+  { type: "machine", label: "Machine" },
+  { type: "cable", label: "Cable" },
+  { type: "bodyweight", label: "Bodyweight" },
+  { type: "assisted", label: "Assisted" },
+  { type: "timed", label: "Timed" },
+  { type: "other", label: "Other" },
+];
 
 /** Search the catalogue, filter by muscle, or add your own exercise. */
 export function ExercisePickerSheet({
@@ -34,38 +92,73 @@ export function ExercisePickerSheet({
     name: string,
     muscle: MuscleGroup,
     bodyweight: boolean,
+    extra?: {
+      loadType?: LoadType;
+      primaryMuscles?: string[];
+    },
   ) => Promise<CatalogExercise | null>;
   title?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
-  const [makeMuscle, setMakeMuscle] = useState<MuscleGroup>("Chest");
-  const [makeBodyweight, setMakeBodyweight] = useState(false);
+  const [filterMuscle, setFilterMuscle] = useState<MuscleGroup | null>(null);
 
-  const q = normalizeName(query);
+  // Create form state: No pre-selected Chest
+  const [createMuscleGroup, setCreateMuscleGroup] = useState<MuscleGroup | null>(null);
+  const [selectedSubMuscles, setSelectedSubMuscles] = useState<string[]>([]);
+  const [otherMuscleText, setOtherMuscleText] = useState("");
+  const [showOtherInput, setShowOtherInput] = useState(false);
+  const [createLoadType, setCreateLoadType] = useState<LoadType>("barbell");
+
   const shown = useMemo(
     () =>
       catalog.filter(
         (entry) =>
-          (!muscle || entry.muscleGroup === muscle) &&
-          (!q || entry.name.toLowerCase().includes(q)),
+          (!filterMuscle || entry.muscleGroup === filterMuscle) &&
+          exerciseMatchesQuery(entry, query),
       ),
-    [catalog, muscle, q],
+    [catalog, filterMuscle, query],
   );
-  const exact = catalog.some((entry) => entry.name.toLowerCase() === q);
 
-  // One pick (or create) per opening. The sheet stays tappable while it
-  // slides away and a create is async, so a second tap would otherwise add the
-  // exercise twice. A ref, not state, so it holds before React re-renders.
+  const exact = catalog.some(
+    (entry) =>
+      entry.name.toLowerCase() === query.trim().toLowerCase() ||
+      normalizeName(entry.name) === normalizeName(query),
+  );
+
+  const duplicateCandidate = useMemo(() => {
+    if (!query.trim() || exact) return undefined;
+    return findSimilarExercise(catalog, query);
+  }, [catalog, query, exact]);
+
+  // One pick (or create) per opening.
   const picking = useRef(false);
 
-  useEffect(() => {
-    if (visible) picking.current = false;
-  }, [visible]);
+  const resetCreateForm = () => {
+    setCreateMuscleGroup(null);
+    setSelectedSubMuscles([]);
+    setOtherMuscleText("");
+    setShowOtherInput(false);
+    setCreateLoadType("barbell");
+  };
 
   const close = () => {
     setQuery("");
+    resetCreateForm();
     onClose();
+  };
+
+  useEffect(() => {
+    if (visible) {
+      picking.current = false;
+    }
+  }, [visible]);
+
+  const isBw = createLoadType === "bodyweight" || createLoadType === "assisted";
+
+  const handleToggleSubMuscle = (sub: string) => {
+    setSelectedSubMuscles((prev) =>
+      prev.includes(sub) ? prev.filter((m) => m !== sub) : [...prev, sub],
+    );
   };
 
   return (
@@ -78,13 +171,13 @@ export function ExercisePickerSheet({
         returnKeyType="search"
       />
       <View style={s.wrap}>
-        <Pill label="All" active={!muscle} onPress={() => setMuscle(null)} />
+        <Pill label="All" active={!filterMuscle} onPress={() => setFilterMuscle(null)} />
         {MUSCLE_ORDER.map((group) => (
           <Pill
             key={group}
             label={group}
-            active={muscle === group}
-            onPress={() => setMuscle(muscle === group ? null : group)}
+            active={filterMuscle === group}
+            onPress={() => setFilterMuscle(filterMuscle === group ? null : group)}
           />
         ))}
       </View>
@@ -117,42 +210,112 @@ export function ExercisePickerSheet({
       {query.trim() && !exact ? (
         <View style={s.create}>
           <Label>{`Add "${query.trim()}"`}</Label>
+
+          {duplicateCandidate ? (
+            <View style={s.dupWarning}>
+              <Text style={s.dupText}>
+                Did you mean{" "}
+                <Text
+                  style={s.dupLink}
+                  onPress={() => {
+                    if (picking.current) return;
+                    picking.current = true;
+                    onPick(duplicateCandidate);
+                    close();
+                  }}
+                >
+                  {duplicateCandidate.name}
+                </Text>
+                ?
+              </Text>
+            </View>
+          ) : null}
+
+          {/* 1. Muscle Group (REQUIRED) */}
+          <Label>Muscle group *</Label>
           <View style={s.wrap}>
-            {MUSCLE_GROUPS.map((group) => (
+            {MUSCLE_ORDER.map((group) => (
               <Pill
                 key={group}
                 label={group}
-                active={makeMuscle === group}
-                onPress={() => setMakeMuscle(group)}
+                active={createMuscleGroup === group}
+                onPress={() => {
+                  setCreateMuscleGroup(group);
+                  setSelectedSubMuscles([]);
+                  setShowOtherInput(false);
+                  setOtherMuscleText("");
+                }}
               />
             ))}
           </View>
+
+          {/* 2. Specific Muscles Chips for selected group */}
+          {createMuscleGroup ? (
+            <View style={s.subMusclesBlock}>
+              <Label>Specific muscles</Label>
+              <View style={s.wrap}>
+                {MUSCLES_BY_GROUP[createMuscleGroup].map((sub) => (
+                  <Pill
+                    key={sub}
+                    label={sub}
+                    active={selectedSubMuscles.includes(sub)}
+                    onPress={() => handleToggleSubMuscle(sub)}
+                  />
+                ))}
+                <Pill
+                  label="Other..."
+                  active={showOtherInput}
+                  onPress={() => setShowOtherInput((prev) => !prev)}
+                />
+              </View>
+              {showOtherInput ? (
+                <Field
+                  placeholder="Additional muscle name"
+                  value={otherMuscleText}
+                  onChangeText={setOtherMuscleText}
+                  autoCorrect={false}
+                />
+              ) : null}
+            </View>
+          ) : null}
+
+          {/* 3. Load Type */}
+          <Label>Load type</Label>
           <View style={s.wrap}>
-            <Pill
-              label="Bodyweight"
-              active={makeBodyweight}
-              onPress={() => setMakeBodyweight((value) => !value)}
-            />
+            {LOAD_TYPES.map(({ type, label }) => (
+              <Pill
+                key={type}
+                label={label}
+                active={createLoadType === type}
+                onPress={() => setCreateLoadType(type)}
+              />
+            ))}
           </View>
+
           <Button
             label="Add exercise"
+            disabled={!createMuscleGroup}
             onPress={() => {
-              if (picking.current) return;
+              if (picking.current || !createMuscleGroup) return;
+
+              const allMuscles = [...selectedSubMuscles];
+              if (otherMuscleText.trim() && !allMuscles.includes(otherMuscleText.trim())) {
+                allMuscles.push(otherMuscleText.trim());
+              }
 
               picking.current = true;
-              void onCreate(query.trim(), makeMuscle, makeBodyweight).then(
-                (created) => {
-                  if (!created) {
-                    // Nothing was added: let the person try again.
-                    picking.current = false;
+              void onCreate(query.trim(), createMuscleGroup, isBw, {
+                loadType: createLoadType,
+                primaryMuscles: allMuscles.length > 0 ? allMuscles : undefined,
+              }).then((created) => {
+                if (!created) {
+                  picking.current = false;
+                  return;
+                }
 
-                    return;
-                  }
-
-                  onPick(created);
-                  close();
-                },
-              );
+                onPick(created);
+                close();
+              });
             }}
           />
         </View>
@@ -198,6 +361,59 @@ export function NoteSheet({
         multiline
         style={s.note}
       />
+    </Sheet>
+  );
+}
+
+export function RepTargetSheet({
+  visible,
+  onClose,
+  title,
+  initial,
+  onSave,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  initial: string;
+  onSave: (target: string) => void;
+}) {
+  const [value, setValue] = useState(initial);
+
+  const presets = ["5", "8", "8-10", "10-12", "8+", "AMRAP"];
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={`Rep target · ${title}`}
+      footer={
+        <Button
+          label="Save"
+          onPress={() => {
+            onSave(value.trim());
+            onClose();
+          }}
+        />
+      }
+    >
+      <Field
+        placeholder="e.g. 8-10, 8+, AMRAP"
+        value={value}
+        onChangeText={setValue}
+        autoCorrect={false}
+      />
+      <Label>Presets</Label>
+      <View style={s.wrap}>
+        {presets.map((preset) => (
+          <Pill
+            key={preset}
+            label={preset}
+            active={value === preset}
+            onPress={() => setValue(preset)}
+          />
+        ))}
+      </View>
     </Sheet>
   );
 }
@@ -307,6 +523,43 @@ export function SummarySheet({
   trimmed: boolean;
   formatPr: (pr: SessionPr) => string;
 }) {
+  const trophyScale = useRef(new Animated.Value(1)).current;
+  const isReduced = useRef(process.env.NODE_ENV === "test");
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    try {
+      AccessibilityInfo.isReduceMotionEnabled()
+        ?.then((e) => {
+          isReduced.current = e;
+        })
+        ?.catch(() => {});
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (isReduced.current || process.env.NODE_ENV === "test") {
+      trophyScale.setValue(1);
+      return;
+    }
+    trophyScale.setValue(0.85);
+    Animated.sequence([
+      Animated.timing(trophyScale, {
+        toValue: 1.25,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(trophyScale, {
+        toValue: 1,
+        damping: 12,
+        stiffness: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [visible, trophyScale]);
+
   return (
     <Sheet
       visible={visible}
@@ -314,6 +567,11 @@ export function SummarySheet({
       title="Workout done"
       footer={<Button label="Done" onPress={onClose} />}
     >
+      <View style={s.summaryHeaderRow}>
+        <Animated.View style={{ transform: [{ scale: trophyScale }] }}>
+          <Trophy size={36} color={F.acc} />
+        </Animated.View>
+      </View>
       <View style={s.stats}>
         <Stat label="Time" value={durationLabel} />
         <Stat label="Volume" value={volumeLabel} />
@@ -327,15 +585,70 @@ export function SummarySheet({
       {prs.length > 0 ? (
         <View style={s.plates}>
           <Label>New records</Label>
-          {prs.map((pr) => (
-            <View key={pr.exerciseId} style={s.row}>
-              <Text style={s.rowName}>{names[pr.exerciseId] ?? pr.exerciseId}</Text>
-              <Text style={s.pr}>{formatPr(pr)}</Text>
-            </View>
+          {prs.map((pr, index) => (
+            <SummaryPrRow
+              key={pr.exerciseId}
+              name={names[pr.exerciseId] ?? pr.exerciseId}
+              prText={formatPr(pr)}
+              index={index}
+            />
           ))}
         </View>
       ) : null}
     </Sheet>
+  );
+}
+
+function SummaryPrRow({
+  name,
+  prText,
+  index,
+}: {
+  name: string;
+  prText: string;
+  index: number;
+}) {
+  const opacity = useRef(
+    new Animated.Value(process.env.NODE_ENV === "test" ? 1 : 0),
+  ).current;
+  const translateY = useRef(
+    new Animated.Value(process.env.NODE_ENV === "test" ? 0 : 12),
+  ).current;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    const delay = Math.min(index * 60, 400);
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [index, opacity, translateY]);
+
+  return (
+    <Animated.View
+      style={[
+        s.row,
+        {
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      <Text style={s.rowName}>{name}</Text>
+      <Text style={s.pr}>{prText}</Text>
+    </Animated.View>
   );
 }
 
@@ -428,6 +741,798 @@ export function ConfirmSheet({
   );
 }
 
+/** Overflow options for a specific exercise in ForgeSession. */
+export function ExerciseMenuSheet({
+  visible,
+  onClose,
+  exerciseName,
+  isBodyweight,
+  isSuperset,
+  canMoveUp,
+  canMoveDown,
+  onNote,
+  onSwap,
+  onPlates,
+  onTargetReps,
+  onToggleSuperset,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  exerciseName: string;
+  isBodyweight?: boolean;
+  isSuperset?: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onNote: () => void;
+  onSwap: () => void;
+  onPlates?: () => void;
+  onTargetReps?: () => void;
+  onToggleSuperset: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title={exerciseName}>
+      <ListRow
+        icon={<FileText size={18} color={F.mute} />}
+        title="Note"
+        onPress={() => {
+          onClose();
+          onNote();
+        }}
+      />
+      {onTargetReps ? (
+        <ListRow
+          icon={<Target size={18} color={F.mute} />}
+          title="Target reps"
+          onPress={() => {
+            onClose();
+            onTargetReps();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<ArrowLeftRight size={18} color={F.mute} />}
+        title="Swap exercise"
+        onPress={() => {
+          onClose();
+          onSwap();
+        }}
+      />
+      {!isBodyweight && onPlates ? (
+        <ListRow
+          icon={<Layers size={18} color={F.mute} />}
+          title="Plates calculator"
+          onPress={() => {
+            onClose();
+            onPlates();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={isSuperset ? <Unlink2 size={18} color={F.mute} /> : <Link2 size={18} color={F.mute} />}
+        title={isSuperset ? "Unlink superset" : "Superset with next"}
+        onPress={() => {
+          onClose();
+          onToggleSuperset();
+        }}
+      />
+      {canMoveUp && onMoveUp ? (
+        <ListRow
+          icon={<ArrowUp size={18} color={F.mute} />}
+          title="Move up"
+          onPress={() => {
+            onClose();
+            onMoveUp();
+          }}
+        />
+      ) : null}
+      {canMoveDown && onMoveDown ? (
+        <ListRow
+          icon={<ArrowDown size={18} color={F.mute} />}
+          title="Move down"
+          onPress={() => {
+            onClose();
+            onMoveDown();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Remove"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onRemove();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+/** Long-press options for a specific set in ForgeSession. */
+export function SetMenuSheet({
+  visible,
+  onClose,
+  setNumber,
+  isWarmup,
+  isFailure,
+  onToggleWarmup,
+  onToggleFailure,
+  onRemove,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  setNumber: number;
+  isWarmup?: boolean;
+  isFailure?: boolean;
+  onToggleWarmup: () => void;
+  onToggleFailure: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title={`Set ${setNumber} options`}>
+      <ListRow
+        icon={<Flame size={18} color={isFailure ? F.bad : F.mute} />}
+        title={isFailure ? "Remove failure mark" : "Mark as to failure"}
+        onPress={() => {
+          onClose();
+          onToggleFailure();
+        }}
+      />
+      <ListRow
+        icon={<Dumbbell size={18} color={isWarmup ? F.warm : F.mute} />}
+        title={isWarmup ? "Make work set" : "Mark as warm-up"}
+        onPress={() => {
+          onClose();
+          onToggleWarmup();
+        }}
+      />
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Remove set"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onRemove();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+/** Overflow options for the workout session. */
+export function WorkoutMenuSheet({
+  visible,
+  onClose,
+  paused,
+  onToggleClock,
+  onNote,
+  onDelete,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  paused: boolean;
+  onToggleClock: () => void;
+  onNote: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Workout options">
+      <ListRow
+        icon={<FileText size={18} color={F.mute} />}
+        title="Workout note"
+        onPress={() => {
+          onClose();
+          onNote();
+        }}
+      />
+      <ListRow
+        icon={paused ? <Play size={18} color={F.mute} /> : <Pause size={18} color={F.mute} />}
+        title={paused ? "Resume clock" : "Pause clock"}
+        onPress={() => {
+          onClose();
+          onToggleClock();
+        }}
+      />
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Delete workout"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onDelete();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+/** Overflow options for a plan day (rename, duplicate, reorder days, delete day). */
+export function DayMenuSheet({
+  visible,
+  onClose,
+  canMoveUp,
+  canMoveDown,
+  onRename,
+  onDuplicate,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onRename?: () => void;
+  onDuplicate?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Day options">
+      {onRename ? (
+        <ListRow
+          icon={<Pencil size={18} color={F.mute} />}
+          title="Rename day"
+          onPress={() => {
+            onClose();
+            onRename();
+          }}
+        />
+      ) : null}
+      {onDuplicate ? (
+        <ListRow
+          icon={<Copy size={18} color={F.mute} />}
+          title="Duplicate day"
+          onPress={() => {
+            onClose();
+            onDuplicate();
+          }}
+        />
+      ) : null}
+      {canMoveUp && onMoveUp ? (
+        <ListRow
+          icon={<ArrowUp size={18} color={F.mute} />}
+          title="Move day up"
+          onPress={() => {
+            onClose();
+            onMoveUp();
+          }}
+        />
+      ) : null}
+      {canMoveDown && onMoveDown ? (
+        <ListRow
+          icon={<ArrowDown size={18} color={F.mute} />}
+          title="Move day down"
+          onPress={() => {
+            onClose();
+            onMoveDown();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Delete day"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onDelete();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+/** Information sheet explaining what a superset is. */
+export function SupersetInfoSheet({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="What's a superset?"
+      footer={<Button label="Got it" onPress={onClose} />}
+    >
+      <Text style={s.bodyText}>
+        Two exercises done back to back with no rest between them, then you rest.
+        Pair opposite muscles (biceps and triceps, chest and back) to save time.
+        In GymOS, link an exercise with the one below it; the rest timer starts
+        after the second one.
+      </Text>
+    </Sheet>
+  );
+}
+
+/** Overflow options for a plan exercise row. */
+export function PlanExerciseMenuSheet({
+  visible,
+  onClose,
+  isSuperset,
+  canMoveUp,
+  canMoveDown,
+  isCustom,
+  onSwap,
+  onToggleSuperset,
+  onMoveUp,
+  onMoveDown,
+  onRenameEverywhere,
+  onSupersetInfo,
+  onRemove,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  isSuperset: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  isCustom?: boolean;
+  onSwap: () => void;
+  onToggleSuperset: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onRenameEverywhere?: () => void;
+  onSupersetInfo?: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Exercise options">
+      <ListRow
+        icon={<ArrowLeftRight size={18} color={F.mute} />}
+        title="Swap exercise"
+        onPress={() => {
+          onClose();
+          onSwap();
+        }}
+      />
+      <ListRow
+        icon={isSuperset ? <Unlink2 size={18} color={F.mute} /> : <Link2 size={18} color={F.mute} />}
+        title={isSuperset ? "Unlink superset" : "Superset with next"}
+        onPress={() => {
+          onClose();
+          onToggleSuperset();
+        }}
+      />
+      {onSupersetInfo ? (
+        <ListRow
+          icon={<HelpCircle size={18} color={F.mute} />}
+          title="What's a superset?"
+          onPress={() => {
+            onClose();
+            onSupersetInfo();
+          }}
+        />
+      ) : null}
+      {canMoveUp && onMoveUp ? (
+        <ListRow
+          icon={<ArrowUp size={18} color={F.mute} />}
+          title="Move up"
+          onPress={() => {
+            onClose();
+            onMoveUp();
+          }}
+        />
+      ) : null}
+      {canMoveDown && onMoveDown ? (
+        <ListRow
+          icon={<ArrowDown size={18} color={F.mute} />}
+          title="Move down"
+          onPress={() => {
+            onClose();
+            onMoveDown();
+          }}
+        />
+      ) : null}
+      {isCustom && onRenameEverywhere ? (
+        <ListRow
+          icon={<Pencil size={18} color={F.mute} />}
+          title="Rename everywhere"
+          onPress={() => {
+            onClose();
+            onRenameEverywhere();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Remove"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onRemove();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+/** Simple rename modal sheet. */
+export function RenameSheet({
+  visible,
+  onClose,
+  title,
+  initial,
+  onSave,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  initial: string;
+  onSave: (name: string) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [prevInitial, setPrevInitial] = useState(initial);
+
+  if (prevInitial !== initial) {
+    setPrevInitial(initial);
+    setValue(initial);
+  }
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={title}
+      footer={
+        <Button
+          label="Save"
+          onPress={() => {
+            if (value.trim()) onSave(value.trim());
+            onClose();
+          }}
+        />
+      }
+    >
+      <Field
+        placeholder="Name"
+        value={value}
+        onChangeText={setValue}
+        autoFocus
+      />
+    </Sheet>
+  );
+}
+
+const CALENDAR_WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export function TodayMenuSheet({
+  visible,
+  onClose,
+  hasFinishedWorkout,
+  onAddAnotherWorkout,
+  onOpenCalendar,
+  onLogCardio,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  hasFinishedWorkout: boolean;
+  onAddAnotherWorkout: () => void;
+  onOpenCalendar: () => void;
+  onLogCardio: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Workout options">
+      {hasFinishedWorkout ? (
+        <ListRow
+          icon={<Plus size={18} color={F.mute} />}
+          title="Add another workout"
+          onPress={() => {
+            onClose();
+            onAddAnotherWorkout();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<Calendar size={18} color={F.mute} />}
+        title="Workout calendar"
+        onPress={() => {
+          onClose();
+          onOpenCalendar();
+        }}
+      />
+      <ListRow
+        icon={<Flame size={18} color={F.mute} />}
+        title="Log cardio"
+        separator={false}
+        onPress={() => {
+          onClose();
+          onLogCardio();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+function CalendarCellView({
+  cell,
+  index,
+  isInspected,
+  onPress,
+}: {
+  cell: MonthCell;
+  index: number;
+  isInspected: boolean;
+  onPress: () => void;
+}) {
+  const ringScale = useRef(new Animated.Value(isInspected ? 1 : 0.85)).current;
+  const dotOpacity = useRef(
+    new Animated.Value(process.env.NODE_ENV === "test" ? 1 : 0),
+  ).current;
+
+  useEffect(() => {
+    if (isInspected) {
+      if (process.env.NODE_ENV === "test") {
+        ringScale.setValue(1);
+        return;
+      }
+      ringScale.setValue(0.85);
+      Animated.spring(ringScale, {
+        toValue: 1,
+        damping: 14,
+        stiffness: 240,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isInspected, ringScale]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    const delay = index * 20;
+    const timer = setTimeout(() => {
+      Animated.timing(dotOpacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [index, dotOpacity]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Day ${cell.dayNumber}`}
+      onPress={onPress}
+      style={[
+        s.calCell,
+        !cell.isCurrentMonth && s.calCellFaded,
+        cell.isToday && s.calCellToday,
+        isInspected && s.calCellInspected,
+      ]}
+    >
+      <Animated.View
+        style={[
+          s.calCellContent,
+          isInspected && { transform: [{ scale: ringScale }] },
+        ]}
+      >
+        <Text
+          style={[
+            s.calCellNum,
+            !cell.isCurrentMonth && s.calCellNumFaded,
+            cell.isToday && s.calCellNumToday,
+            isInspected && s.calCellNumInspected,
+          ]}
+        >
+          {cell.dayNumber}
+        </Text>
+        <Animated.View style={[s.calDotsRow, { opacity: dotOpacity }]}>
+          {cell.hasStrength ? <View style={s.calStrengthDot} /> : null}
+          {cell.hasCardio ? <View style={s.calCardioDot} /> : null}
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+export function CalendarSheet({
+  visible,
+  onClose,
+  summaryMap,
+  todayKey,
+  selectedKey,
+  plan,
+  sessions,
+  onSelectDate,
+  onStartPastWorkout,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  summaryMap: Map<string, CalendarDaySummary>;
+  todayKey: string;
+  selectedKey: string;
+  plan?: Plan;
+  sessions: readonly WorkoutSession[];
+  onSelectDate: (key: string) => void;
+  onStartPastWorkout: (key: string) => void;
+}) {
+  const initialDate = dateFromKey(selectedKey || todayKey);
+  const [viewYear, setViewYear] = useState(initialDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initialDate.getMonth());
+  const [inspectedKey, setInspectedKey] = useState<string | null>(selectedKey);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const monthDir = useRef<1 | -1>(1);
+
+  const prevMonth = () => {
+    monthDir.current = -1;
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    monthDir.current = 1;
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    slideAnim.setValue(monthDir.current * 30);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [viewYear, viewMonth, slideAnim]);
+
+  const grid = useMemo(
+    () => getMonthGrid(viewYear, viewMonth, summaryMap, todayKey),
+    [viewYear, viewMonth, summaryMap, todayKey],
+  );
+
+  const stats = useMemo(
+    () => getMonthStats(viewYear, viewMonth, summaryMap),
+    [viewYear, viewMonth, summaryMap],
+  );
+
+  const monthTitle = `${MONTH_NAMES[viewMonth]} ${viewYear}`;
+  const inspectedSummary = inspectedKey ? summaryMap.get(inspectedKey) : null;
+  const isFuture = inspectedKey ? inspectedKey > todayKey : false;
+  const futurePlanned = isFuture && plan ? dayFor(plan, inspectedKey!, todayKey, sessions) : null;
+  const inspectedHasData = !!(inspectedSummary?.hasStrength || inspectedSummary?.hasCardio);
+
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Workout Calendar">
+      {/* Month streak / count summary */}
+      <View style={s.calStatsRow}>
+        <View style={s.calStat}>
+          <Text style={s.calStatVal}>{stats.workoutsThisMonth}</Text>
+          <Text style={s.calStatLabel}>Workouts</Text>
+        </View>
+        <View style={s.calStat}>
+          <Text style={s.calStatVal}>{stats.cardioThisMonth}</Text>
+          <Text style={s.calStatLabel}>Cardio</Text>
+        </View>
+        <View style={s.calStat}>
+          <Text style={s.calStatVal}>{stats.activeStreakDays}d</Text>
+          <Text style={s.calStatLabel}>Streak</Text>
+        </View>
+      </View>
+
+      {/* Month header & navigation */}
+      <View style={s.calNavRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Previous month"
+          hitSlop={8}
+          onPress={prevMonth}
+          style={s.calNavBtn}
+        >
+          <ChevronLeft size={20} color={F.ink} />
+        </Pressable>
+        <Text style={s.calMonthTitle}>{monthTitle}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Next month"
+          hitSlop={8}
+          onPress={nextMonth}
+          style={s.calNavBtn}
+        >
+          <ChevronRight size={20} color={F.ink} />
+        </Pressable>
+      </View>
+
+      {/* Monday-first weekday headers */}
+      <View style={s.calWeekdaysRow}>
+        {CALENDAR_WEEKDAYS.map((wd) => (
+          <Text key={wd} style={s.calWeekdayLabel}>
+            {wd}
+          </Text>
+        ))}
+      </View>
+
+      {/* Month grid */}
+      <Animated.View
+        style={[
+          s.calGrid,
+          { transform: [{ translateX: slideAnim }] },
+        ]}
+      >
+        {grid.map((cell, index) => (
+          <CalendarCellView
+            key={cell.key}
+            cell={cell}
+            index={index}
+            isInspected={cell.key === inspectedKey}
+            onPress={() => {
+              setInspectedKey(cell.key);
+              if (cell.key <= todayKey && (cell.hasStrength || cell.hasCardio)) {
+                onSelectDate(cell.key);
+                onClose();
+              }
+            }}
+          />
+        ))}
+      </Animated.View>
+
+      {/* Day inspection panel */}
+      {inspectedKey ? (
+        <View style={s.calInspectPanel}>
+          <Text style={s.calInspectDate}>{inspectedKey}</Text>
+          {isFuture ? (
+            <Text style={s.calInspectMeta}>
+              {futurePlanned ? `Planned: ${displayName(futurePlanned.name)}` : "Rest day"}
+            </Text>
+          ) : inspectedHasData ? (
+            <View style={s.calInspectActions}>
+              <Text style={s.calInspectMeta}>
+                {inspectedSummary?.hasStrength ? plural(inspectedSummary.sessions.length, "workout") : ""}
+                {inspectedSummary?.hasStrength && inspectedSummary?.hasCardio ? " · " : ""}
+                {inspectedSummary?.hasCardio ? plural(inspectedSummary.cardio.length, "cardio session") : ""}
+              </Text>
+              <Button
+                label="View day"
+                onPress={() => {
+                  onSelectDate(inspectedKey);
+                  onClose();
+                }}
+              />
+            </View>
+          ) : (
+            <View style={s.calInspectActions}>
+              <Text style={s.calInspectMeta}>Nothing logged on this day</Text>
+              <Button
+                label="Log past workout"
+                onPress={() => {
+                  onStartPastWorkout(inspectedKey);
+                  onClose();
+                }}
+              />
+            </View>
+          )}
+        </View>
+      ) : null}
+    </Sheet>
+  );
+}
+
 const s = StyleSheet.create({
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   row: {
@@ -444,6 +1549,17 @@ const s = StyleSheet.create({
   rowMeta: { color: F.mute, fontSize: 13 },
   empty: { color: F.mute, fontSize: 14, paddingVertical: 16 },
   create: { marginTop: 16 },
+  subMusclesBlock: { marginVertical: 4 },
+  dupWarning: {
+    backgroundColor: F.card2,
+    borderWidth: 1,
+    borderColor: F.line,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  dupText: { color: F.ink, fontSize: 14 },
+  dupLink: { color: F.acc, fontWeight: "600", textDecorationLine: "underline" },
   note: { minHeight: 96, textAlignVertical: "top" },
   big: { color: F.ink, fontSize: 34, fontWeight: "300" },
   plates: { marginTop: 16 },
@@ -461,4 +1577,90 @@ const s = StyleSheet.create({
   stat: { flex: 1 },
   statValue: { color: F.ink, fontSize: 24, fontWeight: "300" },
   pr: { color: F.acc, fontSize: 14, fontWeight: "600" },
+  bodyText: { color: F.mute, fontSize: 14, lineHeight: 22 },
+  calStatsRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
+  calStat: {
+    flex: 1,
+    backgroundColor: F.card2,
+    padding: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  calStatVal: { color: F.ink, fontSize: 18, fontWeight: "600" },
+  calStatLabel: { color: F.mute, fontSize: 12, marginTop: 2 },
+  calNavRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  calNavBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: F.card2,
+  },
+  calMonthTitle: { color: F.ink, fontSize: 16, fontWeight: "600" },
+  calWeekdaysRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  calWeekdayLabel: {
+    width: 38,
+    textAlign: "center",
+    color: F.dim,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  calGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 4,
+  },
+  calCell: {
+    width: 38,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: F.card,
+  },
+  calCellFaded: { opacity: 0.3 },
+  calCellToday: { borderWidth: 1, borderColor: F.acc },
+  calCellInspected: { backgroundColor: "rgba(217, 164, 65, 0.2)" },
+  calCellNum: { color: F.ink, fontSize: 13, fontWeight: "500" },
+  calCellNumFaded: { color: F.dim },
+  calCellNumToday: { color: F.acc, fontWeight: "700" },
+  calCellNumInspected: { color: F.acc, fontWeight: "700" },
+  calDotsRow: { flexDirection: "row", gap: 3, marginTop: 3, minHeight: 6 },
+  calStrengthDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: F.acc,
+  },
+  calCardioDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#2DD4BF",
+  },
+  calInspectPanel: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: F.card2,
+    borderWidth: 1,
+    borderColor: F.line,
+    gap: 8,
+  },
+  calInspectDate: { color: F.ink, fontSize: 15, fontWeight: "600" },
+  calInspectMeta: { color: F.mute, fontSize: 13 },
+  calInspectActions: { gap: 10 },
+  summaryHeaderRow: { alignItems: "center", marginBottom: 12 },
+  calCellContent: { alignItems: "center", justifyContent: "center" },
 });

@@ -43,11 +43,29 @@ export type ForgeSettings = {
   routinesImported: boolean;
 };
 
+export type LoadType =
+  | "barbell"
+  | "dumbbell"
+  | "machine"
+  | "cable"
+  | "bodyweight"
+  | "assisted"
+  | "timed"
+  | "other";
+
+export type RepTarget = {
+  kind: "fixed" | "range" | "amrap";
+  min?: number;
+  max?: number;
+};
+
 export type CustomExercise = {
   id: string;
   name: string;
   muscleGroup: MuscleGroup;
   bodyweight: boolean;
+  loadType?: LoadType;
+  primaryMuscles?: string[];
 };
 
 /** An exercise as the Forge screens use it, from any source. */
@@ -59,4 +77,8 @@ export type CatalogExercise = {
   secondary?: string;
   how?: string;
   custom?: boolean;
+  loadType?: LoadType;
+  primaryMuscles?: string[];
+  aliases?: string[];
 };
+

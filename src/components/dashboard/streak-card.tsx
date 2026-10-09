@@ -1,19 +1,63 @@
+import { Flame } from "lucide-react-native";
 import { StyleSheet, Text, View } from "react-native";
 
-import { GymCard } from "@/components/ui/gym-card";
-import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { Card } from "@/components/ds/card";
+import { Font, HOME } from "@/constants/design";
+import { Spacing, Typography } from "@/constants/theme";
 
 type StreakCardProps = {
   streak: number;
   todayActive?: boolean;
+  compact?: boolean;
 };
 
-export function StreakCard({ streak, todayActive = true }: StreakCardProps) {
-  if (streak === 0) {
+export function StreakCard({
+  streak,
+  todayActive = true,
+  compact = false,
+}: StreakCardProps) {
+  const isNone = streak === 0;
+  const isAtRisk = streak > 0 && !todayActive;
+  const isActive = streak > 0 && todayActive;
+
+  if (compact) {
+    const flameColor = isNone
+      ? HOME.dim
+      : isAtRisk
+        ? "#e0803f"
+        : "#d4a24c";
+
+    const countColor = isNone
+      ? HOME.dim
+      : isAtRisk
+        ? "#e0803f"
+        : "#d4a24c";
+
     return (
-      <GymCard style={styles.card}>
+      <View
+        accessibilityLabel={`Streak: ${streak} days${isNone ? ", none" : isActive ? ", active" : ", at risk"}`}
+        style={[
+          styles.compactPill,
+          isActive && styles.compactPillActive,
+          isAtRisk && styles.compactPillAtRisk,
+          isNone && styles.compactPillNone,
+        ]}
+      >
+        <Flame size={15} color={flameColor} />
+        <Text style={[styles.compactCount, { color: countColor }]}>
+          {streak}
+        </Text>
+      </View>
+    );
+  }
+
+  if (isNone) {
+    return (
+      <Card style={styles.card}>
         <View style={styles.row}>
-          <Text style={styles.emoji}>🔥</Text>
+          <View style={[styles.iconCircle, { backgroundColor: HOME.card2 }]}>
+            <Flame size={20} color={HOME.mute} />
+          </View>
 
           <View style={styles.textBlock}>
             <Text style={styles.label}>No streak yet</Text>
@@ -23,34 +67,38 @@ export function StreakCard({ streak, todayActive = true }: StreakCardProps) {
             </Text>
           </View>
         </View>
-      </GymCard>
+      </Card>
     );
   }
 
-  if (!todayActive) {
+  if (isAtRisk) {
     return (
-      <GymCard style={styles.card}>
+      <Card style={styles.card}>
         <View style={styles.row}>
-          <Text style={styles.emoji}>🔥</Text>
+          <View style={[styles.iconCircle, { backgroundColor: "rgba(224, 128, 63, 0.15)" }]}>
+            <Flame size={20} color="#e0803f" />
+          </View>
 
           <View style={styles.textBlock}>
             <Text style={styles.count}>
               {streak} {streak === 1 ? "day" : "days"}
             </Text>
 
-            <Text style={styles.label}>
+            <Text style={[styles.label, { color: "#e0803f" }]}>
               At risk — log today to keep it
             </Text>
           </View>
         </View>
-      </GymCard>
+      </Card>
     );
   }
 
   return (
-    <GymCard style={styles.card}>
+    <Card style={styles.card}>
       <View style={styles.row}>
-        <Text style={styles.emoji}>🔥</Text>
+        <View style={[styles.iconCircle, { backgroundColor: "rgba(212, 162, 76, 0.15)" }]}>
+          <Flame size={20} color="#d4a24c" />
+        </View>
 
         <View style={styles.textBlock}>
           <Text style={styles.count}>
@@ -66,7 +114,7 @@ export function StreakCard({ streak, todayActive = true }: StreakCardProps) {
           </Text>
         </View>
       </View>
-    </GymCard>
+    </Card>
   );
 }
 
@@ -74,35 +122,62 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: Spacing.two,
   },
-
+  compactPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    backgroundColor: HOME.card2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: HOME.line,
+  },
+  compactPillActive: {
+    borderColor: "rgba(212, 162, 76, 0.4)",
+    backgroundColor: "rgba(212, 162, 76, 0.12)",
+  },
+  compactPillAtRisk: {
+    borderColor: "rgba(224, 128, 63, 0.4)",
+    backgroundColor: "rgba(224, 128, 63, 0.12)",
+  },
+  compactPillNone: {
+    borderColor: HOME.line,
+    opacity: 0.7,
+  },
+  compactCount: {
+    fontFamily: Font.sans,
+    fontSize: 14,
+    fontWeight: "700",
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.three,
   },
-
-  emoji: {
-    fontSize: 28,
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
-
   textBlock: {
     flex: 1,
   },
-
   count: {
-    color: GymColors.text.primary,
+    color: HOME.ink,
     fontSize: Typography.h2,
     fontWeight: "700",
   },
-
   label: {
-    color: GymColors.text.secondary,
+    color: HOME.mute,
     fontSize: Typography.caption,
     marginTop: 2,
   },
-
   hint: {
-    color: GymColors.text.tertiary,
+    color: HOME.dim,
     fontSize: Typography.caption,
     marginTop: 2,
   },

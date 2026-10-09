@@ -10,7 +10,7 @@ jest.mock("expo-haptics", () => ({
 }));
 
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 // The sheets are captured so a test can drive their callbacks directly.
 const mockSheets: {
@@ -19,6 +19,7 @@ const mockSheets: {
 
 jest.mock("@/components/workouts/forge-sheets", () => ({
   ConfirmSheet: () => null,
+  DayMenuSheet: () => null,
   ExercisePickerSheet: () => null,
   NewPlanSheet: (props: {
     onCreate: (template: string | null, name: string) => void;

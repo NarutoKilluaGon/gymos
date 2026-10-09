@@ -11,8 +11,15 @@ import {
   Utensils,
   X,
 } from "lucide-react-native";
-import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import {
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { JournalSheet } from "@/components/quick-add/journal-sheet";
 import { LogFoodSheet } from "@/components/nutrition/log-food-sheet";
@@ -23,6 +30,7 @@ import {
 } from "@/components/quick-add/sleep-sheet";
 import { WeightSheet } from "@/components/quick-add/weight-sheet";
 import { useModules } from "@/contexts/modules-context";
+import { FEATURES } from "@/constants/features";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import type { ModuleId } from "@/storage/repositories/modules";
 import type { WeightUnit } from "@/storage/repositories/preferences";
@@ -54,7 +62,9 @@ const actions: FABAction[] = [
   { label: "Weight", icon: Scale },
   { label: "Measurements", icon: Ruler },
   { label: "Journal", icon: BookOpen },
-  { label: "Progress photo", icon: Camera },
+  ...(FEATURES.progress
+    ? [{ label: "Progress photo", icon: Camera }]
+    : []),
 ];
 
 export function GymFAB({
@@ -77,21 +87,39 @@ export function GymFAB({
   const [sleepSheetOpen, setSleepSheetOpen] = useState(false);
   const [journalSheetOpen, setJournalSheetOpen] = useState(false);
 
+  const rotAnim = useRef(new Animated.Value(0)).current;
+
   async function openSheet() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
+    Animated.spring(rotAnim, {
+      toValue: 1,
+      speed: 20,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
     setOpen(true);
   }
 
   async function closeSheet() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
+    Animated.spring(rotAnim, {
+      toValue: 0,
+      speed: 20,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
     setOpen(false);
   }
 
   async function handleAction(label: string) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    Animated.spring(rotAnim, {
+      toValue: 0,
+      speed: 20,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
     setOpen(false);
 
     if (label === "Water") {
@@ -180,7 +208,20 @@ export function GymFAB({
         onPress={openSheet}
         style={styles.fab}
       >
-        <Plus size={28} color={GymColors.text.primary} />
+        <Animated.View
+          style={{
+            transform: [
+              {
+                rotate: rotAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["0deg", "45deg"],
+                }),
+              },
+            ],
+          }}
+        >
+          <Plus size={28} color={GymColors.text.primary} />
+        </Animated.View>
       </Pressable>
 
       {/* Main Quick Add Sheet */}

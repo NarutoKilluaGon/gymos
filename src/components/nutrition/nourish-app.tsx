@@ -1,20 +1,24 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BackHandler,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+
+import { useRouter } from "expo-router";
 
 import { InsightsView } from "@/components/nutrition/insights-view";
 import { KitchenView } from "@/components/nutrition/kitchen-view";
 import { MeView } from "@/components/nutrition/me-view";
 import { GuardSheet } from "@/components/nutrition/more-sheets";
-import { Pill } from "@/components/nutrition/nourish-ui";
+import { Seg } from "@/components/nutrition/nourish-ui";
 import { TodayView } from "@/components/nutrition/today-view";
-import { N, NSerif } from "@/constants/nourish-theme";
+import { NOURISH } from "@/constants/design";
+import { ThemeProvider } from "@/contexts/theme-context";
+import { Screen } from "@/components/ds/screen";
+import { ScreenHeader } from "@/components/ds/screen-header";
 import { useNourish } from "@/hooks/use-nourish";
 import {
   daysSinceLastChange,
@@ -26,11 +30,12 @@ import { showToast } from "@/utils/toast";
 
 export type NourishViewId = "today" | "insights" | "kitchen" | "me";
 
-const TITLES: Record<Exclude<NourishViewId, "today">, string> = {
-  insights: "Insights",
-  kitchen: "Kitchen",
-  me: "Me",
-};
+const NOURISH_TABS = [
+  { value: "today", label: "Today" },
+  { value: "insights", label: "Insights" },
+  { value: "kitchen", label: "Kitchen" },
+  { value: "me", label: "Me" },
+] as const;
 
 type PendingChange = {
   patch: Partial<NourishSettings>;
@@ -45,6 +50,13 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
   const [seenRequest, setSeenRequest] = useState(requestedView);
   const [pending, setPending] = useState<PendingChange | null>(null);
 
+  const router = useRouter();
+
+  const changeView = useCallback((next: NourishViewId) => {
+    setView(next);
+    router.setParams({ view: next });
+  }, [router]);
+
   if (requestedView !== seenRequest) {
     setSeenRequest(requestedView);
 
@@ -57,14 +69,14 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
-        setView("today");
+        changeView("today");
 
         return true;
       },
     );
 
     return () => subscription.remove();
-  }, [view]);
+  }, [changeView, view]);
 
   const settings = nourish.data?.settings;
 
@@ -93,71 +105,56 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
   }
 
   return (
-    <KeyboardAvoidingView
-      style={s.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <View style={s.header}>
-        {view === "today" ? (
-          <>
-            <Text style={s.title}>Nourish</Text>
-            <View style={s.nav}>
-              <Pill label="Insights" onPress={() => setView("insights")} />
-              <Pill label="Kitchen" onPress={() => setView("kitchen")} />
-              <Pill label="Me" onPress={() => setView("me")} />
-            </View>
-          </>
-        ) : (
-          <>
-            <Pill label="‹ Today" onPress={() => setView("today")} />
-            <Text style={s.title}>{TITLES[view]}</Text>
-          </>
-        )}
-      </View>
+    <ThemeProvider theme={NOURISH}>
+      <Screen scroll={false}>
+        <KeyboardAvoidingView
+          style={s.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScreenHeader
+            eyebrow="NOURISH"
+            title="Nutrition"
+            onBack={view !== "today" ? () => changeView("today") : undefined}
+          />
 
-      {view === "today" ? <TodayView nourish={nourish} /> : null}
-      {view === "insights" ? (
-        <InsightsView nourish={nourish} onChangeSettings={requestChange} />
-      ) : null}
-      {view === "kitchen" ? <KitchenView nourish={nourish} /> : null}
-      {view === "me" ? (
-        <MeView nourish={nourish} onChangeSettings={requestChange} />
-      ) : null}
+          <View style={s.tabs}>
+            <Seg
+              options={NOURISH_TABS}
+              value={view}
+              onChange={changeView}
+            />
+          </View>
 
-      <GuardSheet
-        visible={pending !== null}
-        daysAgo={
-          settings ? (daysSinceLastChange(settings.changeLog, new Date()) ?? 0) : 0
-        }
-        onKeep={() => setPending(null)}
-        onProceed={() => {
-          const change = pending;
+          {view === "today" ? <TodayView nourish={nourish} /> : null}
+          {view === "insights" ? (
+            <InsightsView nourish={nourish} onChangeSettings={requestChange} />
+          ) : null}
+          {view === "kitchen" ? <KitchenView nourish={nourish} /> : null}
+          {view === "me" ? (
+            <MeView nourish={nourish} onChangeSettings={requestChange} />
+          ) : null}
 
-          setPending(null);
+          <GuardSheet
+            visible={pending !== null}
+            daysAgo={
+              settings ? (daysSinceLastChange(settings.changeLog, new Date()) ?? 0) : 0
+            }
+            onKeep={() => setPending(null)}
+            onProceed={() => {
+              const change = pending;
 
-          if (change) void apply(change);
-        }}
-      />
-    </KeyboardAvoidingView>
+              setPending(null);
+
+              if (change) void apply(change);
+            }}
+          />
+        </KeyboardAvoidingView>
+      </Screen>
+    </ThemeProvider>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: N.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 32,
-    paddingBottom: 4,
-  },
-  title: {
-    fontFamily: NSerif,
-    fontWeight: "300",
-    fontSize: 26,
-    color: N.ink,
-  },
-  nav: { flexDirection: "row", gap: 6 },
+  flex: { flex: 1 },
+  tabs: { paddingHorizontal: 0, marginBottom: 12 },
 });

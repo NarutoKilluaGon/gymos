@@ -1,15 +1,15 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 
-import { GymColors } from "@/constants/theme";
+import { HOME } from "@/constants/design";
 
 export default function AppTabs() {
   return (
     <NativeTabs
-      backgroundColor={GymColors.background.primary}
-      indicatorColor={GymColors.background.surface}
+      backgroundColor={HOME.bg}
+      indicatorColor={HOME.card2}
       labelStyle={{
         selected: {
-          color: GymColors.text.primary,
+          color: HOME.ink,
         },
       }}
     >
@@ -34,17 +34,6 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon
           md={{ default: "restaurant", selected: "restaurant" }}
           sf={{ default: "fork.knife", selected: "fork.knife" }}
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="progress">
-        <NativeTabs.Trigger.Label>Progress</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          md={{ default: "trending_up", selected: "trending_up" }}
-          sf={{
-            default: "chart.line.uptrend.xyaxis",
-            selected: "chart.line.uptrend.xyaxis",
-          }}
         />
       </NativeTabs.Trigger>
 

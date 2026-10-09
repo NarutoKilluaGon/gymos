@@ -22,6 +22,7 @@ export type ReviewState = {
 
 export type ManualState = {
   name: string;
+  slot?: MealSlot;
   /** Day and "HH:MM" ("" for none) snapshotted when the sheet opened. */
   dayKey: string;
   at: string;
@@ -166,7 +167,15 @@ export function useFoodLogger(input: {
   );
 
   const openManual = useCallback(
-    (name = "") => setManual({ name, ...snapshot() }),
+    (nameOrSlot: string = "", optionalSlot?: MealSlot) => {
+      let name = nameOrSlot;
+      let slot: MealSlot | undefined = optionalSlot;
+      if (!optionalSlot && (["Breakfast", "Lunch", "Snacks", "Dinner"] as const).includes(nameOrSlot as MealSlot)) {
+        slot = nameOrSlot as MealSlot;
+        name = "";
+      }
+      setManual({ name, slot, ...snapshot() });
+    },
     [snapshot],
   );
 

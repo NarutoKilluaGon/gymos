@@ -13,10 +13,11 @@ import {
   addSupplement,
   getSupplements,
   removeSupplement,
+  restoreSupplement,
   setSupplementEnabled,
   type Supplement,
 } from "@/storage/repositories/supplements";
-import { showToast } from "@/utils/toast";
+import { showToast, showUndoToast } from "@/utils/toast";
 
 const QUICK_ADD = ["Creatine", "Whey", "Vitamin D", "Fish Oil"];
 
@@ -77,12 +78,22 @@ export function SupplementsSheet({ onClose }: SupplementsSheetProps) {
   }
 
   async function handleRemove(id: string) {
+    const target = supplements.find((s) => s.id === id);
     try {
       await removeSupplement(id);
 
       setSupplements((current) =>
         current.filter((s) => s.id !== id),
       );
+      if (target) {
+        showUndoToast({
+          message: `${target.name} removed`,
+          onUndo: async () => {
+            await restoreSupplement(target);
+            setSupplements(await getSupplements());
+          },
+        });
+      }
     } catch {
       showToast("Couldn't remove supplement");
     }

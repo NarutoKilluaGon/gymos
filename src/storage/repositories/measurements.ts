@@ -170,6 +170,23 @@ export async function deleteMeasurement(
   }
 }
 
+/** Restore a previously deleted measurement. */
+export async function restoreMeasurement(
+  measurement: Measurement,
+): Promise<void> {
+  await withDailyLock(async () => {
+    const date = measurement.timestamp.slice(0, 10);
+    const activity = await readDailyActivityUnlocked(date);
+    if (!Array.isArray(activity.measurements)) {
+      activity.measurements = [];
+    }
+    if (!activity.measurements.some((m) => m.id === measurement.id)) {
+      activity.measurements.push(measurement);
+      await writeDailyActivityUnlocked(activity);
+    }
+  });
+}
+
 export async function getMeasurementHistory(
   type: MeasurementType,
 ): Promise<Measurement[]> {

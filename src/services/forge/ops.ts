@@ -107,6 +107,20 @@ export const toggleWarmup = (
     now,
   );
 
+export const toggleFailure = (
+  session: WorkoutSession,
+  exerciseIndex: number,
+  setIndex: number,
+  now: Date,
+): WorkoutSession =>
+  touch(
+    mapSet(session, exerciseIndex, setIndex, (set) => ({
+      ...set,
+      toFailure: !set.toFailure,
+    })),
+    now,
+  );
+
 export const setSetValues = (
   session: WorkoutSession,
   exerciseIndex: number,
@@ -166,6 +180,24 @@ export const removeSet = (
     now,
   );
 
+/** Reinsert a set at its original index. */
+export const reinsertSet = (
+  session: WorkoutSession,
+  exerciseIndex: number,
+  setIndex: number,
+  set: WorkoutSet,
+  now: Date,
+): WorkoutSession =>
+  touch(
+    mapExercise(session, exerciseIndex, (exercise) => {
+      const sets = [...exercise.sets];
+      const targetIndex = Math.max(0, Math.min(setIndex, sets.length));
+      sets.splice(targetIndex, 0, set);
+      return { ...exercise, sets };
+    }),
+    now,
+  );
+
 /** Groups need two neighbours; clear any that no longer have them. */
 export function dropOrphanGroups(
   exercises: readonly WorkoutExercise[],
@@ -198,24 +230,49 @@ export function removeExercise(
   return touch({ ...session, exercises: dropOrphanGroups(exercises) }, now);
 }
 
+/** Reinsert an exercise at its original index. */
+export function reinsertExercise(
+  session: WorkoutSession,
+  exerciseIndex: number,
+  exercise: WorkoutExercise,
+  now: Date,
+): WorkoutSession {
+  const exercises = [...session.exercises];
+  const targetIndex = Math.max(0, Math.min(exerciseIndex, exercises.length));
+  exercises.splice(targetIndex, 0, exercise);
+  return touch({ ...session, exercises: dropOrphanGroups(exercises) }, now);
+}
+
 /** Swap an exercise with the one above it. */
 export function moveExerciseUp(
   session: WorkoutSession,
   exerciseIndex: number,
   now: Date,
 ): WorkoutSession {
-  if (exerciseIndex <= 0 || exerciseIndex >= session.exercises.length) {
+  return moveExercise(session, exerciseIndex, exerciseIndex - 1, now);
+}
+
+/** Move an exercise from one position to another; orphan groups are dropped. */
+export function moveExercise(
+  session: WorkoutSession,
+  from: number,
+  to: number,
+  now: Date,
+): WorkoutSession {
+  if (
+    from < 0 ||
+    from >= session.exercises.length ||
+    to < 0 ||
+    to >= session.exercises.length ||
+    from === to
+  ) {
     return session;
   }
 
   const exercises = [...session.exercises];
-  const above = exercises[exerciseIndex - 1];
-  const current = exercises[exerciseIndex];
-
-  if (!above || !current) return session;
-
-  exercises[exerciseIndex - 1] = current;
-  exercises[exerciseIndex] = above;
+  const [moved] = exercises.splice(from, 1);
+  if (!moved) return session;
+  exercises.splice(to, 0, moved);
 
   return touch({ ...session, exercises: dropOrphanGroups(exercises) }, now);
 }

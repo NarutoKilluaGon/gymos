@@ -20,7 +20,7 @@ const act: (callback: () => unknown) => Promise<void> = TestRenderer.act;
 // The theme module side-effect-imports a stylesheet Jest cannot parse.
 jest.mock("@/global.css", () => ({}));
 jest.mock("lucide-react-native", () => ({ LineChart: () => null }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 jest.mock("expo-router", () => {
   const { useEffect } = require("react");

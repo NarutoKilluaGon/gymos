@@ -15,14 +15,14 @@
  * vitaminA/vitaminD/vitaminB12/folate in µg amounts.
  */
 
-import type { EstimatedFood } from "@/types/gymos";
-import type { MealEstimate } from "@/services/meal-estimator";
-import type { MacroTotals } from "@/storage/repositories/meals";
 import {
   NUTRIENT_KEYS,
   pickMicronutrients,
+  type EstimatedFood,
   type Micronutrients,
 } from "@/types/gymos";
+import type { MealEstimate } from "@/services/meal-estimator";
+import type { MacroTotals } from "@/storage/repositories/meals";
 
 /** One catalog food: fixed name, structured portion, macros per portion. */
 export type FoodEntry = {
@@ -228,12 +228,12 @@ export function matchFoodEntry(
   // not alias and stay subject to the minScore confidence bar.
   const q = resolveFoodAlias(raw);
 
-  const scored: Array<{
+  const scored: {
     entry: FoodEntry;
     score: number;
     length: number;
     index: number;
-  }> = [];
+  }[] = [];
 
   FOOD_DATABASE.forEach((entry, index) => {
     const name = normalizeFoodName(entry.name);
@@ -317,6 +317,23 @@ const UNIT_ALIASES: Record<string, string> = {
   bowls: "bowl",
   clove: "clove",
   cloves: "clove",
+  katori: "bowl",
+  katoris: "bowl",
+  glass: "glass",
+  glasses: "glass",
+  sprig: "sprig",
+  sprigs: "sprig",
+  pinch: "pinch",
+  pinches: "pinch",
+  handful: "handful",
+  handfuls: "handful",
+  oz: "oz",
+  ounce: "oz",
+  ounces: "oz",
+  lb: "lb",
+  lbs: "lb",
+  pound: "lb",
+  pounds: "lb",
 };
 
 export function isSameUnit(a: string, b: string): boolean {

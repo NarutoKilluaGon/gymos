@@ -12,7 +12,7 @@ export const N = {
   line: "#2b3530",
   ink: "#ece8df",
   mute: "#9aa59e",
-  dim: "#6c776f",
+  dim: "#869088",
   acc: "#81a996",
   accInk: "#0f1a15",
   gold: "#d4a24c",

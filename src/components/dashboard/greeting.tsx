@@ -1,6 +1,7 @@
 import { StyleSheet, Text } from "react-native";
 
-import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { Font } from "@/constants/design";
+import { GymColors } from "@/constants/theme";
 
 type GreetingProps = {
   /** Optional override for testing. Defaults to time-of-day greeting. */
@@ -32,8 +33,9 @@ export function Greeting({ text }: GreetingProps) {
 const styles = StyleSheet.create({
   text: {
     color: GymColors.text.primary,
-    fontSize: Typography.display,
-    fontWeight: "700",
-    marginBottom: Spacing.three,
+    fontFamily: Font.serif,
+    fontSize: 34,
+    fontWeight: "300",
+    lineHeight: 40,
   },
 });

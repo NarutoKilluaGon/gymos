@@ -28,7 +28,7 @@ jest.mock("expo-router", () => {
     useFocusEffect: (callback: () => void) => useEffect(callback, [callback]),
   };
 });
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 jest.mock("@/contexts/modules-context", () => ({
   useModules: () => ({ enabled: { workouts: true, nutrition: true } }),
 }));

@@ -218,32 +218,82 @@ export async function saveSlotAsMeal(
   );
 }
 
-/** Log a saved meal's foods on a day, as separate diary entries. */
+/** Log a saved meal, food, or recipe on a day, as diary entries. */
 export async function logSavedMeal(
   saved: SavedFood,
   dayKey: string,
   now: Date = new Date(),
+  options?: {
+    slot?: MealSlot;
+    servingsMultiplier?: number;
+  },
 ): Promise<Meal[]> {
-  const foods = saved.foods ?? [];
+  const mult =
+    options?.servingsMultiplier !== undefined &&
+    Number.isFinite(options.servingsMultiplier) &&
+    options.servingsMultiplier > 0
+      ? options.servingsMultiplier
+      : 1;
   const hm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  const slot = saved.slot ?? slotForTime(hm);
+  const slot = options?.slot ?? saved.slot ?? slotForTime(hm);
   const timestamp =
     dayKey === getTodayKey()
       ? now.toISOString()
       : entryTimestamp(dayKey, null, slot);
 
-  return addMeals(
-    foods.map((food) => ({
-      name: food.name,
-      macros: nutritionOf(food),
+  const isMeal = saved.foods !== undefined && saved.foods.length > 0;
+
+  if (isMeal) {
+    return addMeals(
+      saved.foods!.map((food) => ({
+        name: food.name,
+        macros: mult !== 1 ? scaleNutrients(nutritionOf(food), mult) : nutritionOf(food),
+        slot,
+        ...(food.qty
+          ? { qty: mult !== 1 ? `${mult}× ${food.qty}` : food.qty }
+          : {}),
+        ...(typeof food.confidence === "number"
+          ? { confidence: food.confidence }
+          : {}),
+        timestamp,
+      })),
+    );
+  }
+
+  // Single food or recipe
+  const portionSuffix =
+    mult === 0.5
+      ? " (½ serving)"
+      : mult === 1.5
+        ? " (1½ servings)"
+        : mult !== 1
+          ? ` (${mult} servings)`
+          : "";
+  const qty = saved.qty
+    ? `${saved.qty}${portionSuffix}`
+    : mult !== 1
+      ? `${mult} servings`
+      : undefined;
+
+  return addMeals([
+    {
+      name: saved.name,
+      macros: scaleNutrients(
+        {
+          calories: saved.calories ?? 0,
+          protein: saved.protein ?? 0,
+          carbs: saved.carbs ?? 0,
+          fat: saved.fat ?? 0,
+          ...pickMicronutrients(saved),
+        },
+        mult,
+      ),
       slot,
-      ...(food.qty ? { qty: food.qty } : {}),
-      ...(typeof food.confidence === "number"
-        ? { confidence: food.confidence }
-        : {}),
+      ...(qty ? { qty } : {}),
+      confidence: 0.9,
       timestamp,
-    })),
-  );
+    },
+  ]);
 }
 
 /** Per-serving nutrition for a recipe's resolved ingredients. */
@@ -287,7 +337,7 @@ export function recipePerServing(
   };
 }
 
-/** Save (or replace) a recipe as a per-serving saved food. */
+/** Save (or replace) a recipe as a per-serving saved food with ingredients stored. */
 export async function saveRecipe(
   name: string,
   items: readonly DraftItem[],
@@ -298,6 +348,6 @@ export async function saveRecipe(
   void confidence;
 
   // One atomic repository operation: a failed save keeps the old recipe.
-  return replaceRecipe(name, nutrition);
+  return replaceRecipe(name, nutrition, items, servings);
 }
 

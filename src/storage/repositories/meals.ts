@@ -311,6 +311,21 @@ export async function deleteMeal(
   }
 }
 
+/** Restore a previously deleted meal to the store. */
+export async function restoreMeal(meal: Meal): Promise<Meal> {
+  return mealsMutex.runExclusive(async () => {
+    await ensureMigratedUnlocked();
+
+    const meals = await readMealsUnlocked();
+    if (!meals.some((m) => m.id === meal.id)) {
+      meals.push(meal);
+      await writeMealsUnlocked(meals);
+    }
+
+    return meal;
+  });
+}
+
 export async function getDailyMacroTotals(
   dateKey: string,
 ): Promise<MacroTotals> {
