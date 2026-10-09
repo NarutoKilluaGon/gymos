@@ -8,20 +8,27 @@ export function Bar({
   max,
   color,
   height = 6,
+  trackColor,
 }: {
   value: number;
   max: number;
   color?: string;
   height?: number;
+  trackColor?: string;
 }) {
   const theme = useTheme();
   const barColor = color ?? theme.acc;
 
   const raw = max > 0 ? value / max : 0;
   const ratio = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
+  const resolvedTrack =
+    trackColor ??
+    (color && color.startsWith("#") && color.length === 7
+      ? `${color}33`
+      : theme.card2);
 
   return (
-    <View style={[styles.track, { height, backgroundColor: theme.card2 }]}>
+    <View style={[styles.track, { height, backgroundColor: resolvedTrack }]}>
       <View
         style={{
           width: `${ratio * 100}%`,

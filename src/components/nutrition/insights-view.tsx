@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BarChart, LineChart } from "@/components/nutrition/nourish-charts";
-import { WeeklyReadSheet } from "@/components/nutrition/more-sheets";
+import { ChangeLogSheet, WeeklyReadSheet } from "@/components/nutrition/more-sheets";
 import {
   Bar,
   Button,
@@ -65,6 +65,7 @@ export function InsightsView({
   const [seriesKey, setSeriesKey] = useState<SeriesKey>("protein");
   const [weightText, setWeightText] = useState("");
   const [readOpen, setReadOpen] = useState(false);
+  const [changeLogOpen, setChangeLogOpen] = useState(false);
 
   const span = records ? loggedSpanDays(records, todayKey) : 0;
   const ranges = availableRanges(span);
@@ -159,6 +160,17 @@ export function InsightsView({
               Averages over logged days. Dashed line is your{" "}
               {seriesKey === "calories" ? "calorie" : seriesKey} target.
             </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Why did my targets change?"
+              onPress={() => {
+                tap();
+                setChangeLogOpen(true);
+              }}
+              style={s.whyBtn}
+            >
+              <Text style={s.whyLink}>Why did my targets change? ›</Text>
+            </Pressable>
           </NCard>
 
           <NCard style={s.gap}>
@@ -282,6 +294,11 @@ export function InsightsView({
       </NCard>
 
       <WeeklyReadSheet visible={readOpen} onClose={() => setReadOpen(false)} read={read} />
+      <ChangeLogSheet
+        visible={changeLogOpen}
+        onClose={() => setChangeLogOpen(false)}
+        changeLog={settings.changeLog}
+      />
     </ScrollView>
   );
 }
@@ -296,8 +313,10 @@ function Summary({ label, value }: { label: string; value: string }) {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 20, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 0, paddingVertical: 8, paddingBottom: 40 },
   fill: { flex: 1 },
+  whyBtn: { marginTop: 8, alignSelf: "flex-start" },
+  whyLink: { color: N.acc, fontSize: 13, fontWeight: "600" },
   gap: { marginBottom: 12 },
   top: { marginTop: 12 },
   body: { color: N.ink, fontSize: 15, lineHeight: 21 },

@@ -2,6 +2,16 @@ import { useEffect, useState } from "react";
 
 export type ToastVariant = "error" | "success" | "undo";
 
+export type ToastAction = {
+  label: string;
+  onPress: () => void | Promise<void>;
+};
+
+export type ToastOptions = {
+  duration?: number;
+  action?: ToastAction;
+};
+
 export type UndoToastOptions = {
   message: string;
   onUndo: () => void | Promise<void>;
@@ -14,6 +24,7 @@ export type ToastMessage = {
   variant: ToastVariant;
   onUndo?: () => void | Promise<void>;
   duration?: number;
+  action?: ToastAction;
 };
 
 type ToastListener = (toast: ToastMessage | null) => void;
@@ -31,9 +42,16 @@ function publish() {
 export function showToast(
   message: string,
   variant: ToastVariant = "error",
+  options?: ToastOptions,
 ): number {
   const id = nextId++;
-  current = { id, message, variant };
+  current = {
+    id,
+    message,
+    variant,
+    duration: options?.duration ?? 4000,
+    action: options?.action,
+  };
   publish();
   return id;
 }

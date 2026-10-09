@@ -9,13 +9,24 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Font } from "@/constants/design";
-import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
+import { N } from "@/constants/nourish-theme";
 import { dismissToast, useToast } from "@/utils/toast";
+
+function useGuardedInsets() {
+  try {
+    const insets = useSafeAreaInsets();
+    return insets ?? { top: 0, bottom: 0, left: 0, right: 0 };
+  } catch {
+    return { top: 0, bottom: 0, left: 0, right: 0 };
+  }
+}
 
 export function ToastHost() {
   const toast = useToast();
+  const insets = useGuardedInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(1)).current;
   const panX = useRef(new Animated.Value(0)).current;
@@ -96,7 +107,7 @@ export function ToastHost() {
     isPausedRef.current = true;
     if (timerRef.current) clearTimeout(timerRef.current);
     progressAnim.stopAnimation((val) => {
-      const total = currentToastRef.current?.duration ?? 5000;
+      const total = currentToastRef.current?.duration ?? 4000;
       remainingMsRef.current = Math.max(0, val * total);
     });
   }, [progressAnim]);
@@ -181,7 +192,7 @@ export function ToastHost() {
     fadeAnim.setValue(0);
     progressAnim.setValue(1);
 
-    const duration = toast.duration ?? (toast.variant === "undo" ? 5000 : 2600);
+    const duration = toast.duration ?? (toast.variant === "undo" ? 5000 : 4000);
     remainingMsRef.current = duration;
 
     Animated.timing(fadeAnim, {
@@ -202,19 +213,25 @@ export function ToastHost() {
   }
 
   const isUndo = toast.variant === "undo";
-  const bgColor = isUndo
-    ? "#1a1e1b"
-    : toast.variant === "success"
-      ? GymColors.semantic.accent
-      : GymColors.semantic.error;
+  const isError = toast.variant === "error";
+  const isSuccess = toast.variant === "success";
+
+  const borderColor = isError
+    ? "rgba(200, 99, 75, 0.45)"
+    : isSuccess
+      ? "rgba(76, 154, 106, 0.45)"
+      : N.line;
+
+  const dotColor = isError ? N.bad : isSuccess ? N.ok : "#d4a24c";
+  const bottomOffset = Math.max(16, insets.bottom) + 64;
 
   return (
     <Animated.View
       style={[
         styles.toast,
-        isUndo && styles.undoToast,
-        { backgroundColor: bgColor },
         {
+          bottom: bottomOffset,
+          borderColor,
           opacity: fadeAnim,
           transform: [
             {
@@ -238,8 +255,9 @@ export function ToastHost() {
       onTouchEnd={resumeTimer}
       {...panResponder.panHandlers}
     >
-      <View style={isUndo ? styles.undoRow : styles.normalRow}>
-        <Text style={[styles.text, isUndo && styles.undoText]} numberOfLines={2}>
+      <View style={styles.cardRow}>
+        <View style={[styles.dot, { backgroundColor: dotColor }]} />
+        <Text style={styles.text} numberOfLines={2}>
           {toast.message}
         </Text>
 
@@ -248,10 +266,30 @@ export function ToastHost() {
             accessibilityRole="button"
             accessibilityLabel="Undo"
             onPress={handleUndo}
-            style={styles.undoButton}
+            style={styles.actionButton}
             hitSlop={8}
           >
             <Text style={styles.undoButtonText}>Undo</Text>
+          </Pressable>
+        ) : toast.action ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={toast.action.label}
+            onPress={() => {
+              dismissCurrent();
+              void toast.action?.onPress();
+            }}
+            style={styles.actionButton}
+            hitSlop={8}
+          >
+            <Text
+              style={[
+                styles.actionButtonText,
+                { color: isError ? N.bad : N.acc },
+              ]}
+            >
+              {toast.action.label}
+            </Text>
           </Pressable>
         ) : null}
       </View>
@@ -275,61 +313,60 @@ export function ToastHost() {
 const styles = StyleSheet.create({
   toast: {
     position: "absolute",
-    left: Spacing.four,
-    right: Spacing.four,
-    bottom: 112, // above tab bar
-    borderRadius: Radius.medium,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 9999,
-  },
-  undoToast: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 0,
+    left: 16,
+    right: 16,
+    maxWidth: 520,
+    alignSelf: "center",
+    backgroundColor: N.card,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 9999,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  normalRow: {
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  undoRow: {
+  cardRow: {
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    minHeight: 52,
-    paddingLeft: Spacing.two,
+    gap: 10,
+    minHeight: 28,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   text: {
-    color: GymColors.text.primary,
-    fontSize: Typography.body,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  undoText: {
     flex: 1,
-    textAlign: "left",
+    color: N.ink,
     fontSize: 14,
     fontWeight: "500",
-    color: "#ece8df",
+    lineHeight: 20,
   },
-  undoButton: {
+  actionButton: {
     minWidth: 44,
-    minHeight: 44,
+    minHeight: 36,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: 10,
   },
   undoButtonText: {
     fontFamily: Font.sans,
     fontSize: 14,
     fontWeight: "700",
     color: "#d4a24c",
+  },
+  actionButtonText: {
+    fontFamily: Font.sans,
+    fontSize: 14,
+    fontWeight: "700",
   },
   barTrack: {
     position: "absolute",

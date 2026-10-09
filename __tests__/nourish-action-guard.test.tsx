@@ -30,6 +30,10 @@ jest.mock("lucide-react-native", () => ({
   ChevronRight: () => null,
   Plus: () => null,
   Send: () => null,
+  RotateCcw: () => null,
+  Bookmark: () => null,
+  Utensils: () => null,
+  Sparkles: () => null,
 }));
 
 jest.mock("@/components/nutrition/nourish-ui", () => ({

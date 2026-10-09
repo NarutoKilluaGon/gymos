@@ -1,5 +1,14 @@
 import * as Haptics from "expo-haptics";
-import { ChevronLeft, ChevronRight, Plus, Send } from "lucide-react-native";
+import {
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  RotateCcw,
+  Send,
+  Sparkles,
+  Utensils,
+} from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
@@ -33,7 +42,7 @@ import { N, NRadius, NSerif } from "@/constants/nourish-theme";
 import { useFoodLogger } from "@/hooks/use-food-logger";
 import type { useNourish } from "@/hooks/use-nourish";
 import { useTodayKey } from "@/hooks/use-today-key";
-import { dayHeading, dayTitle, FEEL_OPTIONS } from "@/services/nourish/format";
+import { dayTitle, FEEL_OPTIONS } from "@/services/nourish/format";
 import { confidenceLabel, confidenceOf } from "@/services/nourish/nutrition";
 import { slotOfMeal, timeOfDay } from "@/services/nourish/slots";
 import { savedFoodToDraft } from "@/services/nourish/resolve-log";
@@ -46,8 +55,24 @@ import {
 import { isSavedMeal, type SavedFood } from "@/storage/repositories/saved-foods";
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
-import { addDaysToKey, dateKeyFromTimestamp, getTodayKey } from "@/utils/date";
+import {
+  addDaysToKey,
+  dateFromKey,
+  dateKeyFromTimestamp,
+  getTodayKey,
+} from "@/utils/date";
 import { showToast, showUndoToast } from "@/utils/toast";
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function formatShortDate(key: string): string {
+  const date = dateFromKey(key);
+  return `${WEEKDAY_SHORT[date.getDay()]} ${date.getDate()} ${MONTH_SHORT[date.getMonth()]}`;
+}
 
 type Nourish = ReturnType<typeof useNourish>;
 
@@ -203,8 +228,6 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     }
   }
 
-  const firstEmptySlot = MEAL_SLOTS.find((slot) => day.bySlot[slot].length === 0);
-
   return (
     <View style={s.fill}>
       <ScrollView
@@ -214,8 +237,9 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
       >
         <View style={s.dayStrip}>
           <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Previous day"
-            hitSlop={12}
+            hitSlop={8}
             onPress={() => {
               tap();
               stepDay(-1);
@@ -226,11 +250,12 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           </Pressable>
           <View style={s.dayTitleWrap}>
             <Text style={s.dayTitle}>{dayTitle(dayKey, todayKey)}</Text>
-            <Text style={s.daySubtitle}> · {dayHeading(dayKey)}</Text>
+            <Text style={s.daySubtitle}> · {formatShortDate(dayKey)}</Text>
           </View>
           <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Next day"
-            hitSlop={12}
+            hitSlop={8}
             disabled={isToday}
             onPress={() => {
               tap();
@@ -281,19 +306,31 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           {prevMeals.length > 0 ? (
             <Pill
               label={`Repeat ${dayTitle(prevKey, todayKey).toLowerCase()}`}
+              icon={<RotateCcw size={14} color={N.mute} />}
               onPress={repeatPrevious}
             />
           ) : null}
-          <Pill label="Saved" onPress={() => setSavedOpen(true)} />
-          <Pill label="Add manually" onPress={() => logger.openManual()} />
+          <Pill
+            label="Saved"
+            icon={<Bookmark size={14} color={N.mute} />}
+            onPress={() => setSavedOpen(true)}
+          />
+          <Pill
+            label="Add food"
+            accessibilityLabel="Add manually"
+            icon={<Plus size={14} color={N.mute} />}
+            onPress={() => logger.openManual()}
+          />
           <Pill
             label="Eating out"
+            icon={<Utensils size={14} color={logger.eatingOut ? N.accInk : N.mute} />}
             active={logger.eatingOut}
             onPress={() => logger.setEatingOut(!logger.eatingOut)}
           />
           {day.proteinGap > 0 && day.meals.length > 0 ? (
             <Pill
               label={`${Math.round(day.proteinGap)}g protein to go`}
+              icon={<Sparkles size={14} color={N.mute} />}
               onPress={() => setIdeasOpen(true)}
             />
           ) : null}
@@ -304,18 +341,38 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           const kcal = entries.reduce((sum, m) => sum + (m.calories ?? 0), 0);
           const protein = entries.reduce((sum, m) => sum + (m.protein ?? 0), 0);
           const isEmpty = entries.length === 0;
-          const showEmptyHint = slot === firstEmptySlot;
+
+          if (isEmpty) {
+            return (
+              <View key={slot} style={s.emptyRow}>
+                <View style={s.emptyRowMain}>
+                  <Text style={s.emptyTitle}>{slot}</Text>
+                  <Text style={s.emptySub}>Nothing logged</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add food to ${slot}`}
+                  hitSlop={4}
+                  style={s.compactAddBtn}
+                  onPress={() => {
+                    tap();
+                    logger.openManual(slot);
+                  }}
+                >
+                  <Plus size={18} color={N.acc} />
+                </Pressable>
+              </View>
+            );
+          }
 
           return (
             <View key={slot} style={s.section}>
               <View style={s.sectionHead}>
                 <View style={s.sectionTitleRow}>
                   <Text style={s.sectionTitle}>{slot}</Text>
-                  {entries.length > 0 ? (
-                    <Text style={s.sectionSub}>
-                      {fmtInt(kcal)} kcal · {Math.round(protein)}g protein
-                    </Text>
-                  ) : null}
+                  <Text style={s.sectionSub}>
+                    {fmtInt(kcal)} kcal · {Math.round(protein)}g protein
+                  </Text>
                 </View>
                 <Pressable
                   accessibilityRole="button"
@@ -327,51 +384,47 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                     logger.openManual(slot);
                   }}
                 >
-                  <Plus size={16} color={N.ink} />
+                  <Plus size={18} color={N.ink} />
                 </Pressable>
               </View>
-              {isEmpty ? (
-                showEmptyHint ? <Text style={s.empty}>Nothing yet</Text> : null
-              ) : (
-                <NCard style={s.rows}>
-                  {entries.map((meal, index) => (
-                    <EntryRow
-                      key={meal.id}
-                      meal={meal}
-                      last={index === entries.length - 1}
-                      onPress={() => setEditing(meal)}
-                    />
-                  ))}
-                  <View style={s.sectionSaveRow}>
-                    <Pill
-                      label="Save as meal"
-                      onPress={() =>
-                        void actions
-                          .saveSection(entries, slot)
-                          .then((ok) => {
-                            if (ok)
-                              showToast("Saved to Kitchen › Meals", "success");
-                          })
-                      }
-                    />
+              <NCard style={s.rows}>
+                {entries.map((meal, index) => (
+                  <EntryRow
+                    key={meal.id}
+                    meal={meal}
+                    last={index === entries.length - 1}
+                    onPress={() => setEditing(meal)}
+                  />
+                ))}
+                <View style={s.sectionSaveRow}>
+                  <Pill
+                    label="Save as meal"
+                    onPress={() =>
+                      void actions
+                        .saveSection(entries, slot)
+                        .then((ok) => {
+                          if (ok)
+                            showToast("Saved to Kitchen › Meals", "success");
+                        })
+                    }
+                  />
+                </View>
+                <View style={s.feelContainer}>
+                  <Text style={s.feelLabel}>How did it feel?</Text>
+                  <View style={s.feelRow}>
+                    {FEEL_OPTIONS.map((option) => (
+                      <Pill
+                        key={option.value}
+                        label={option.label}
+                        active={day.feel[slot] === option.value}
+                        onPress={() =>
+                          void actions.setFeel(dayKey, slot, option.value)
+                        }
+                      />
+                    ))}
                   </View>
-                  <View style={s.feelContainer}>
-                    <Text style={s.feelLabel}>How did it feel?</Text>
-                    <View style={s.feelRow}>
-                      {FEEL_OPTIONS.map((option) => (
-                        <Pill
-                          key={option.value}
-                          label={option.label}
-                          active={day.feel[slot] === option.value}
-                          onPress={() =>
-                            void actions.setFeel(dayKey, slot, option.value)
-                          }
-                        />
-                      ))}
-                    </View>
-                  </View>
-                </NCard>
-              )}
+                </View>
+              </NCard>
             </View>
           );
         })}
@@ -630,19 +683,19 @@ function EntryRow({
 const s = StyleSheet.create({
   fill: { flex: 1 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
+  scroll: { paddingHorizontal: 0, paddingBottom: 120 },
   mute: { color: N.mute, fontSize: 13 },
   hidden: { opacity: 0 },
   dayStrip: {
-    height: 40,
+    height: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginVertical: 8,
+    marginVertical: 4,
   },
   dayNavBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -651,7 +704,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dayTitle: { fontFamily: NSerif, fontWeight: "400", fontSize: 18, color: N.ink },
+  dayTitle: { fontFamily: NSerif, fontWeight: "400", fontSize: 16, color: N.ink },
   daySubtitle: { fontSize: 14, color: N.mute },
   hero: { flexDirection: "row", alignItems: "center", gap: 20, marginBottom: 12 },
   ringNumber: {
@@ -687,7 +740,7 @@ const s = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   microLink: { color: N.acc, fontSize: 13, alignSelf: "flex-end" },
-  chips: { gap: 8, paddingVertical: 6, paddingRight: 20 },
+  chips: { gap: 8, paddingVertical: 6, paddingRight: 0 },
   section: { marginTop: 18 },
   sectionHead: {
     flexDirection: "row",
@@ -708,6 +761,42 @@ const s = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   sectionAddBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: N.card,
+    borderRadius: NRadius.control,
+    borderWidth: 1,
+    borderColor: N.line,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 4,
+    marginTop: 10,
+    minHeight: 48,
+  },
+  emptyRowMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+  },
+  emptyTitle: {
+    fontFamily: NSerif,
+    fontWeight: "400",
+    fontSize: 17,
+    color: N.ink,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: N.dim,
+  },
+  compactAddBtn: {
     width: 44,
     height: 44,
     alignItems: "center",
@@ -756,8 +845,8 @@ const s = StyleSheet.create({
   },
   dock: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    left: 0,
+    right: 0,
     bottom: 12,
     flexDirection: "row",
     alignItems: "center",

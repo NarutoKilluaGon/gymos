@@ -1078,7 +1078,7 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 0, paddingVertical: 8, paddingBottom: 40 },
   explainerCard: {
     backgroundColor: N.card,
     borderRadius: NRadius.control,

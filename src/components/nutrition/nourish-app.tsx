@@ -156,5 +156,5 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
 
 const s = StyleSheet.create({
   flex: { flex: 1 },
-  tabs: { paddingHorizontal: 20, marginBottom: 12 },
+  tabs: { paddingHorizontal: 0, marginBottom: 12 },
 });

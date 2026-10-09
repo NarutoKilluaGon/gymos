@@ -25,6 +25,10 @@ jest.mock("lucide-react-native", () => ({
   ChevronRight: () => null,
   Plus: () => null,
   Send: () => null,
+  RotateCcw: () => null,
+  Bookmark: () => null,
+  Utensils: () => null,
+  Sparkles: () => null,
 }));
 
 // The ring/bars draw with react-native-svg; they are irrelevant to day binding.

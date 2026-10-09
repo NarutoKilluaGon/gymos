@@ -40,12 +40,14 @@ export function Pill({
   active,
   icon,
   disabled,
+  accessibilityLabel,
 }: {
   label: string;
   onPress: () => void;
   active?: boolean;
   icon?: ReactNode;
   disabled?: boolean;
+  accessibilityLabel?: string;
 }) {
   return (
     <Chip
@@ -54,6 +56,7 @@ export function Pill({
       active={active}
       icon={icon}
       disabled={disabled}
+      accessibilityLabel={accessibilityLabel}
     />
   );
 }

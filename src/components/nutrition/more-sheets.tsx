@@ -16,8 +16,10 @@ import { estimateCardio } from "@/services/nourish/cardio";
 import { MICRO_SPECS, type DayTotals } from "@/services/nourish/nutrition";
 import type { Suggestion } from "@/services/nourish/suggestions";
 import type { WeeklyRead } from "@/services/nourish/weekly-read";
+import { dayTitle } from "@/services/nourish/format";
 import { isSavedMeal, type SavedFood } from "@/storage/repositories/saved-foods";
-import type { CardioLog } from "@/types/nourish";
+import type { CardioLog, ChangeLogEntry } from "@/types/nourish";
+import { dateKeyFromTimestamp, getTodayKey } from "@/utils/date";
 
 export function CardioSheet({
   visible,
@@ -441,6 +443,52 @@ export function GuardSheet({
   );
 }
 
+export function ChangeLogSheet({
+  visible,
+  onClose,
+  changeLog,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  changeLog: readonly ChangeLogEntry[];
+}) {
+  const todayKey = getTodayKey();
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Why did my targets change?"
+    >
+      <View style={s.guardCard}>
+        <Text style={s.guardCardTitle}>14-day change guard</Text>
+        <Text style={s.guardCardBody}>
+          Target changes are guarded: your body and metabolism take up to 2 weeks to settle on a deficit or surplus. Holding targets for 14 days filters out daily water noise and lets you see your true rate of progress.
+        </Text>
+      </View>
+
+      <Text style={s.logSectionTitle}>Target Change History</Text>
+      {changeLog.length === 0 ? (
+        <Text style={s.empty}>No target changes recorded yet.</Text>
+      ) : (
+        <View style={s.changeLogList}>
+          {[...changeLog].reverse().map((entry, idx) => {
+            const key = dateKeyFromTimestamp(entry.date);
+            return (
+              <View key={`${entry.date}-${idx}`} style={s.changeItem}>
+                <Text style={s.changeDate}>
+                  {key ? dayTitle(key, todayKey) : entry.date}
+                </Text>
+                <Text style={s.changeDesc}>{entry.change}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </Sheet>
+  );
+}
+
 const s = StyleSheet.create({
   estimate: {
     backgroundColor: N.card,
@@ -486,5 +534,52 @@ const s = StyleSheet.create({
     borderColor: N.line,
     padding: 14,
     marginBottom: 10,
+  },
+  guardCard: {
+    backgroundColor: N.card2,
+    borderRadius: NRadius.control,
+    borderWidth: 1,
+    borderColor: N.line,
+    padding: 14,
+    marginBottom: 16,
+  },
+  guardCardTitle: {
+    color: N.acc,
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  guardCardBody: {
+    color: N.ink,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  logSectionTitle: {
+    color: N.mute,
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  changeLogList: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  changeItem: {
+    backgroundColor: N.card,
+    borderRadius: NRadius.control,
+    borderWidth: 1,
+    borderColor: N.line,
+    padding: 12,
+  },
+  changeDate: {
+    color: N.mute,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  changeDesc: {
+    color: N.ink,
+    fontSize: 14,
+    lineHeight: 19,
   },
 });
