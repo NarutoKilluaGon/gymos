@@ -5,14 +5,20 @@ import {
   ArrowDown,
   ArrowLeftRight,
   ArrowUp,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
   Copy,
+  Dumbbell,
   FileText,
+  Flame,
   HelpCircle,
   Layers,
   Link2,
   Pause,
   Pencil,
   Play,
+  Plus,
   Target,
   Trash2,
   Unlink2,
@@ -37,6 +43,13 @@ import {
 } from "@/services/forge/catalog";
 import { round1, type WeightUnit } from "@/services/forge/load";
 import { DEFAULT_BAR, platesFor } from "@/services/forge/plates";
+import type { CalendarDaySummary } from "@/services/forge/calendar";
+import { getMonthGrid, getMonthStats } from "@/services/forge/calendar";
+import { dateFromKey } from "@/utils/date";
+import { dayFor } from "@/services/forge/plan";
+import { displayName, plural } from "@/utils/format";
+import type { Plan } from "@/types/forge";
+import type { WorkoutSession } from "@/types/gymos";
 import { PLAN_TEMPLATES } from "@/services/forge/plan";
 import type { CatalogExercise, LoadType } from "@/types/forge";
 import type { SessionPr } from "@/types/gymos";
@@ -1035,6 +1048,253 @@ export function RenameSheet({
   );
 }
 
+const CALENDAR_WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export function TodayMenuSheet({
+  visible,
+  onClose,
+  hasFinishedWorkout,
+  onAddAnotherWorkout,
+  onOpenCalendar,
+  onLogCardio,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  hasFinishedWorkout: boolean;
+  onAddAnotherWorkout: () => void;
+  onOpenCalendar: () => void;
+  onLogCardio: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Workout options">
+      {hasFinishedWorkout ? (
+        <ListRow
+          icon={<Plus size={18} color={F.mute} />}
+          title="Add another workout"
+          onPress={() => {
+            onClose();
+            onAddAnotherWorkout();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<Calendar size={18} color={F.mute} />}
+        title="Workout calendar"
+        onPress={() => {
+          onClose();
+          onOpenCalendar();
+        }}
+      />
+      <ListRow
+        icon={<Flame size={18} color={F.mute} />}
+        title="Log cardio"
+        separator={false}
+        onPress={() => {
+          onClose();
+          onLogCardio();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+export function CalendarSheet({
+  visible,
+  onClose,
+  summaryMap,
+  todayKey,
+  selectedKey,
+  plan,
+  sessions,
+  onSelectDate,
+  onStartPastWorkout,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  summaryMap: Map<string, CalendarDaySummary>;
+  todayKey: string;
+  selectedKey: string;
+  plan?: Plan;
+  sessions: readonly WorkoutSession[];
+  onSelectDate: (key: string) => void;
+  onStartPastWorkout: (key: string) => void;
+}) {
+  const initialDate = dateFromKey(selectedKey || todayKey);
+  const [viewYear, setViewYear] = useState(initialDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initialDate.getMonth());
+  const [inspectedKey, setInspectedKey] = useState<string | null>(selectedKey);
+
+  const prevMonth = () => {
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  };
+
+  const grid = useMemo(
+    () => getMonthGrid(viewYear, viewMonth, summaryMap, todayKey),
+    [viewYear, viewMonth, summaryMap, todayKey],
+  );
+
+  const stats = useMemo(
+    () => getMonthStats(viewYear, viewMonth, summaryMap),
+    [viewYear, viewMonth, summaryMap],
+  );
+
+  const monthTitle = `${MONTH_NAMES[viewMonth]} ${viewYear}`;
+  const inspectedSummary = inspectedKey ? summaryMap.get(inspectedKey) : null;
+  const isFuture = inspectedKey ? inspectedKey > todayKey : false;
+  const futurePlanned = isFuture && plan ? dayFor(plan, inspectedKey!, todayKey, sessions) : null;
+  const inspectedHasData = !!(inspectedSummary?.hasStrength || inspectedSummary?.hasCardio);
+
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Workout Calendar">
+      {/* Month streak / count summary */}
+      <View style={s.calStatsRow}>
+        <View style={s.calStat}>
+          <Text style={s.calStatVal}>{stats.workoutsThisMonth}</Text>
+          <Text style={s.calStatLabel}>Workouts</Text>
+        </View>
+        <View style={s.calStat}>
+          <Text style={s.calStatVal}>{stats.cardioThisMonth}</Text>
+          <Text style={s.calStatLabel}>Cardio</Text>
+        </View>
+        <View style={s.calStat}>
+          <Text style={s.calStatVal}>{stats.activeStreakDays}d</Text>
+          <Text style={s.calStatLabel}>Streak</Text>
+        </View>
+      </View>
+
+      {/* Month header & navigation */}
+      <View style={s.calNavRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Previous month"
+          hitSlop={8}
+          onPress={prevMonth}
+          style={s.calNavBtn}
+        >
+          <ChevronLeft size={20} color={F.ink} />
+        </Pressable>
+        <Text style={s.calMonthTitle}>{monthTitle}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Next month"
+          hitSlop={8}
+          onPress={nextMonth}
+          style={s.calNavBtn}
+        >
+          <ChevronRight size={20} color={F.ink} />
+        </Pressable>
+      </View>
+
+      {/* Monday-first weekday headers */}
+      <View style={s.calWeekdaysRow}>
+        {CALENDAR_WEEKDAYS.map((wd) => (
+          <Text key={wd} style={s.calWeekdayLabel}>
+            {wd}
+          </Text>
+        ))}
+      </View>
+
+      {/* Month grid */}
+      <View style={s.calGrid}>
+        {grid.map((cell) => {
+          const isInspected = cell.key === inspectedKey;
+          return (
+            <Pressable
+              key={cell.key}
+              accessibilityRole="button"
+              accessibilityLabel={`Day ${cell.dayNumber}`}
+              onPress={() => {
+                setInspectedKey(cell.key);
+                if (cell.key <= todayKey && (cell.hasStrength || cell.hasCardio)) {
+                  onSelectDate(cell.key);
+                  onClose();
+                }
+              }}
+              style={[
+                s.calCell,
+                !cell.isCurrentMonth && s.calCellFaded,
+                cell.isToday && s.calCellToday,
+                isInspected && s.calCellInspected,
+              ]}
+            >
+              <Text
+                style={[
+                  s.calCellNum,
+                  !cell.isCurrentMonth && s.calCellNumFaded,
+                  cell.isToday && s.calCellNumToday,
+                  isInspected && s.calCellNumInspected,
+                ]}
+              >
+                {cell.dayNumber}
+              </Text>
+              <View style={s.calDotsRow}>
+                {cell.hasStrength ? <View style={s.calStrengthDot} /> : null}
+                {cell.hasCardio ? <View style={s.calCardioDot} /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Day inspection panel */}
+      {inspectedKey ? (
+        <View style={s.calInspectPanel}>
+          <Text style={s.calInspectDate}>{inspectedKey}</Text>
+          {isFuture ? (
+            <Text style={s.calInspectMeta}>
+              {futurePlanned ? `Planned: ${displayName(futurePlanned.name)}` : "Rest day"}
+            </Text>
+          ) : inspectedHasData ? (
+            <View style={s.calInspectActions}>
+              <Text style={s.calInspectMeta}>
+                {inspectedSummary?.hasStrength ? plural(inspectedSummary.sessions.length, "workout") : ""}
+                {inspectedSummary?.hasStrength && inspectedSummary?.hasCardio ? " · " : ""}
+                {inspectedSummary?.hasCardio ? plural(inspectedSummary.cardio.length, "cardio session") : ""}
+              </Text>
+              <Button
+                label="View day"
+                onPress={() => {
+                  onSelectDate(inspectedKey);
+                  onClose();
+                }}
+              />
+            </View>
+          ) : (
+            <View style={s.calInspectActions}>
+              <Text style={s.calInspectMeta}>Nothing logged on this day</Text>
+              <Button
+                label="Log past workout"
+                onPress={() => {
+                  onStartPastWorkout(inspectedKey);
+                  onClose();
+                }}
+              />
+            </View>
+          )}
+        </View>
+      ) : null}
+    </Sheet>
+  );
+}
+
 const s = StyleSheet.create({
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   row: {
@@ -1080,4 +1340,87 @@ const s = StyleSheet.create({
   statValue: { color: F.ink, fontSize: 24, fontWeight: "300" },
   pr: { color: F.acc, fontSize: 14, fontWeight: "600" },
   bodyText: { color: F.mute, fontSize: 14, lineHeight: 22 },
+  calStatsRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
+  calStat: {
+    flex: 1,
+    backgroundColor: F.card2,
+    padding: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  calStatVal: { color: F.ink, fontSize: 18, fontWeight: "600" },
+  calStatLabel: { color: F.mute, fontSize: 12, marginTop: 2 },
+  calNavRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  calNavBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: F.card2,
+  },
+  calMonthTitle: { color: F.ink, fontSize: 16, fontWeight: "600" },
+  calWeekdaysRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  calWeekdayLabel: {
+    width: 38,
+    textAlign: "center",
+    color: F.dim,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  calGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 4,
+  },
+  calCell: {
+    width: 38,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: F.card,
+  },
+  calCellFaded: { opacity: 0.3 },
+  calCellToday: { borderWidth: 1, borderColor: F.acc },
+  calCellInspected: { backgroundColor: "rgba(217, 164, 65, 0.2)" },
+  calCellNum: { color: F.ink, fontSize: 13, fontWeight: "500" },
+  calCellNumFaded: { color: F.dim },
+  calCellNumToday: { color: F.acc, fontWeight: "700" },
+  calCellNumInspected: { color: F.acc, fontWeight: "700" },
+  calDotsRow: { flexDirection: "row", gap: 3, marginTop: 3, minHeight: 6 },
+  calStrengthDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: F.acc,
+  },
+  calCardioDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#2DD4BF",
+  },
+  calInspectPanel: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: F.card2,
+    borderWidth: 1,
+    borderColor: F.line,
+    gap: 8,
+  },
+  calInspectDate: { color: F.ink, fontSize: 15, fontWeight: "600" },
+  calInspectMeta: { color: F.mute, fontSize: 13 },
+  calInspectActions: { gap: 10 },
 });
