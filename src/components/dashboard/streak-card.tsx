@@ -1,3 +1,4 @@
+import { Flame } from "lucide-react-native";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Card } from "@/components/ds/card";
@@ -15,33 +16,48 @@ export function StreakCard({
   todayActive = true,
   compact = false,
 }: StreakCardProps) {
+  const isNone = streak === 0;
+  const isAtRisk = streak > 0 && !todayActive;
+  const isActive = streak > 0 && todayActive;
+
   if (compact) {
+    const flameColor = isNone
+      ? HOME.dim
+      : isAtRisk
+        ? "#e0803f"
+        : "#d4a24c";
+
+    const countColor = isNone
+      ? HOME.dim
+      : isAtRisk
+        ? "#e0803f"
+        : "#d4a24c";
+
     return (
       <View
-        accessibilityLabel={`Streak: ${streak} days${todayActive ? ", active" : ", at risk"}`}
+        accessibilityLabel={`Streak: ${streak} days${isNone ? ", none" : isActive ? ", active" : ", at risk"}`}
         style={[
           styles.compactPill,
-          todayActive ? styles.compactPillActive : styles.compactPillAtRisk,
+          isActive && styles.compactPillActive,
+          isAtRisk && styles.compactPillAtRisk,
+          isNone && styles.compactPillNone,
         ]}
       >
-        <Text style={styles.compactEmoji}>🔥</Text>
-        <Text
-          style={[
-            styles.compactCount,
-            todayActive ? styles.compactCountActive : styles.compactCountAtRisk,
-          ]}
-        >
+        <Flame size={15} color={flameColor} />
+        <Text style={[styles.compactCount, { color: countColor }]}>
           {streak}
         </Text>
       </View>
     );
   }
 
-  if (streak === 0) {
+  if (isNone) {
     return (
       <Card style={styles.card}>
         <View style={styles.row}>
-          <Text style={styles.emoji}>🔥</Text>
+          <View style={[styles.iconCircle, { backgroundColor: HOME.card2 }]}>
+            <Flame size={20} color={HOME.mute} />
+          </View>
 
           <View style={styles.textBlock}>
             <Text style={styles.label}>No streak yet</Text>
@@ -55,18 +71,20 @@ export function StreakCard({
     );
   }
 
-  if (!todayActive) {
+  if (isAtRisk) {
     return (
       <Card style={styles.card}>
         <View style={styles.row}>
-          <Text style={styles.emoji}>🔥</Text>
+          <View style={[styles.iconCircle, { backgroundColor: "rgba(224, 128, 63, 0.15)" }]}>
+            <Flame size={20} color="#e0803f" />
+          </View>
 
           <View style={styles.textBlock}>
             <Text style={styles.count}>
               {streak} {streak === 1 ? "day" : "days"}
             </Text>
 
-            <Text style={styles.label}>
+            <Text style={[styles.label, { color: "#e0803f" }]}>
               At risk — log today to keep it
             </Text>
           </View>
@@ -78,7 +96,9 @@ export function StreakCard({
   return (
     <Card style={styles.card}>
       <View style={styles.row}>
-        <Text style={styles.emoji}>🔥</Text>
+        <View style={[styles.iconCircle, { backgroundColor: "rgba(212, 162, 76, 0.15)" }]}>
+          <Flame size={20} color="#d4a24c" />
+        </View>
 
         <View style={styles.textBlock}>
           <Text style={styles.count}>
@@ -107,42 +127,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    borderRadius: 22,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    borderRadius: 18,
     backgroundColor: HOME.card2,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: HOME.line,
   },
   compactPillActive: {
-    borderColor: "rgba(245, 158, 11, 0.4)",
-    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    borderColor: "rgba(212, 162, 76, 0.4)",
+    backgroundColor: "rgba(212, 162, 76, 0.12)",
   },
   compactPillAtRisk: {
-    borderColor: HOME.line,
-    opacity: 0.85,
+    borderColor: "rgba(224, 128, 63, 0.4)",
+    backgroundColor: "rgba(224, 128, 63, 0.12)",
   },
-  compactEmoji: {
-    fontSize: 16,
+  compactPillNone: {
+    borderColor: HOME.line,
+    opacity: 0.7,
   },
   compactCount: {
     fontFamily: Font.sans,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
-  },
-  compactCountActive: {
-    color: "#f59e0b",
-  },
-  compactCountAtRisk: {
-    color: HOME.mute,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.three,
   },
-  emoji: {
-    fontSize: 28,
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   textBlock: {
     flex: 1,

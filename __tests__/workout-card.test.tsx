@@ -98,4 +98,47 @@ describe("WorkoutCard", () => {
 
     expect(mockNavigate).toHaveBeenCalledWith("/workouts");
   });
+
+  it("shows finished today state with volume and duration", () => {
+    const { texts, press } = render(
+      <WorkoutCard
+        plannedDay={day}
+        finishedToday={{
+          id: "f1",
+          name: "Back & Biceps",
+          startedAt: "2026-03-01T10:00:00.000Z",
+          endedAt: "2026-03-01T10:47:00.000Z",
+          exercises: [
+            {
+              id: "e1",
+              exerciseId: "pullup",
+              name: "Pull Up",
+              sets: [
+                { id: "s1", reps: 10, weight: 10, completed: true },
+                { id: "s2", reps: 10, weight: 10, completed: true },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(texts).toContain("WORKOUT COMPLETE");
+    expect(texts).toContain("Back & Biceps");
+    expect(texts).toContain("200 kg · 1 exercise · 47 min");
+    expect(texts).toContain("Up next: Upper A · tomorrow");
+    expect(texts).toContain("View");
+
+    (press("View workout") as () => void)();
+    expect(mockNavigate).toHaveBeenCalledWith("/workouts");
+  });
+
+  it("shows rest day state when scheduled as rest", () => {
+    const { texts } = render(
+      <WorkoutCard plannedDay={null} isRestDay={true} />,
+    );
+
+    expect(texts).toContain("REST & RECOVERY");
+    expect(texts).toContain("Rest day");
+  });
 });

@@ -14,7 +14,7 @@ import { HOME } from "@/constants/design";
 import { Spacing, Typography } from "@/constants/theme";
 import type { PlanDay } from "@/types/forge";
 import type { WorkoutSession } from "@/types/gymos";
-import { plural } from "@/utils/format";
+import { formatDuration, formatNumber, plural } from "@/utils/format";
 
 type WorkoutCardProps = {
   /** Today's workout, or null if none started yet. */
@@ -65,6 +65,35 @@ function describeWorkout(workout: WorkoutSession): {
     title: workout.name,
     message: parts.join(" · "),
   };
+}
+
+function describeFinishedWorkout(workout: WorkoutSession): string {
+  const totalVolumeKg = workout.exercises.reduce((acc, ex) => {
+    return acc + ex.sets.reduce((sAcc, s) => sAcc + (s.weight || 0) * (s.reps || 0), 0);
+  }, 0);
+
+  const durationMs =
+    workout.endedAt && workout.startedAt
+      ? new Date(workout.endedAt).getTime() - new Date(workout.startedAt).getTime()
+      : 0;
+
+  const parts: string[] = [];
+
+  if (totalVolumeKg > 0) {
+    parts.push(`${formatNumber(Math.round(totalVolumeKg))} kg`);
+  }
+
+  if (workout.exercises.length > 0) {
+    parts.push(plural(workout.exercises.length, "exercise"));
+  }
+
+  if (durationMs > 0) {
+    parts.push(formatDuration(durationMs));
+  }
+
+  return parts.length > 0
+    ? parts.join(" · ")
+    : `${plural(workout.exercises.length, "exercise")} completed today.`;
 }
 
 function PulsingPip() {
@@ -146,7 +175,8 @@ export function WorkoutCard({
   }
 
   // 2. FINISHED WORKOUT TODAY (and no active workout)
-  if (finishedToday && !plannedDay) {
+  if (finishedToday) {
+    const statsMessage = describeFinishedWorkout(finishedToday);
     return (
       <Card tone="forge" style={styles.card}>
         <View style={styles.headerRow}>
@@ -156,18 +186,22 @@ export function WorkoutCard({
           </View>
         </View>
 
-        <Text style={styles.title}>{finishedToday.name || "Workout done"}</Text>
-        <Text style={styles.message}>
-          {plural(finishedToday.exercises.length, "exercise")} completed today. Great work!
-        </Text>
+        <Text style={styles.title}>{finishedToday.name || "Workout session"}</Text>
+        <Text style={styles.message}>{statsMessage}</Text>
+
+        {plannedDay && (
+          <Text style={styles.quietNextText}>
+            {`Up next: ${plannedDay.name} · tomorrow`}
+          </Text>
+        )}
 
         <Pressable
           style={styles.secondaryButton}
           onPress={() => router.navigate("/workouts")}
           accessibilityRole="button"
-          accessibilityLabel="Open workouts"
+          accessibilityLabel="View workout"
         >
-          <Text style={styles.secondaryButtonText}>View workout history</Text>
+          <Text style={styles.secondaryButtonText}>View</Text>
         </Pressable>
       </Card>
     );
@@ -220,7 +254,7 @@ export function WorkoutCard({
       >
         <Dumbbell size={18} color="#000" />
         <Text style={styles.actionButtonText}>
-          {plannedDay ? "Start workout" : "Open workouts"}
+          {plannedDay ? "Start workout" : "Create a plan"}
         </Text>
       </Pressable>
     </Card>
@@ -338,5 +372,10 @@ const styles = StyleSheet.create({
     color: HOME.ink,
     fontSize: 15,
     fontWeight: "500",
+  },
+  quietNextText: {
+    color: HOME.dim,
+    fontSize: Typography.caption,
+    marginTop: Spacing.one,
   },
 });

@@ -1,9 +1,13 @@
 import { router, useFocusEffect } from "expo-router";
 import {
+  Activity,
+  BookOpen,
+  ChevronRight,
   Dumbbell,
   Droplets,
   Plus,
   Scale,
+  Sparkles,
   User,
   Utensils,
   WifiOff,
@@ -29,6 +33,8 @@ import { PressableScale } from "@/components/ds/pressable-scale";
 import { Screen } from "@/components/ds/screen";
 import { ScreenHeader } from "@/components/ds/screen-header";
 import { GymFAB } from "@/components/fab/gym-fab";
+import { CardioSheet } from "@/components/nutrition/more-sheets";
+import { JournalSheet } from "@/components/quick-add/journal-sheet";
 import type { SleepInput } from "@/components/quick-add/sleep-sheet";
 import { FadeIn } from "@/components/ui/fade-in";
 import { Font, HOME } from "@/constants/design";
@@ -37,11 +43,13 @@ import { Spacing, Typography } from "@/constants/theme";
 import { useModules } from "@/contexts/modules-context";
 import { useTodayKey } from "@/hooks/use-today-key";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
+import { getHomeSuggestion } from "@/services/dashboard/suggestions";
 import { dayFor } from "@/services/forge/plan";
 import { activePlan } from "@/services/forge/settings";
 import { getStreak, type Streak } from "@/services/streak";
 import { getForgeSettings } from "@/storage/repositories/forge-settings";
 import { addJournalEntry } from "@/storage/repositories/journal";
+import { addCardioLog } from "@/storage/repositories/nourish-cardio";
 import {
   getDailyMacroTotals,
   getTodayMeals,
@@ -114,72 +122,6 @@ function formatRelativeTime(timestamp?: string): string {
   return `${days}d ago`;
 }
 
-function getSuggestion(
-  activeWorkout: WorkoutSession | undefined,
-  meals: Meal[],
-  waterLitres: number,
-  protein: number,
-  proteinTarget: number | undefined,
-  supplementProgress: SupplementProgress,
-  steps: number,
-  stepsTarget: number,
-  sleep: SleepSession[],
-  streak: number,
-  nutritionEnabled: boolean,
-): string {
-  if (activeWorkout) {
-    return `Continue your workout — ${plural(
-      activeWorkout.exercises.length,
-      "exercise",
-    )} logged.`;
-  }
-
-  if (waterLitres <= 0) {
-    return "Start your day with a glass of water.";
-  }
-
-  if (waterLitres < DAILY_TARGETS.waterL) {
-    return `Stay hydrated — ${formatNumber(DAILY_TARGETS.waterL - waterLitres)}L to go today.`;
-  }
-
-  if (meals.length === 0) {
-    return "Don't forget to log your first meal.";
-  }
-
-  if (nutritionEnabled && proteinTarget && protein < proteinTarget * 0.5) {
-    return `Protein is low — ${formatNumber(Math.round(proteinTarget - protein))}g to hit your target.`;
-  }
-
-  if (supplementProgress.total > 0 && supplementProgress.taken < supplementProgress.total) {
-    const remaining = supplementProgress.total - supplementProgress.taken;
-    return `Take your supplements — ${remaining} remaining.`;
-  }
-
-  if (steps < stepsTarget * 0.5) {
-    return `Get moving — ${formatNumber(stepsTarget - steps)} steps to go today.`;
-  }
-
-  const hasSleep = sleep.some((s) => s.endedAt);
-  if (!hasSleep) {
-    return "Log your sleep when you wake up tomorrow.";
-  }
-
-  if (streak >= 7) {
-    return `${streak}-day streak — don't break the chain!`;
-  }
-
-  if (streak >= 3) {
-    return `${streak} days strong — keep the momentum going.`;
-  }
-
-  const hour = new Date().getHours();
-  if (hour >= 17) {
-    return "Evening workout? It's never too late to move.";
-  }
-
-  return "Ready for today's workout?";
-}
-
 type RecentEvent = {
   id: string;
   type: "workout" | "meal";
@@ -216,6 +158,8 @@ export default function HomeScreen() {
   const [supplementProgress, setSupplementProgress] =
     useState<SupplementProgress>({ total: 0, taken: 0 });
   const [supplementSheetOpen, setSupplementSheetOpen] = useState(false);
+  const [cardioSheetOpen, setCardioSheetOpen] = useState(false);
+  const [journalSheetOpen, setJournalSheetOpen] = useState(false);
   const [steps, setSteps] = useState(0);
   const [sleep, setSleep] = useState<SleepSession[]>([]);
   const [streak, setStreak] = useState<Streak>({ days: 0, todayActive: false });
@@ -274,8 +218,11 @@ export default function HomeScreen() {
               allSessions,
             );
             setPlannedDay(day);
-            const finished = allSessions.find((s) => s.date === todayKey && s.endedAt);
-            setFinishedWorkout(finished ?? null);
+            const finishedTodaySessions = allSessions.filter((s) => s.date === todayKey && s.endedAt);
+            const finished = finishedTodaySessions.sort(
+              (a, b) => new Date(b.endedAt!).getTime() - new Date(a.endedAt!).getTime()
+            )[0] ?? null;
+            setFinishedWorkout(finished);
             const plan = activePlan(forgeSettings);
             const hasPlan = Boolean(plan && plan.days && plan.days.length > 0);
             setIsRestDay(hasPlan && day === null && !finished);
@@ -387,19 +334,17 @@ export default function HomeScreen() {
     }
   }
 
-  const suggestion = getSuggestion(
+  const suggestion = getHomeSuggestion({
     activeWorkout,
+    plannedDay,
+    finishedWorkout,
     meals,
-    water,
+    waterLitres: water,
     protein,
     proteinTarget,
-    supplementProgress,
-    steps,
-    DAILY_TARGETS.steps,
     sleep,
-    streak.days,
-    enabled.nutrition,
-  );
+    nutritionEnabled: enabled.nutrition,
+  });
 
   const now = new Date();
   const dateFormatted = now
@@ -407,13 +352,13 @@ export default function HomeScreen() {
     .toUpperCase();
   const todayHeading = `GYMOS · ${dateFormatted}`;
 
-  // Assemble Recent Activity (last 3 items)
-  const recentEvents: RecentEvent[] = [];
+  // Assemble Recent Activity (last 6 items, then sorted and merged)
+  const rawRecentEvents: RecentEvent[] = [];
   allSessionsList
     .filter((s) => s.endedAt)
-    .slice(-3)
+    .slice(-6)
     .forEach((s) => {
-      recentEvents.push({
+      rawRecentEvents.push({
         id: s.id,
         type: "workout",
         title: displayName(s.name || "Workout session"),
@@ -422,8 +367,8 @@ export default function HomeScreen() {
       });
     });
 
-  meals.slice(-3).forEach((m) => {
-    recentEvents.push({
+  meals.slice(-6).forEach((m) => {
+    rawRecentEvents.push({
       id: m.id,
       type: "meal",
       title: displayName(m.name || "Meal"),
@@ -435,9 +380,25 @@ export default function HomeScreen() {
     });
   });
 
-  const topRecentEvents = recentEvents
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 3);
+  const sortedEvents = rawRecentEvents.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+  );
+
+  // Merge consecutive identical entries (e.g. "paneer bhurji ×2"), max 3 rows
+  const mergedEvents: RecentEvent[] = [];
+  for (const evt of sortedEvents) {
+    const last = mergedEvents[mergedEvents.length - 1];
+    if (last && last.type === evt.type && last.title === evt.title) {
+      const match = last.title.match(/ ×(\d+)$/);
+      const count = match ? parseInt(match[1], 10) : 1;
+      const base = last.title.replace(/ ×\d+$/, "");
+      last.title = `${base} ×${count + 1}`;
+    } else {
+      mergedEvents.push({ ...evt });
+    }
+    if (mergedEvents.length === 3) break;
+  }
+  const topRecentEvents = mergedEvents;
 
   const isOffline =
     typeof navigator !== "undefined" &&
@@ -464,6 +425,29 @@ export default function HomeScreen() {
             onClose={() => setSupplementSheetOpen(false)}
             onChanged={handleSupplementsChanged}
           />
+
+          <CardioSheet
+            visible={cardioSheetOpen}
+            onClose={() => setCardioSheetOpen(false)}
+            initialText=""
+            weightKg={70}
+            onSave={async (entry) => {
+              try {
+                await addCardioLog(todayKey, entry);
+                showToast("Cardio logged");
+                return true;
+              } catch {
+                showToast("Couldn't save cardio");
+                return false;
+              }
+            }}
+          />
+
+          <JournalSheet
+            visible={journalSheetOpen}
+            onClose={() => setJournalSheetOpen(false)}
+            onSave={handleJournalAdd}
+          />
         </>
       }
     >
@@ -473,9 +457,14 @@ export default function HomeScreen() {
           eyebrow={todayHeading}
           title={
             <View style={styles.headerGreetingRow}>
-              <View style={styles.avatar}>
+              <PressableScale
+                style={styles.avatar}
+                onPress={() => router.push("/hub")}
+                accessibilityRole="button"
+                accessibilityLabel="Profile and settings"
+              >
                 <User size={18} color={HOME.ink} />
-              </View>
+              </PressableScale>
               <Greeting />
             </View>
           }
@@ -532,33 +521,17 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.shelfContent}
           >
-            {enabled.nutrition && (
-              <PressableScale
-                style={styles.shelfCard}
-                onPress={() => router.push("/nutrition")}
-                accessibilityRole="button"
-                accessibilityLabel="Log meal"
-              >
-                <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
-                  <Utensils size={18} color="#10b981" />
-                </View>
-                <Text style={styles.shelfLabel}>Log meal</Text>
-              </PressableScale>
-            )}
-
-            {enabled.workouts && (
-              <PressableScale
-                style={styles.shelfCard}
-                onPress={() => router.push("/workouts")}
-                accessibilityRole="button"
-                accessibilityLabel="Start workout"
-              >
-                <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(245, 158, 11, 0.15)" }]}>
-                  <Dumbbell size={18} color="#f59e0b" />
-                </View>
-                <Text style={styles.shelfLabel}>Start workout</Text>
-              </PressableScale>
-            )}
+            <PressableScale
+              style={styles.shelfCard}
+              onPress={() => void handleWaterAdd(0.25)}
+              accessibilityRole="button"
+              accessibilityLabel="Add 250ml water"
+            >
+              <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(6, 182, 212, 0.15)" }]}>
+                <Droplets size={18} color="#06b6d4" />
+              </View>
+              <Text style={styles.shelfLabel}>+250ml Water</Text>
+            </PressableScale>
 
             <PressableScale
               style={styles.shelfCard}
@@ -574,14 +547,26 @@ export default function HomeScreen() {
 
             <PressableScale
               style={styles.shelfCard}
-              onPress={() => handleWaterAdd(0.25)}
+              onPress={() => setCardioSheetOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel="Add 250ml water"
+              accessibilityLabel="Log cardio"
             >
-              <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(6, 182, 212, 0.15)" }]}>
-                <Droplets size={18} color="#06b6d4" />
+              <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(245, 158, 11, 0.15)" }]}>
+                <Activity size={18} color="#f59e0b" />
               </View>
-              <Text style={styles.shelfLabel}>+250ml Water</Text>
+              <Text style={styles.shelfLabel}>Log cardio</Text>
+            </PressableScale>
+
+            <PressableScale
+              style={styles.shelfCard}
+              onPress={() => setJournalSheetOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Open journal"
+            >
+              <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(168, 85, 247, 0.15)" }]}>
+                <BookOpen size={18} color="#a855f7" />
+              </View>
+              <Text style={styles.shelfLabel}>Journal</Text>
             </PressableScale>
           </ScrollView>
         </View>
@@ -667,7 +652,16 @@ export default function HomeScreen() {
       {/* 7. RECENT ACTIVITY FEED */}
       <FadeIn delay={70}>
         <Card style={styles.activityCard}>
-          <Text style={styles.activityEyebrow}>RECENT ACTIVITY</Text>
+          <View style={styles.activityHeader}>
+            <Text style={styles.activityEyebrow}>RECENT ACTIVITY</Text>
+            <PressableScale
+              onPress={() => router.push("/hub")}
+              accessibilityRole="button"
+              accessibilityLabel="See all activity"
+            >
+              <Text style={styles.seeAllText}>See all</Text>
+            </PressableScale>
+          </View>
           {topRecentEvents.length === 0 ? (
             <Text style={styles.activityEmpty}>
               No activity logged yet today. Use quick actions above to begin.
@@ -699,12 +693,33 @@ export default function HomeScreen() {
         </Card>
       </FadeIn>
 
-      {/* 8. COACH SUGGESTION */}
+      {/* 8. NEXT UP (SUGGESTION) */}
       <FadeIn delay={80}>
-        <View style={styles.suggestionInline}>
-          <Text style={styles.suggestionLabel}>COACH SUGGESTION</Text>
-          <Text style={styles.suggestionText}>{suggestion}</Text>
-        </View>
+        <PressableScale
+          style={styles.suggestionCard}
+          onPress={() => {
+            if (suggestion.action.route) {
+              router.push(suggestion.action.route as any);
+            } else if (suggestion.action.type === "water") {
+              void handleWaterAdd(0.25);
+            } else if (suggestion.action.type === "sleep") {
+              router.push("/hub");
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Next up: ${suggestion.text}`}
+        >
+          <View style={styles.suggestionLeft}>
+            <View style={styles.suggestionIconCircle}>
+              <Sparkles size={16} color={HOME.acc} />
+            </View>
+            <View style={styles.suggestionTextGroup}>
+              <Text style={styles.suggestionEyebrow}>NEXT UP</Text>
+              <Text style={styles.suggestionText}>{suggestion.text}</Text>
+            </View>
+          </View>
+          <ChevronRight size={16} color={HOME.mute} />
+        </PressableScale>
       </FadeIn>
     </Screen>
   );
@@ -897,7 +912,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 8,
   },
-  suggestionInline: {
+  activityHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.two,
+  },
+  seeAllText: {
+    color: HOME.acc,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  suggestionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     backgroundColor: HOME.card,
@@ -905,16 +934,34 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: HOME.line,
   },
-  suggestionLabel: {
-    color: HOME.dim,
-    fontSize: Typography.caption,
-    letterSpacing: 1,
+  suggestionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  suggestionIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(212, 162, 76, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  suggestionTextGroup: {
+    flex: 1,
+  },
+  suggestionEyebrow: {
+    color: HOME.acc,
+    fontSize: 11,
+    letterSpacing: 1.2,
     fontWeight: "600",
-    marginBottom: Spacing.half,
+    textTransform: "uppercase",
   },
   suggestionText: {
-    color: HOME.mute,
+    color: HOME.ink,
     fontSize: Typography.body,
+    marginTop: 2,
     lineHeight: 20,
   },
 });

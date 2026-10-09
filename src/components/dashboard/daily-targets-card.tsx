@@ -17,6 +17,7 @@ type DailyTargetsCardProps = {
   supplementsTaken?: number;
   supplementsTotal?: number;
   nutritionEnabled?: boolean;
+  showNutrition?: boolean;
   onEditTargets?: () => void;
   onSupplementsPress?: () => void;
   onSleepDeleteLongPress?: () => void;
@@ -34,11 +35,13 @@ export function DailyTargetsCard({
   supplementsTaken,
   supplementsTotal,
   nutritionEnabled = true,
+  showNutrition,
   onEditTargets,
   onSupplementsPress,
   onSleepDeleteLongPress,
   compact = false,
 }: DailyTargetsCardProps) {
+  const shouldShowNutrition = showNutrition ?? !nutritionEnabled;
   const hasProteinTarget =
     typeof proteinTarget === "number" && proteinTarget > 0;
 
@@ -64,8 +67,8 @@ export function DailyTargetsCard({
     />
   );
 
-  // Protein - either progress bar or target row
-  if (nutritionEnabled) {
+  // Protein - only shown when Nourish card is not present on screen
+  if (shouldShowNutrition) {
     if (hasProteinTarget) {
       items.push(
         <ProgressBar
@@ -139,7 +142,7 @@ export function DailyTargetsCard({
   }
 
   // Meals logged
-  if (nutritionEnabled) {
+  if (shouldShowNutrition) {
     items.push(
       <TargetRow
         key="meals"
