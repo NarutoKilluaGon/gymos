@@ -5,11 +5,15 @@ import {
   ArrowDown,
   ArrowLeftRight,
   ArrowUp,
+  Copy,
   FileText,
+  HelpCircle,
   Layers,
   Link2,
   Pause,
+  Pencil,
   Play,
+  Target,
   Trash2,
   Unlink2,
 } from "lucide-react-native";
@@ -338,6 +342,59 @@ export function NoteSheet({
   );
 }
 
+export function RepTargetSheet({
+  visible,
+  onClose,
+  title,
+  initial,
+  onSave,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  initial: string;
+  onSave: (target: string) => void;
+}) {
+  const [value, setValue] = useState(initial);
+
+  const presets = ["5", "8", "8-10", "10-12", "8+", "AMRAP"];
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={`Rep target · ${title}`}
+      footer={
+        <Button
+          label="Save"
+          onPress={() => {
+            onSave(value.trim());
+            onClose();
+          }}
+        />
+      }
+    >
+      <Field
+        placeholder="e.g. 8-10, 8+, AMRAP"
+        value={value}
+        onChangeText={setValue}
+        autoCorrect={false}
+      />
+      <Label>Presets</Label>
+      <View style={s.wrap}>
+        {presets.map((preset) => (
+          <Pill
+            key={preset}
+            label={preset}
+            active={value === preset}
+            onPress={() => setValue(preset)}
+          />
+        ))}
+      </View>
+    </Sheet>
+  );
+}
+
 export function PlatesSheet({
   visible,
   onClose,
@@ -576,6 +633,7 @@ export function ExerciseMenuSheet({
   onNote,
   onSwap,
   onPlates,
+  onTargetReps,
   onToggleSuperset,
   onMoveUp,
   onMoveDown,
@@ -591,6 +649,7 @@ export function ExerciseMenuSheet({
   onNote: () => void;
   onSwap: () => void;
   onPlates?: () => void;
+  onTargetReps?: () => void;
   onToggleSuperset: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -606,6 +665,16 @@ export function ExerciseMenuSheet({
           onNote();
         }}
       />
+      {onTargetReps ? (
+        <ListRow
+          icon={<Target size={18} color={F.mute} />}
+          title="Target reps"
+          onPress={() => {
+            onClose();
+            onTargetReps();
+          }}
+        />
+      ) : null}
       <ListRow
         icon={<ArrowLeftRight size={18} color={F.mute} />}
         title="Swap exercise"
@@ -714,12 +783,14 @@ export function WorkoutMenuSheet({
   );
 }
 
-/** Overflow options for a plan day (reorder days, delete day). */
+/** Overflow options for a plan day (rename, duplicate, reorder days, delete day). */
 export function DayMenuSheet({
   visible,
   onClose,
   canMoveUp,
   canMoveDown,
+  onRename,
+  onDuplicate,
   onMoveUp,
   onMoveDown,
   onDelete,
@@ -728,12 +799,34 @@ export function DayMenuSheet({
   onClose: () => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  onRename?: () => void;
+  onDuplicate?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onDelete: () => void;
 }) {
   return (
     <Sheet visible={visible} onClose={onClose} title="Day options">
+      {onRename ? (
+        <ListRow
+          icon={<Pencil size={18} color={F.mute} />}
+          title="Rename day"
+          onPress={() => {
+            onClose();
+            onRename();
+          }}
+        />
+      ) : null}
+      {onDuplicate ? (
+        <ListRow
+          icon={<Copy size={18} color={F.mute} />}
+          title="Duplicate day"
+          onPress={() => {
+            onClose();
+            onDuplicate();
+          }}
+        />
+      ) : null}
       {canMoveUp && onMoveUp ? (
         <ListRow
           icon={<ArrowUp size={18} color={F.mute} />}
@@ -763,6 +856,180 @@ export function DayMenuSheet({
           onClose();
           onDelete();
         }}
+      />
+    </Sheet>
+  );
+}
+
+/** Information sheet explaining what a superset is. */
+export function SupersetInfoSheet({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="What's a superset?"
+      footer={<Button label="Got it" onPress={onClose} />}
+    >
+      <Text style={s.bodyText}>
+        Two exercises done back to back with no rest between them, then you rest.
+        Pair opposite muscles (biceps and triceps, chest and back) to save time.
+        In GymOS, link an exercise with the one below it; the rest timer starts
+        after the second one.
+      </Text>
+    </Sheet>
+  );
+}
+
+/** Overflow options for a plan exercise row. */
+export function PlanExerciseMenuSheet({
+  visible,
+  onClose,
+  isSuperset,
+  canMoveUp,
+  canMoveDown,
+  isCustom,
+  onSwap,
+  onToggleSuperset,
+  onMoveUp,
+  onMoveDown,
+  onRenameEverywhere,
+  onSupersetInfo,
+  onRemove,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  isSuperset: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  isCustom?: boolean;
+  onSwap: () => void;
+  onToggleSuperset: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onRenameEverywhere?: () => void;
+  onSupersetInfo?: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Exercise options">
+      <ListRow
+        icon={<ArrowLeftRight size={18} color={F.mute} />}
+        title="Swap exercise"
+        onPress={() => {
+          onClose();
+          onSwap();
+        }}
+      />
+      <ListRow
+        icon={isSuperset ? <Unlink2 size={18} color={F.mute} /> : <Link2 size={18} color={F.mute} />}
+        title={isSuperset ? "Unlink superset" : "Superset with next"}
+        onPress={() => {
+          onClose();
+          onToggleSuperset();
+        }}
+      />
+      {onSupersetInfo ? (
+        <ListRow
+          icon={<HelpCircle size={18} color={F.mute} />}
+          title="What's a superset?"
+          onPress={() => {
+            onClose();
+            onSupersetInfo();
+          }}
+        />
+      ) : null}
+      {canMoveUp && onMoveUp ? (
+        <ListRow
+          icon={<ArrowUp size={18} color={F.mute} />}
+          title="Move up"
+          onPress={() => {
+            onClose();
+            onMoveUp();
+          }}
+        />
+      ) : null}
+      {canMoveDown && onMoveDown ? (
+        <ListRow
+          icon={<ArrowDown size={18} color={F.mute} />}
+          title="Move down"
+          onPress={() => {
+            onClose();
+            onMoveDown();
+          }}
+        />
+      ) : null}
+      {isCustom && onRenameEverywhere ? (
+        <ListRow
+          icon={<Pencil size={18} color={F.mute} />}
+          title="Rename everywhere"
+          onPress={() => {
+            onClose();
+            onRenameEverywhere();
+          }}
+        />
+      ) : null}
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Remove"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onRemove();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+/** Simple rename modal sheet. */
+export function RenameSheet({
+  visible,
+  onClose,
+  title,
+  initial,
+  onSave,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  initial: string;
+  onSave: (name: string) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [prevInitial, setPrevInitial] = useState(initial);
+
+  if (prevInitial !== initial) {
+    setPrevInitial(initial);
+    setValue(initial);
+  }
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={title}
+      footer={
+        <Button
+          label="Save"
+          onPress={() => {
+            if (value.trim()) onSave(value.trim());
+            onClose();
+          }}
+        />
+      }
+    >
+      <Field
+        placeholder="Name"
+        value={value}
+        onChangeText={setValue}
+        autoFocus
       />
     </Sheet>
   );
@@ -812,4 +1079,5 @@ const s = StyleSheet.create({
   stat: { flex: 1 },
   statValue: { color: F.ink, fontSize: 24, fontWeight: "300" },
   pr: { color: F.acc, fontSize: 14, fontWeight: "600" },
+  bodyText: { color: F.mute, fontSize: 14, lineHeight: 22 },
 });

@@ -69,6 +69,8 @@ export type WorkoutExercise = {
   /** The last session hit the top of the rep range on every set, so the
    *  planned weight was nudged up. */
   progressed?: boolean;
+  /** Planned rep target expression (e.g. "8-10", "8+", "AMRAP"). */
+  repTarget?: string;
 };
 
 export type SessionPr = {

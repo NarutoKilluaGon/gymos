@@ -138,3 +138,17 @@ export function deleteCustomExercise(id: string): Promise<void> {
     );
   });
 }
+
+export function renameCustomExercise(id: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) return Promise.resolve();
+
+  return customMutex.runExclusive(async () => {
+    const all = await readCustom();
+
+    await setStorage(
+      CUSTOM_KEY,
+      all.map((entry) => (entry.id === id ? { ...entry, name: trimmed } : entry)),
+    );
+  });
+}

@@ -275,31 +275,92 @@ export const reinsertPlanExercise = (
     now,
   );
 
-export const movePlanExerciseUp = (
+export const moveExercise = (
   plan: Plan,
   dayId: string,
-  index: number,
+  from: number,
+  to: number,
   now: Date,
 ): Plan =>
   mapDay(
     plan,
     dayId,
     (day) => {
-      if (index <= 0 || index >= day.exercises.length) return day;
+      if (
+        from < 0 ||
+        from >= day.exercises.length ||
+        to < 0 ||
+        to >= day.exercises.length ||
+        from === to
+      ) {
+        return day;
+      }
+      const original = day.exercises;
+      // Map each original exercise to its partner if linked as a superset
+      const partnerOf = new Map<PlanExercise, PlanExercise>();
+      for (let i = 0; i < original.length - 1; i++) {
+        const current = original[i];
+        const next = original[i + 1];
+        if (current?.superset && next) {
+          partnerOf.set(current, next);
+        }
+      }
 
-      const exercises = [...day.exercises];
-      const above = exercises[index - 1];
-      const current = exercises[index];
+      const exercises = [...original];
+      const [item] = exercises.splice(from, 1);
+      if (!item) return day;
+      exercises.splice(to, 0, item);
 
-      if (!above || !current) return day;
+      // Maintain supersets only if partner is still immediately next
+      const cleaned = exercises.map((ex, i, arr) => {
+        if (i === arr.length - 1) return { ...ex, superset: false };
+        if (!ex.superset) return ex;
+        const expectedPartner = partnerOf.get(ex);
+        const actualPartner = arr[i + 1];
+        if (expectedPartner && actualPartner === expectedPartner) {
+          return ex;
+        }
+        return { ...ex, superset: false };
+      });
 
-      exercises[index - 1] = current;
-      exercises[index] = above;
-
-      return { ...day, exercises };
+      return { ...day, exercises: cleaned };
     },
     now,
   );
+
+export const movePlanExerciseUp = (
+  plan: Plan,
+  dayId: string,
+  index: number,
+  now: Date,
+): Plan => moveExercise(plan, dayId, index, index - 1, now);
+
+export const movePlanExerciseDown = (
+  plan: Plan,
+  dayId: string,
+  index: number,
+  now: Date,
+): Plan => moveExercise(plan, dayId, index, index + 1, now);
+
+export function duplicateDay(
+  plan: Plan,
+  dayId: string,
+  now: Date,
+  newId: () => string = createId,
+): Plan {
+  const idx = plan.days.findIndex((d) => d.id === dayId);
+  if (idx === -1) return plan;
+  const source = plan.days[idx];
+  if (!source) return plan;
+  const copy: PlanDay = {
+    id: newId(),
+    name: `${source.name} (Copy)`,
+    exercises: source.exercises.map((e) => ({ ...e })),
+  };
+  const days = [...plan.days];
+  days.splice(idx + 1, 0, copy);
+  return stamp({ ...plan, days }, now);
+}
 
 /** Which plan day is scheduled on `dateKey`, if any. */
 export function scheduledDay(plan: Plan, dateKey: string): PlanDay | null {

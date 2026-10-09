@@ -151,6 +151,7 @@ export function buildExercise(input: {
     ...(bodyweight ? { bodyweight: true } : {}),
     ...(tip ? { tip } : {}),
     ...(progressed ? { progressed: true } : {}),
+    ...(target?.reps ? { repTarget: target.reps } : {}),
   };
 }
 

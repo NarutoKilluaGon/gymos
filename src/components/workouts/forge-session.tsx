@@ -28,6 +28,7 @@ import {
   FinishSheet,
   NoteSheet,
   PlatesSheet,
+  RepTargetSheet,
   SummarySheet,
   WorkoutMenuSheet,
 } from "@/components/workouts/forge-sheets";
@@ -50,6 +51,7 @@ import {
   setNote,
   setSetValues,
   swapExercise,
+  toggleFailure,
   toggleSet,
   toggleSuperset,
   toggleWarmup,
@@ -100,6 +102,7 @@ type SheetState =
   | { kind: "add" }
   | { kind: "swap"; index: number }
   | { kind: "note"; index: number }
+  | { kind: "targetReps"; index: number }
   | { kind: "plates"; index: number }
   | { kind: "exerciseMenu"; index: number }
   | { kind: "workoutMenu" }
@@ -386,6 +389,9 @@ export function ForgeSession({
                 onToggleWarmup={(setIndex) =>
                   update((current) => toggleWarmup(current, index, setIndex, new Date()))
                 }
+                onToggleFailure={(setIndex) =>
+                  update((current) => toggleFailure(current, index, setIndex, new Date()))
+                }
                 onRemoveSet={(setIndex) => {
                   const targetExercise = exercise;
                   const targetSet = targetExercise.sets[setIndex];
@@ -481,6 +487,27 @@ export function ForgeSession({
           }
         />
 
+        {RepTargetSheet ? (
+          <RepTargetSheet
+            key={sheet.kind === "targetReps" ? `reps-${sheet.index}` : "reps-closed"}
+            visible={sheet.kind === "targetReps"}
+            onClose={() => setSheet({ kind: "none" })}
+            title={exerciseSheet?.name ?? "Exercise"}
+            initial={exerciseSheet?.repTarget ?? ""}
+            onSave={(target) => {
+              if (sheet.kind === "targetReps") {
+                const idx = sheet.index;
+                update((current) => {
+                  const exercises = current.exercises.map((ex, i) =>
+                    i === idx ? { ...ex, repTarget: target || undefined } : ex,
+                  );
+                  return { ...current, exercises };
+                });
+              }
+            }}
+          />
+        ) : null}
+
         <PlatesSheet
           visible={sheet.kind === "plates"}
           onClose={() => setSheet({ kind: "none" })}
@@ -509,6 +536,12 @@ export function ForgeSession({
               if (sheet.kind === "exerciseMenu") {
                 const idx = sheet.index;
                 setSheet({ kind: "note", index: idx });
+              }
+            }}
+            onTargetReps={() => {
+              if (sheet.kind === "exerciseMenu") {
+                const idx = sheet.index;
+                setSheet({ kind: "targetReps", index: idx });
               }
             }}
             onSwap={() => {

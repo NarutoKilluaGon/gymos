@@ -23,6 +23,7 @@ type ExerciseCardProps = {
   onOptionsPress: () => void;
   onAddSet: () => void;
   onToggleWarmup: (setIndex: number) => void;
+  onToggleFailure?: (setIndex: number) => void;
   onRemoveSet: (setIndex: number) => void;
   onWeightCommit: (setIndex: number, setId: string, weight: number) => void;
   onRepsCommit: (setIndex: number, setId: string, reps: number) => void;
@@ -39,6 +40,7 @@ export function ExerciseCard({
   onOptionsPress,
   onAddSet,
   onToggleWarmup,
+  onToggleFailure,
   onRemoveSet,
   onWeightCommit,
   onRepsCommit,
@@ -95,6 +97,13 @@ export function ExerciseCard({
         {lastLine}
       </Text>
 
+      {/* Target reps line if set */}
+      {exercise.repTarget ? (
+        <Text style={styles.targetLine} numberOfLines={1}>
+          {`Target · ${exercise.repTarget} reps`}
+        </Text>
+      ) : null}
+
       {/* Progress or tip badges */}
       {exercise.progressed ? (
         <Text style={styles.progressText}>
@@ -143,6 +152,9 @@ export function ExerciseCard({
               bodyweight={exercise.bodyweight}
               refSet={refSet}
               onToggleWarmup={() => onToggleWarmup(setIndex)}
+              onToggleFailure={
+                onToggleFailure ? () => onToggleFailure(setIndex) : undefined
+              }
               onRemove={() => onRemoveSet(setIndex)}
               onWeightCommit={(weight) =>
                 onWeightCommit(setIndex, set.id, weight)
@@ -256,6 +268,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: F.mute,
     marginTop: 4,
+    marginLeft: 34,
+  },
+  targetLine: {
+    fontFamily: Font.sans,
+    fontSize: 13,
+    color: F.dim,
+    marginTop: 2,
     marginLeft: 34,
   },
   progressText: {

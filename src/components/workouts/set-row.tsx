@@ -23,6 +23,7 @@ type SetRowProps = {
   bodyweight?: boolean;
   refSet?: { weight?: number; reps?: number };
   onToggleWarmup: () => void;
+  onToggleFailure?: () => void;
   onRemove: () => void;
   onWeightCommit: (weight: number) => void;
   onRepsCommit: (reps: number) => void;
@@ -37,6 +38,7 @@ export function SetRow({
   bodyweight = false,
   refSet,
   onToggleWarmup,
+  onToggleFailure,
   onRemove,
   onWeightCommit,
   onRepsCommit,
@@ -58,23 +60,35 @@ export function SetRow({
 
   return (
     <View style={styles.row}>
-      {/* 1. SET / WARMUP BADGE */}
+      {/* 1. SET / WARMUP BADGE (tap = warmup, double tap / long tap = failure) */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
           set.warmup
             ? "Warm-up set. Tap to make a work set"
-            : "Tap to mark as warm-up"
+            : set.toFailure
+              ? "Taken to failure"
+              : "Tap to mark as warm-up"
         }
         onPress={() => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onToggleWarmup();
         }}
         onLongPress={onRemove}
-        style={[styles.badge, set.warmup && styles.badgeWarm]}
+        style={[
+          styles.badge,
+          set.warmup && styles.badgeWarm,
+          !set.warmup && set.toFailure && styles.badgeFailure,
+        ]}
       >
-        <Text style={[styles.badgeText, set.warmup && styles.badgeWarmText]}>
-          {set.warmup ? "W" : String(workSetNumber)}
+        <Text
+          style={[
+            styles.badgeText,
+            set.warmup && styles.badgeWarmText,
+            !set.warmup && set.toFailure && styles.badgeFailureText,
+          ]}
+        >
+          {set.warmup ? "W" : set.toFailure ? `${workSetNumber}F` : String(workSetNumber)}
         </Text>
       </Pressable>
 
@@ -126,6 +140,12 @@ export function SetRow({
           ]).start();
           onToggleDone();
         }}
+        onLongPress={() => {
+          if (onToggleFailure) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onToggleFailure();
+          }
+        }}
       >
         <Animated.View
           style={[
@@ -168,6 +188,10 @@ const styles = StyleSheet.create({
     borderColor: F.warm,
     backgroundColor: "rgba(217, 164, 65, 0.15)",
   },
+  badgeFailure: {
+    borderColor: F.bad,
+    backgroundColor: "rgba(209, 96, 74, 0.15)",
+  },
   badgeText: {
     fontFamily: Font.sans,
     fontSize: 13,
@@ -177,6 +201,9 @@ const styles = StyleSheet.create({
   },
   badgeWarmText: {
     color: F.warm,
+  },
+  badgeFailureText: {
+    color: F.bad,
   },
   inputWrap: {
     flex: 1,

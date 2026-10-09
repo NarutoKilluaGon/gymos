@@ -162,6 +162,7 @@ export function ForgeApp() {
             unit={unit}
             onSave={actions.saveSettings}
             onCreateExercise={actions.addCustom}
+            onRenameCustom={actions.renameCustom}
             drafts={planDrafts}
           />
         ) : null}

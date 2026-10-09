@@ -21,6 +21,7 @@ import {
   deleteCustomExercise,
   getCustomExercises,
   getForgeSettings,
+  renameCustomExercise,
   updateForgeSettings,
 } from "@/storage/repositories/forge-settings";
 import { getMeasurements } from "@/storage/repositories/measurements";
@@ -221,6 +222,8 @@ export function useForge() {
       },
       removeCustom: (id: string) =>
         act(() => deleteCustomExercise(id), "Couldn't delete"),
+      renameCustom: (id: string, name: string) =>
+        act(() => renameCustomExercise(id, name), "Couldn't rename"),
       addCardio: (
         dayKey: string,
         entry: Omit<CardioLog, "id" | "loggedAt">,
