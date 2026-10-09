@@ -166,7 +166,15 @@ export function ForgeApp() {
             drafts={planDrafts}
           />
         ) : null}
-        {tab === "history" ? <HistoryView data={data} unit={unit} onOpen={(session) => void openSession(session)} /> : null}
+        {tab === "history" ? (
+          <HistoryView
+            data={data}
+            unit={unit}
+            onOpen={(session) => void openSession(session)}
+            onDelete={actions.remove}
+            onRestore={actions.restore}
+          />
+        ) : null}
       </Screen>
     </ThemeProvider>
   );
