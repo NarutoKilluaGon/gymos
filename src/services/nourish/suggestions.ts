@@ -1,5 +1,4 @@
-import { FOOD_DATABASE } from "@/services/food-db";
-import { normalizeFoodName } from "@/services/food-db";
+import { FOOD_DATABASE, normalizeFoodName } from "@/services/food-db";
 
 export type SuggestionCandidate = {
   name: string;

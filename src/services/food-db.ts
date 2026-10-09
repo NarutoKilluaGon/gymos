@@ -15,14 +15,14 @@
  * vitaminA/vitaminD/vitaminB12/folate in µg amounts.
  */
 
-import type { EstimatedFood } from "@/types/gymos";
-import type { MealEstimate } from "@/services/meal-estimator";
-import type { MacroTotals } from "@/storage/repositories/meals";
 import {
   NUTRIENT_KEYS,
   pickMicronutrients,
+  type EstimatedFood,
   type Micronutrients,
 } from "@/types/gymos";
+import type { MealEstimate } from "@/services/meal-estimator";
+import type { MacroTotals } from "@/storage/repositories/meals";
 
 /** One catalog food: fixed name, structured portion, macros per portion. */
 export type FoodEntry = {
@@ -228,12 +228,12 @@ export function matchFoodEntry(
   // not alias and stay subject to the minScore confidence bar.
   const q = resolveFoodAlias(raw);
 
-  const scored: Array<{
+  const scored: {
     entry: FoodEntry;
     score: number;
     length: number;
     index: number;
-  }> = [];
+  }[] = [];
 
   FOOD_DATABASE.forEach((entry, index) => {
     const name = normalizeFoodName(entry.name);

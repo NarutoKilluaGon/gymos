@@ -22,7 +22,7 @@ import type { JournalEntry } from "@/types/gymos";
 
 const MAX_CHARS = 500;
 
-const MOODS: Array<{ value: JournalEntry["mood"]; label: string; emoji: string }> = [
+const MOODS: { value: JournalEntry["mood"]; label: string; emoji: string }[] = [
   { value: "great", label: "Great", emoji: "😄" },
   { value: "good", label: "Good", emoji: "🙂" },
   { value: "okay", label: "Okay", emoji: "😐" },
