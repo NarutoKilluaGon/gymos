@@ -116,6 +116,7 @@ export function ForgeApp() {
           flushRef={flushRef}
           onClose={() => void closeSession()}
           onDelete={actions.remove}
+          onRestore={actions.restore}
           onCreateExercise={actions.addCustom}
           onChanged={() => void reload()}
         />
@@ -152,6 +153,7 @@ export function ForgeApp() {
             }}
             onAddCardio={actions.addCardio}
             onRemoveCardio={(day, id) => void actions.removeCardio(day, id)}
+            onRestoreCardio={(day, log, index) => void actions.restoreCardio(day, log, index)}
           />
         ) : null}
         {tab === "plan" ? (

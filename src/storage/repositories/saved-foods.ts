@@ -223,3 +223,20 @@ export async function deleteSavedFood(
     );
   });
 }
+
+export async function restoreSavedFood(
+  food: SavedFood,
+  index?: number,
+): Promise<void> {
+  await savedFoodsMutex.runExclusive(async () => {
+    const foods = await readSavedFoodsUnlocked();
+    if (!foods.some((f) => f.id === food.id)) {
+      if (typeof index === "number" && index >= 0 && index <= foods.length) {
+        foods.splice(index, 0, food);
+      } else {
+        foods.push(food);
+      }
+      await setStorage(SAVED_FOODS_KEY, foods);
+    }
+  });
+}

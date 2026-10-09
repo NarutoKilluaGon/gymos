@@ -25,6 +25,8 @@ import {
   newPlan,
   planExerciseFor,
   planFromTemplate,
+  reinsertDay,
+  reinsertPlanExercise,
   removeDay,
   removePlanExercise,
   renameDay,
@@ -34,6 +36,7 @@ import {
 import { activePlan, MAX_REST_SECONDS } from "@/services/forge/settings";
 import type { CatalogExercise, ForgeSettings, Plan, PlanExercise } from "@/types/forge";
 import { displayName } from "@/utils/format";
+import { showUndoToast } from "@/utils/toast";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const REST_CHOICES = [
@@ -264,9 +267,6 @@ export function PlanView({
                 >
                   <Text style={s.menuIcon}>⋯</Text>
                 </Pressable>
-                <Pressable accessibilityRole="button" onPress={() => edit((current, now) => removeDay(current, day.id, now))}>
-                  <Text style={s.remove}>Delete day</Text>
-                </Pressable>
               </View>
 
               {!plan.rotate ? (
@@ -320,7 +320,28 @@ export function PlanView({
                       <Action label={exercise.superset ? "Unlink" : "Superset"} onPress={() => editRowAt(day.id, day.exercises, index, 0, (current, now) => updatePlanExercise(current, day.id, index, { superset: !exercise.superset }, now))} />
                     ) : null}
                     {index > 0 ? <Action label="↑" onPress={() => editRowAt(day.id, day.exercises, index, -1, (current, now) => movePlanExerciseUp(current, day.id, index, now))} /> : null}
-                    <Action label="Remove" danger onPress={() => editRowAt(day.id, day.exercises, index, 1, (current, now) => removePlanExercise(current, day.id, index, now))} />
+                    <Action
+                      label="Remove"
+                      danger
+                      onPress={() => {
+                        const targetExercise = exercise;
+                        const targetIndex = index;
+                        const targetDayId = day.id;
+                        editRowAt(day.id, day.exercises, index, 1, (current, now) =>
+                          removePlanExercise(current, day.id, index, now),
+                        );
+                        const exerciseName =
+                          catalog.find((c) => c.id === targetExercise.exerciseId)?.name ?? "Exercise";
+                        showUndoToast({
+                          message: `${exerciseName} removed`,
+                          onUndo: () => {
+                            edit((current, now) =>
+                              reinsertPlanExercise(current, targetDayId, targetIndex, targetExercise, now),
+                            );
+                          },
+                        });
+                      }}
+                    />
                   </View>
                 </View>
               ))}
@@ -408,7 +429,23 @@ export function PlanView({
           if (menuDay) moveDay(menuDay, 1);
         }}
         onDelete={() => {
-          if (menuDay) edit((current, now) => removeDay(current, menuDay, now));
+          if (menuDay && plan) {
+            const dayIndex = plan.days.findIndex((d) => d.id === menuDay);
+            const targetDay = plan.days[dayIndex];
+            if (targetDay) {
+              const daySchedule: Record<string, string> = {};
+              for (const [k, v] of Object.entries(plan.schedule)) {
+                if (v === targetDay.id) daySchedule[k] = v;
+              }
+              edit((current, now) => removeDay(current, menuDay, now));
+              showUndoToast({
+                message: `${targetDay.name} removed`,
+                onUndo: () => {
+                  edit((current, now) => reinsertDay(current, targetDay, dayIndex, daySchedule, now));
+                },
+              });
+            }
+          }
         }}
       />
     </View>
@@ -439,7 +476,6 @@ const s = StyleSheet.create({
     borderRadius: 12,
   },
   menuIcon: { color: F.mute, fontSize: 20 },
-  remove: { color: F.bad, fontSize: 13 },
   exRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: F.line, gap: 8 },
   exName: { color: F.ink, fontSize: 16 },
   targets: { flexDirection: "row", alignItems: "center", gap: 8 },

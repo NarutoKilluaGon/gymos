@@ -14,6 +14,7 @@ import {
   addCardioLog,
   getCardioMap,
   removeCardioLog,
+  restoreCardioLog,
 } from "@/storage/repositories/nourish-cardio";
 import {
   addCustomExercise,
@@ -193,6 +194,8 @@ export function useForge() {
       },
       remove: (id: string) =>
         act(() => deleteSession(id), "Couldn't delete workout"),
+      restore: (session: WorkoutSession) =>
+        act(() => saveSession(session), "Couldn't restore workout"),
       saveSettings: (change: (current: ForgeSettings) => ForgeSettings) =>
         act(() => updateForgeSettings(change), "Couldn't save"),
       addCustom: async (
@@ -220,6 +223,8 @@ export function useForge() {
       ) => act(() => addCardioLog(dayKey, entry), "Couldn't save cardio"),
       removeCardio: (dayKey: string, id: string) =>
         act(() => removeCardioLog(dayKey, id), "Couldn't remove"),
+      restoreCardio: (dayKey: string, log: CardioLog, index?: number) =>
+        act(() => restoreCardioLog(dayKey, log, index), "Couldn't restore cardio"),
     }),
     [act, data, reload, unit],
   );

@@ -47,7 +47,7 @@ import { isSavedMeal, type SavedFood } from "@/storage/repositories/saved-foods"
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
 import { addDaysToKey, dateKeyFromTimestamp, getTodayKey } from "@/utils/date";
-import { showToast } from "@/utils/toast";
+import { showToast, showUndoToast } from "@/utils/toast";
 
 type Nourish = ReturnType<typeof useNourish>;
 
@@ -405,7 +405,20 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                       hitSlop={10}
                       onPress={() => {
                         tap();
-                        void actions.removeCardio(dayKey, entry.id);
+                        const cardioLogs = data?.cardio[dayKey] ?? [];
+                        const targetLog = cardioLogs.find((b) => b.id === entry.id);
+                        const targetIndex = cardioLogs.findIndex((b) => b.id === entry.id);
+                        if (!targetLog) return;
+                        void actions.removeCardio(dayKey, entry.id).then((ok) => {
+                          if (ok) {
+                            showUndoToast({
+                              message: `${targetLog.name} removed`,
+                              onUndo: () => {
+                                void actions.restoreCardio(dayKey, targetLog, targetIndex);
+                              },
+                            });
+                          }
+                        });
                       }}
                     >
                       <Text style={s.remove}>✕</Text>
@@ -474,9 +487,17 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         }}
         onDelete={() => {
           if (!editing) return;
-
-          void actions.removeEntry(editing.id).then((ok) => {
-            if (ok) setEditing(null);
+          const targetMeal = editing;
+          setEditing(null);
+          void actions.removeEntry(targetMeal.id).then((ok) => {
+            if (ok) {
+              showUndoToast({
+                message: `${targetMeal.name} deleted`,
+                onUndo: () => {
+                  void actions.restoreEntry(targetMeal);
+                },
+              });
+            }
           });
         }}
       />
@@ -504,7 +525,18 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         onClose={() => setSavedOpen(false)}
         foods={data.saved}
         onLog={logFromSaved}
-        onDelete={(food) => void actions.removeSaved(food.id)}
+        onDelete={(food) => {
+          void actions.removeSaved(food.id).then((ok) => {
+            if (ok) {
+              showUndoToast({
+                message: `${food.name} removed`,
+                onUndo: () => {
+                  void actions.restoreSaved(food);
+                },
+              });
+            }
+          });
+        }}
       />
     </View>
   );

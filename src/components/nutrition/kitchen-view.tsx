@@ -16,7 +16,7 @@ import { recipePerServing } from "@/services/nourish/diary";
 import { resolveLogText } from "@/services/nourish/resolve-log";
 import { isSavedMeal } from "@/storage/repositories/saved-foods";
 import type { DraftItem } from "@/types/nourish";
-import { showToast } from "@/utils/toast";
+import { showToast, showUndoToast } from "@/utils/toast";
 
 type Nourish = ReturnType<typeof useNourish>;
 
@@ -128,7 +128,18 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
         visible={savedOpen}
         onClose={() => setSavedOpen(false)}
         foods={data.saved}
-        onDelete={(food) => void actions.removeSaved(food.id)}
+        onDelete={(food) => {
+          void actions.removeSaved(food.id).then((ok) => {
+            if (ok) {
+              showUndoToast({
+                message: `${food.name} removed`,
+                onUndo: () => {
+                  void actions.restoreSaved(food);
+                },
+              });
+            }
+          });
+        }}
       />
     </ScrollView>
   );

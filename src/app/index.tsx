@@ -10,7 +10,6 @@ import {
 } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -53,6 +52,7 @@ import {
   deleteSleepSession,
   getTodaySleep,
   logSleepDuration,
+  restoreSleepSession,
 } from "@/storage/repositories/sleep";
 import { getTodaySteps } from "@/storage/repositories/steps";
 import {
@@ -74,7 +74,7 @@ import type {
 } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
 import { displayName, formatNumber, plural } from "@/utils/format";
-import { showToast } from "@/utils/toast";
+import { showToast, showUndoToast } from "@/utils/toast";
 
 const DEFAULT_WATER = 0;
 
@@ -343,26 +343,20 @@ export default function HomeScreen() {
     const latest = sleep.find((s) => s.endedAt) ?? sleep[0];
     if (!latest) return;
 
-    Alert.alert(
-      "Delete today's sleep log?",
-      "This removes the logged sleep and can't be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deleteSleepSession(latest.id)
-              .then(async () => {
-                setSleep(await getTodaySleep());
-              })
-              .catch(() => {
-                showToast("Couldn't delete sleep");
-              });
+    deleteSleepSession(latest.id)
+      .then(async () => {
+        setSleep(await getTodaySleep());
+        showUndoToast({
+          message: "Sleep log deleted",
+          onUndo: async () => {
+            await restoreSleepSession(latest);
+            setSleep(await getTodaySleep());
           },
-        },
-      ],
-    );
+        });
+      })
+      .catch(() => {
+        showToast("Couldn't delete sleep");
+      });
   }
 
   function handleWorkoutStart() {

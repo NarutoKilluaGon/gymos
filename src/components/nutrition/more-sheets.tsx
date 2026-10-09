@@ -222,7 +222,6 @@ export function SavedSheet({
   onDelete: (food: SavedFood) => void;
 }) {
   const [tab, setTab] = useState<SavedTab>("meals");
-  const [armed, setArmed] = useState<string | null>(null);
 
   const meals = foods.filter(isSavedMeal);
   const recipes = foods.filter((f) => f.recipe && !isSavedMeal(f));
@@ -242,7 +241,6 @@ export function SavedSheet({
           value={tab}
           onChange={(next) => {
             setTab(next);
-            setArmed(null);
           }}
           options={[
             { value: "meals", label: `Meals ${meals.length}` },
@@ -283,18 +281,10 @@ export function SavedSheet({
               hitSlop={10}
               onPress={() => {
                 tap();
-
-                if (armed === food.id) {
-                  setArmed(null);
-                  onDelete(food);
-                } else {
-                  setArmed(food.id);
-                }
+                onDelete(food);
               }}
             >
-              <Text style={[s.del, armed === food.id && { color: N.bad }]}>
-                {armed === food.id ? "Delete?" : "✕"}
-              </Text>
+              <Text style={s.del}>✕</Text>
             </Pressable>
           </View>
         ))

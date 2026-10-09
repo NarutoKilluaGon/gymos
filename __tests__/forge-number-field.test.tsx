@@ -18,7 +18,7 @@ jest.mock("expo-haptics", () => ({
 // Jest setup). Same isolation the other Forge suites use (forge-prs-hook,
 // forge-session-flush): stub expo-router and the toast, load use-forge as is.
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 jest.mock("@/components/workouts/forge-sheets", () => ({
   ConfirmSheet: () => null,

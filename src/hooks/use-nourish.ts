@@ -23,6 +23,7 @@ import {
   addCardioLog,
   getCardioMap,
   removeCardioLog,
+  restoreCardioLog,
 } from "@/storage/repositories/nourish-cardio";
 import {
   getFeelMap,
@@ -36,6 +37,7 @@ import {
   addMeals,
   deleteMeal,
   getAllMeals,
+  restoreMeal,
   updateMealById,
   type NewMeal,
 } from "@/storage/repositories/meals";
@@ -43,13 +45,15 @@ import {
   deleteMeasurement,
   getMeasurements,
   replaceTodayWeight,
+  restoreMeasurement,
 } from "@/storage/repositories/measurements";
 import {
   deleteSavedFood,
   getSavedFoods,
+  restoreSavedFood,
   type SavedFood,
 } from "@/storage/repositories/saved-foods";
-import type { Meal, MealSlot } from "@/types/gymos";
+import type { Meal, MealSlot, Measurement } from "@/types/gymos";
 import type {
   CardioLog,
   CardioMap,
@@ -229,6 +233,8 @@ export function useNourish() {
         ),
       removeEntry: (id: string) =>
         act(() => deleteMeal(id), "Couldn't delete"),
+      restoreEntry: (meal: Meal) =>
+        act(() => restoreMeal(meal), "Couldn't restore"),
       setFeel: (dayKey: string, slot: MealSlot, value: FeelValue) =>
         act(() => toggleFeel(dayKey, slot, value), "Couldn't save"),
       repeatInto: (source: readonly Meal[], toKey: string) =>
@@ -243,6 +249,8 @@ export function useNourish() {
         actOnce("logSaved", () => logSavedMeal(saved, dayKey), "Couldn't log"),
       removeSaved: (id: string) =>
         act(() => deleteSavedFood(id), "Couldn't delete"),
+      restoreSaved: (food: SavedFood, index?: number) =>
+        act(() => restoreSavedFood(food, index), "Couldn't restore"),
       addRecipe: (name: string, items: readonly DraftItem[], servings: number) =>
         act(() => saveRecipe(name, items, servings), "Couldn't save recipe"),
       addCardio: (
@@ -256,6 +264,8 @@ export function useNourish() {
         ),
       removeCardio: (dayKey: string, id: string) =>
         act(() => removeCardioLog(dayKey, id), "Couldn't remove"),
+      restoreCardio: (dayKey: string, log: CardioLog, index?: number) =>
+        act(() => restoreCardioLog(dayKey, log, index), "Couldn't restore cardio"),
       saveSettings: (settings: NourishSettings) =>
         act(() => saveNourishSettings(settings), "Couldn't save targets"),
       /** Replace today's weight (one reading per day, atomically). */
@@ -263,6 +273,20 @@ export function useNourish() {
         act(() => replaceTodayWeight(value, unit), "Couldn't save weight"),
       removeWeight: (id: string) =>
         act(() => deleteMeasurement(id), "Couldn't delete"),
+      restoreWeight: (point: WeightPoint | Measurement) =>
+        act(() => {
+          const measurement: Measurement =
+            "timestamp" in point
+              ? point
+              : {
+                  id: point.id,
+                  type: "weight",
+                  value: point.kg,
+                  unit: "kg",
+                  timestamp: `${point.key}T12:00:00.000Z`,
+                };
+          return restoreMeasurement(measurement);
+        }, "Couldn't restore weight"),
     }),
     [act, actOnce, unit],
   );

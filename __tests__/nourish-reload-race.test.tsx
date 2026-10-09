@@ -6,7 +6,7 @@ import { deleteMeal, getAllMeals } from "@/storage/repositories/meals";
 import type { Meal } from "@/types/gymos";
 import { showToast } from "@/utils/toast";
 
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 // Reloads are triggered by hand in these tests, so the focus effect is inert.
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));

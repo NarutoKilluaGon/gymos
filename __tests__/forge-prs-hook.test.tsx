@@ -30,7 +30,7 @@ function renderHook<T>(hook: () => T): { result: { current: T } } {
 }
 
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 const lift = (sid: string, date: string, weight: number, ended: boolean): WorkoutSession => ({
   id: sid,

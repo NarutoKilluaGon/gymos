@@ -139,6 +139,21 @@ export function removeDay(plan: Plan, dayId: string, now: Date): Plan {
   );
 }
 
+/** Restore a previously removed day at its original index and schedule. */
+export function reinsertDay(
+  plan: Plan,
+  day: PlanDay,
+  index: number,
+  scheduleEntries: Record<string, string> = {},
+  now: Date = new Date(),
+): Plan {
+  const days = [...plan.days];
+  const targetIndex = Math.max(0, Math.min(index, days.length));
+  days.splice(targetIndex, 0, day);
+  const schedule = { ...plan.schedule, ...scheduleEntries };
+  return stamp({ ...plan, days, schedule }, now);
+}
+
 export function renameDay(
   plan: Plan,
   dayId: string,
@@ -237,6 +252,26 @@ export const removePlanExercise = (
           i === rest.length - 1 ? { ...exercise, superset: false } : exercise,
         ),
     }),
+    now,
+  );
+
+/** Restore a previously removed exercise in a day at its original index. */
+export const reinsertPlanExercise = (
+  plan: Plan,
+  dayId: string,
+  index: number,
+  exercise: PlanExercise,
+  now: Date = new Date(),
+): Plan =>
+  mapDay(
+    plan,
+    dayId,
+    (day) => {
+      const exercises = [...day.exercises];
+      const targetIndex = Math.max(0, Math.min(index, exercises.length));
+      exercises.splice(targetIndex, 0, exercise);
+      return { ...day, exercises };
+    },
     now,
   );
 

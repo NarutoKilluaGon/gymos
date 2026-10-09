@@ -23,6 +23,7 @@ import {
   formatWeight,
   plural,
 } from "@/utils/format";
+import { showUndoToast } from "@/utils/toast";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -40,6 +41,7 @@ export function TodayView({
   onOpen,
   onAddCardio,
   onRemoveCardio,
+  onRestoreCardio,
   onGoPlan,
 }: {
   data: ForgeData;
@@ -49,6 +51,7 @@ export function TodayView({
   onOpen: (session: WorkoutSession) => void;
   onAddCardio: (dayKey: string, entry: Omit<CardioLog, "id" | "loggedAt">) => Promise<boolean>;
   onRemoveCardio: (dayKey: string, id: string) => void;
+  onRestoreCardio?: (dayKey: string, log: CardioLog, index?: number) => void;
   onGoPlan: () => void;
 }) {
   const todayKey = useTodayKey();
@@ -157,7 +160,7 @@ export function TodayView({
       {cardio.length > 0 ? (
         <FCard style={s.card}>
           <Label>Cardio</Label>
-          {cardio.map((entry) => (
+          {cardio.map((entry, index) => (
             <View key={entry.id} style={s.cardioRow}>
               <View style={{ flexShrink: 1 }}>
                 <Text style={s.lineStrong}>{displayName(entry.name)}</Text>
@@ -165,8 +168,21 @@ export function TodayView({
               </View>
               <View style={s.cardioRight}>
                 <Text style={s.lineStrong}>{`${entry.kcal} kcal`}</Text>
-                <Pressable accessibilityRole="button" onPress={() => onRemoveCardio(dateKey, entry.id)}>
-                  <Text style={s.remove}>remove</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${entry.name}`}
+                  hitSlop={8}
+                  onPress={() => {
+                    onRemoveCardio(dateKey, entry.id);
+                    showUndoToast({
+                      message: `Removed ${displayName(entry.name)}`,
+                      onUndo: () => {
+                        onRestoreCardio?.(dateKey, entry, index);
+                      },
+                    });
+                  }}
+                >
+                  <Text style={s.remove}>✕</Text>
                 </Pressable>
               </View>
             </View>
@@ -288,7 +304,7 @@ const s = StyleSheet.create({
   pills: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   cardioRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12, paddingVertical: 6 },
   cardioRight: { alignItems: "flex-end" },
-  remove: { color: F.bad, fontSize: 12, marginTop: 2 },
+  remove: { color: F.dim, fontSize: 15, paddingHorizontal: 6, paddingVertical: 2 },
   exerciseRow: {
     flexDirection: "row",
     justifyContent: "space-between",

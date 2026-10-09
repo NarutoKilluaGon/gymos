@@ -160,6 +160,22 @@ export async function deleteSleepSession(
   }
 }
 
+/** Restore a previously deleted sleep session. */
+export async function restoreSleepSession(
+  session: SleepSession,
+): Promise<void> {
+  await withDailyLock(async () => {
+    const activity = await readDailyActivityUnlocked(getTodayKey());
+    if (!Array.isArray(activity.sleep)) {
+      activity.sleep = [];
+    }
+    if (!activity.sleep.some((item) => item.id === session.id)) {
+      activity.sleep.push(session);
+      await writeDailyActivityUnlocked(activity);
+    }
+  });
+}
+
 export async function getTodaySleep(): Promise<SleepSession[]> {
   const activity = await getDailyActivity(getTodayKey());
 

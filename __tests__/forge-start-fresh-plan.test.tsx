@@ -13,7 +13,7 @@ jest.mock("expo-router", () => ({
     require("react").useEffect(callback, [callback]),
 }));
 jest.mock("@/hooks/use-weight-unit", () => ({ useWeightUnit: () => ({ unit: "kg" }) }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 // react-test-renderer ships with jest-expo (no @types), so load it untyped.

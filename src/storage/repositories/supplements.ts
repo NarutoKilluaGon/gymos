@@ -65,6 +65,21 @@ export async function removeSupplement(
   );
 }
 
+export async function restoreSupplement(
+  supplement: Supplement,
+  index?: number,
+): Promise<void> {
+  const supplements = await getSupplements();
+  if (!supplements.some((s) => s.id === supplement.id)) {
+    if (typeof index === "number" && index >= 0 && index <= supplements.length) {
+      supplements.splice(index, 0, supplement);
+    } else {
+      supplements.push(supplement);
+    }
+    await setStorage(SUPPLEMENTS_KEY, supplements);
+  }
+}
+
 export async function setSupplementEnabled(
   id: string,
   enabled: boolean,

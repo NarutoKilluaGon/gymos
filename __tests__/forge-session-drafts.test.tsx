@@ -12,7 +12,7 @@ jest.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success" },
 }));
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 jest.mock("@/storage/repositories/workout-sessions", () => ({
   saveSession: jest.fn(),
   getAllSessions: jest.fn(),

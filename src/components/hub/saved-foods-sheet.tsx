@@ -4,9 +4,10 @@ import { SavedSheet } from "@/components/nutrition/more-sheets";
 import {
   deleteSavedFood,
   getSavedFoods,
+  restoreSavedFood,
   type SavedFood,
 } from "@/storage/repositories/saved-foods";
-import { showToast } from "@/utils/toast";
+import { showToast, showUndoToast } from "@/utils/toast";
 
 /** Hub entry point to manage saved meals, remembered foods and recipes.
  *  (Logging from them happens in the Nutrition tab.) */
@@ -39,6 +40,13 @@ export function HubSavedFoodsSheet({
     try {
       await deleteSavedFood(food.id);
       setFoods(await getSavedFoods());
+      showUndoToast({
+        message: `${food.name} removed`,
+        onUndo: async () => {
+          await restoreSavedFood(food);
+          setFoods(await getSavedFoods());
+        },
+      });
     } catch {
       showToast("Couldn't delete");
     }

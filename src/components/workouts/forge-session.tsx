@@ -23,7 +23,6 @@ import {
   createDraftRegistry,
 } from "@/components/workouts/number-field";
 import {
-  ConfirmSheet,
   ExerciseMenuSheet,
   ExercisePickerSheet,
   FinishSheet,
@@ -43,6 +42,8 @@ import {
   appendExercise,
   isSupersetLeader,
   moveExerciseUp,
+  reinsertExercise,
+  reinsertSet,
   removeExercise,
   removeSet,
   setCounts,
@@ -69,6 +70,7 @@ import {
 } from "@/services/forge/timing";
 import type { CatalogExercise } from "@/types/forge";
 import type { SessionPr, WorkoutSession } from "@/types/gymos";
+import { showUndoToast } from "@/utils/toast";
 
 export {
   createDraftRegistry,
@@ -101,8 +103,7 @@ type SheetState =
   | { kind: "plates"; index: number }
   | { kind: "exerciseMenu"; index: number }
   | { kind: "workoutMenu" }
-  | { kind: "finish" }
-  | { kind: "delete" };
+  | { kind: "finish" };
 
 export function ForgeSession({
   initial,
@@ -110,6 +111,7 @@ export function ForgeSession({
   unit,
   onClose,
   onDelete,
+  onRestore,
   onCreateExercise,
   onChanged,
   flushRef,
@@ -119,6 +121,7 @@ export function ForgeSession({
   unit: "kg" | "lb";
   onClose: () => void;
   onDelete: (id: string) => Promise<boolean>;
+  onRestore?: (session: WorkoutSession) => Promise<boolean>;
   onCreateExercise: (
     name: string,
     muscle: CatalogExercise["muscleGroup"],
@@ -383,9 +386,26 @@ export function ForgeSession({
                 onToggleWarmup={(setIndex) =>
                   update((current) => toggleWarmup(current, index, setIndex, new Date()))
                 }
-                onRemoveSet={(setIndex) =>
-                  update((current) => removeSet(current, index, setIndex, new Date()))
-                }
+                onRemoveSet={(setIndex) => {
+                  const targetExercise = exercise;
+                  const targetSet = targetExercise.sets[setIndex];
+                  if (!targetSet) return;
+                  update((current) => {
+                    const curIdx = current.exercises.findIndex((e) => e.id === targetExercise.id);
+                    return curIdx >= 0 ? removeSet(current, curIdx, setIndex, new Date()) : current;
+                  });
+                  showUndoToast({
+                    message: "Set removed",
+                    onUndo: () => {
+                      update((current) => {
+                        const curIdx = current.exercises.findIndex((e) => e.id === targetExercise.id);
+                        return curIdx >= 0
+                          ? reinsertSet(current, curIdx, setIndex, targetSet, new Date())
+                          : current;
+                      });
+                    },
+                  });
+                }}
                 onWeightCommit={(setIndex, setId, weight) =>
                   update((current) => setValuesById(current, exercise.id, setId, { weight }))
                 }
@@ -522,7 +542,19 @@ export function ForgeSession({
             }}
             onRemove={() => {
               if (sheet.kind === "exerciseMenu") {
-                update((current) => removeExercise(current, sheet.index, new Date()));
+                const targetIndex = sheet.index;
+                const targetExercise = session.exercises[targetIndex];
+                setSheet({ kind: "none" });
+                if (!targetExercise) return;
+                update((current) => removeExercise(current, targetIndex, new Date()));
+                showUndoToast({
+                  message: `${targetExercise.name} removed`,
+                  onUndo: () => {
+                    update((current) =>
+                      reinsertExercise(current, targetIndex, targetExercise, new Date()),
+                    );
+                  },
+                });
               }
             }}
           />
@@ -539,7 +571,26 @@ export function ForgeSession({
               );
             }}
             onNote={() => setSheet({ kind: "note", index: -1 })}
-            onDelete={() => setSheet({ kind: "delete" })}
+            onDelete={() => {
+              setSheet({ kind: "none" });
+              drafts.flushAll();
+              const sessionToDelete = session;
+              void flush()
+                .then(() => onDelete(sessionToDelete.id))
+                .then((ok) => {
+                  if (ok) {
+                    onClose();
+                    showUndoToast({
+                      message: "Workout deleted",
+                      onUndo: () => {
+                        if (onRestore) {
+                          void onRestore(sessionToDelete);
+                        }
+                      },
+                    });
+                  }
+                });
+            }}
           />
         ) : null}
 
@@ -548,22 +599,6 @@ export function ForgeSession({
           onClose={() => setSheet({ kind: "none" })}
           open={counts.total - counts.done}
           onFinish={(mode) => void finishWith(mode)}
-        />
-
-        <ConfirmSheet
-          visible={sheet.kind === "delete"}
-          onClose={() => setSheet({ kind: "none" })}
-          title="Delete this workout?"
-          body="It disappears from history and progress. This can't be undone."
-          confirmLabel="Delete workout"
-          onConfirm={() => {
-            drafts.flushAll();
-            void flush()
-              .then(() => onDelete(session.id))
-              .then((ok) => {
-                if (ok) onClose();
-              });
-          }}
         />
 
         <SummarySheet

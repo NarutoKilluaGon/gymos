@@ -18,7 +18,7 @@ jest.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success" },
 }));
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
-jest.mock("@/utils/toast", () => ({ showToast: jest.fn() }));
+jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn() }));
 
 // The real repository over the AsyncStorage mock, with the calls observable.
 jest.mock("@/storage/repositories/workout-sessions", () => {

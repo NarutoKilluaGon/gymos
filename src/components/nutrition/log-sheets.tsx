@@ -363,7 +363,6 @@ function EditForm({
   const [factor, setFactor] = useState(1);
   const [slot, setSlot] = useState<MealSlot>(initialSlot);
   const [at, setAt] = useState(initialAt);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const timeOk = parseClock(at) !== null;
 
   return (
@@ -401,11 +400,7 @@ function EditForm({
           disabled={!timeOk}
           onPress={() => onSave(factor, slot, parseClock(at) ?? "")}
         />
-        {confirmDelete ? (
-          <Button label="Tap again to delete" kind="danger" onPress={onDelete} />
-        ) : (
-          <Button label="Delete" kind="ghost" onPress={() => setConfirmDelete(true)} />
-        )}
+        <Button label="Delete" kind="danger" onPress={onDelete} />
         <Button label="Cancel" kind="ghost" onPress={onCancel} />
       </View>
     </View>

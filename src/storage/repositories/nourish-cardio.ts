@@ -69,3 +69,23 @@ export async function removeCardioLog(
     await setStorage(CARDIO_KEY, map);
   });
 }
+
+export async function restoreCardioLog(
+  dateKey: string,
+  log: CardioLog,
+  index?: number,
+): Promise<void> {
+  await cardioMutex.runExclusive(async () => {
+    const map = clean(await getStorage<unknown>(CARDIO_KEY));
+    const list = [...(map[dateKey] ?? [])];
+    if (!list.some((l) => l.id === log.id)) {
+      if (typeof index === "number" && index >= 0 && index <= list.length) {
+        list.splice(index, 0, log);
+      } else {
+        list.push(log);
+      }
+      map[dateKey] = list;
+      await setStorage(CARDIO_KEY, map);
+    }
+  });
+}

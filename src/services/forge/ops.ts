@@ -166,6 +166,24 @@ export const removeSet = (
     now,
   );
 
+/** Reinsert a set at its original index. */
+export const reinsertSet = (
+  session: WorkoutSession,
+  exerciseIndex: number,
+  setIndex: number,
+  set: WorkoutSet,
+  now: Date,
+): WorkoutSession =>
+  touch(
+    mapExercise(session, exerciseIndex, (exercise) => {
+      const sets = [...exercise.sets];
+      const targetIndex = Math.max(0, Math.min(setIndex, sets.length));
+      sets.splice(targetIndex, 0, set);
+      return { ...exercise, sets };
+    }),
+    now,
+  );
+
 /** Groups need two neighbours; clear any that no longer have them. */
 export function dropOrphanGroups(
   exercises: readonly WorkoutExercise[],
@@ -195,6 +213,19 @@ export function removeExercise(
 ): WorkoutSession {
   const exercises = session.exercises.filter((_, i) => i !== exerciseIndex);
 
+  return touch({ ...session, exercises: dropOrphanGroups(exercises) }, now);
+}
+
+/** Reinsert an exercise at its original index. */
+export function reinsertExercise(
+  session: WorkoutSession,
+  exerciseIndex: number,
+  exercise: WorkoutExercise,
+  now: Date,
+): WorkoutSession {
+  const exercises = [...session.exercises];
+  const targetIndex = Math.max(0, Math.min(exerciseIndex, exercises.length));
+  exercises.splice(targetIndex, 0, exercise);
   return touch({ ...session, exercises: dropOrphanGroups(exercises) }, now);
 }
 

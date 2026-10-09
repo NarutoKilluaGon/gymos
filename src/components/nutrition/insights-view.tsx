@@ -41,7 +41,7 @@ import {
 } from "@/services/nourish/weight";
 import { buildWeeklyRead } from "@/services/nourish/weekly-read";
 import type { NourishSettings } from "@/types/nourish";
-import { showToast } from "@/utils/toast";
+import { showToast, showUndoToast } from "@/utils/toast";
 
 type Nourish = ReturnType<typeof useNourish>;
 
@@ -258,7 +258,17 @@ export function InsightsView({
                 accessibilityLabel={`Delete weight from ${dayTitle(w.key, todayKey)}`}
                 onPress={() => {
                   tap();
-                  void actions.removeWeight(w.id);
+                  const targetWeight = w;
+                  void actions.removeWeight(w.id).then((ok) => {
+                    if (ok) {
+                      showUndoToast({
+                        message: "Weight removed",
+                        onUndo: () => {
+                          void actions.restoreWeight(targetWeight);
+                        },
+                      });
+                    }
+                  });
                 }}
                 style={s.chip}
               >
