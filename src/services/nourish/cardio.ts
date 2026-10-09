@@ -1,74 +1,100 @@
-/** Matches text that describes exercise rather than food, so the log bar
- *  can route it to the cardio sheet. */
-export const CARDIO_PATTERN =
-  /\b(cardio|workout|walk\w*|jog\w*|run|running|ran|cycl\w*|swim\w*|hik\w*|hiit|skipping|rowing|climb\w*|stairs?|storey|floors?|football|badminton)\b|\d\s*(km|mi|miles?)\b/i;
+import { CARDIO_ACTIVITIES, matchCardioActivity } from "@/data/cardio";
+import type { CardioActivity } from "@/types/gymos";
 
-export function looksLikeCardio(text: string): boolean {
-  return CARDIO_PATTERN.test(text);
-}
+export const MET: Readonly<Record<string, number>> = Object.fromEntries(
+  CARDIO_ACTIVITIES.map((a) => [a.id, a.met]),
+);
 
-/** Metabolic equivalents (MET) for common activities. */
-export const MET: Readonly<Record<string, number>> = {
-  walk: 3.5,
-  jog: 7,
-  run: 9.8,
-  cycl: 7.5,
-  swim: 6,
-  hiit: 9,
-  skipping: 11,
-  rope: 11,
-  rowing: 7,
-  hik: 6,
-  football: 8,
-  badminton: 5.5,
-};
-
-const DISPLAY_NAME: Record<string, string> = {
-  walk: "Walk",
-  jog: "Jog",
-  run: "Run",
-  cycl: "Cycle",
-  swim: "Swim",
-  hiit: "HIIT",
-  skipping: "Skipping",
-  rope: "Skipping",
-  rowing: "Rowing",
-  hik: "Hike",
-  football: "Football",
-  badminton: "Badminton",
-};
-
-/** Estimated calories per minute when the Workouts module logged cardio
- *  without calories. Matches the rate the app has always assumed. */
+/** Estimated calories per minute when logged without calories. */
 export const WORKOUT_CARDIO_KCAL_PER_MIN = 8;
 
 export type CardioEstimate = {
+  activity: CardioActivity;
   name: string;
   detail: string;
   minutes: number;
+  distanceKm?: number;
   kcal: number;
+  isEstimate: boolean;
+  needsActivity?: boolean;
 };
 
 const METRES_PER_FLOOR = 3;
-/** Climbing is ~25% efficient; the descent adds about 30% on top. */
 const CLIMB_EFFICIENCY = 0.25;
 const DESCENT_FACTOR = 1.3;
 const JOULES_PER_KCAL = 4184;
 const GRAVITY = 9.8;
 const KM_PER_MILE = 1.609;
 
+// Build comprehensive regex for detecting cardio
+const ALL_ALIASES = CARDIO_ACTIVITIES.flatMap((a) => a.aliases);
+const EXTRA_CARDIO_TERMS = [
+  "cardio",
+  "workout",
+  "exercise",
+  "floor",
+  "floors",
+  "flight",
+  "flights",
+  "storey",
+  "storeys",
+  "stair",
+  "stairs",
+  "climb",
+  "climbed",
+  "climbing",
+];
+
+const ALIAS_PATTERN_STR = ALL_ALIASES.concat(EXTRA_CARDIO_TERMS)
+  .map((a) => a.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"))
+  .join("|");
+
+export const CARDIO_PATTERN = new RegExp(
+  `\\b(${ALIAS_PATTERN_STR})\\b|\\d+\\s*(?:km|kms|kilometers?|kilometres?|mi|miles?)\\b`,
+  "i",
+);
+
+export function looksLikeCardio(text: string): boolean {
+  return CARDIO_PATTERN.test(text);
+}
+
 /**
- * Deterministic calorie estimate for a typed cardio description. Handles
- * a duration with a known activity (MET × kg × hours), a distance on its
- * own, and stair/floor climbing. Returns null when there is nothing to
- * estimate from, so the caller can ask for a time or distance.
+ * Standard ACSM metabolic equations for walking and running on an incline.
+ * Returns grade-adjusted MET.
+ */
+function acsmMet(
+  isRun: boolean,
+  speedKmH: number,
+  inclinePercent: number,
+): number {
+  const speedMMin = (speedKmH * 1000) / 60;
+  const grade = inclinePercent / 100;
+
+  if (isRun) {
+    // Running formula: VO2 = 3.5 + (0.2 * S) + (0.9 * S * G)
+    const vo2 = 3.5 + 0.2 * speedMMin + 0.9 * speedMMin * grade;
+    return vo2 / 3.5;
+  }
+
+  // Walking formula: VO2 = 3.5 + (0.1 * S) + (1.8 * S * G)
+  const vo2 = 3.5 + 0.1 * speedMMin + 1.8 * speedMMin * grade;
+  return vo2 / 3.5;
+}
+
+/**
+ * Deterministic calorie estimate for a typed cardio description.
+ * Parses activity, duration, distance, incline and speed.
+ * Never silently defaults unknown activities to Walk.
  */
 export function estimateCardio(
   text: string,
   weightKg: number,
 ): CardioEstimate | null {
-  const lower = text.toLowerCase();
+  const clean = text.trim();
+  if (!clean) return null;
+  const lower = clean.toLowerCase();
 
+  // 1. FLOORS / STAIRS
   const floors = lower.match(
     /(\d+(?:\.\d+)?)\s*(?:floors?|flights?|storeys?|stories)\b(?:\s*[x×*]\s*(\d+)|,?\s*(\d+)\s*(?:times|reps))?/,
   );
@@ -83,6 +109,7 @@ export function estimateCardio(
     );
 
     return {
+      activity: "stairmaster",
       name: "Stair climb",
       detail:
         reps > 1
@@ -90,46 +117,109 @@ export function estimateCardio(
           : `${count} floors, about ${metres} m climbed`,
       minutes: 0,
       kcal,
+      isEstimate: true,
     };
   }
 
-  const hours = lower.match(/(\d+(?:\.\d+)?)\s*(?:hr|hrs|hours?)\b/);
-  const mins = lower.match(/(\d+(?:\.\d+)?)\s*(?:min|mins|minutes|m)\b/);
-  const minutes = mins
-    ? Number(mins[1])
-    : hours
-      ? Number(hours[1]) * 60
-      : 0;
-  const words = lower.split(/\W+/);
-  const activity = Object.keys(MET).find((key) =>
-    words.some((word) => word.startsWith(key)),
+  // 2. PARSE ACTIVITY
+  const matchedDef = matchCardioActivity(lower);
+
+  // 3. PARSE DURATION
+  // m alone is NOT minutes
+  const hoursMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(?:hr|hrs|hours?|h)\b/i);
+  const minsMatch = lower.match(
+    /\b(\d+(?:\.\d+)?)\s*(?:min|mins|minutes)\b/i,
   );
 
-  if (minutes > 0 && activity) {
-    return {
-      name: DISPLAY_NAME[activity] ?? "Cardio",
-      detail: `${Math.round(minutes)} min`,
-      minutes: Math.round(minutes),
-      kcal: Math.round(((MET[activity] ?? 0) * weightKg * minutes) / 60),
-    };
+  let minutes = minsMatch
+    ? Number(minsMatch[1])
+    : hoursMatch
+      ? Number(hoursMatch[1]) * 60
+      : 0;
+  minutes = Math.round(minutes * 10) / 10;
+
+  // 4. PARSE DISTANCE
+  // Avoid matching incomplete "mi" while typing "min"
+  let distanceKm: number | undefined;
+  const isTypingMi = /(?:^|\s)\d+(?:\.\d+)?\s*mi$/i.test(lower);
+  if (!isTypingMi) {
+    const distMatch = lower.match(
+      /\b(\d+(?:\.\d+)?)\s*(km|kms|kilometers?|kilometres?|mi|miles?)\b(?!\w)/i,
+    );
+    if (distMatch) {
+      const val = Number(distMatch[1]);
+      const unit = distMatch[2].toLowerCase();
+      distanceKm = unit.startsWith("mi") ? val * KM_PER_MILE : val;
+      distanceKm = Math.round(distanceKm * 100) / 100;
+    }
   }
 
-  const distance = lower.match(/(\d+(?:\.\d+)?)\s*(km|mi|miles?)\b/);
+  // 5. PARSE INCLINE & SPEED
+  const inclineMatch =
+    lower.match(/\b(?:on\s+)?(\d+(?:\.\d+)?)\s*(?:%|percent)?\s*(?:incline|grade|gradient)\b/i) ||
+    lower.match(/\b(?:incline|grade|gradient)\s*(?:of\s+)?(\d+(?:\.\d+)?)\s*(?:%|percent)?\b/i);
+  const inclinePercent = inclineMatch ? Number(inclineMatch[1]) : 0;
 
-  if (distance) {
-    const km =
-      Number(distance[1]) * (distance[2] === "km" ? 1 : KM_PER_MILE);
-    const running = /run|jog/.test(lower);
-    const cycling = /cycl/.test(lower);
-    const perKgPerKm = running ? 1 : cycling ? 0.3 : 0.55;
+  const speedMatch =
+    lower.match(/\b(?:at\s+)?(\d+(?:\.\d+)?)\s*(?:km\/h|kmh|kph|mph)\s*(?:speed)?\b/i) ||
+    lower.match(/\bspeed\s*(?:of\s+)?(\d+(?:\.\d+)?)\s*(?:km\/h|kmh|kph|mph)?\b/i);
+  const rawSpeed = speedMatch ? Number(speedMatch[1]) : undefined;
+  const isMph = speedMatch && speedMatch[0].includes("mph");
+  const speedKmH = rawSpeed ? (isMph ? rawSpeed * KM_PER_MILE : rawSpeed) : undefined;
 
-    return {
-      name: running ? "Run" : cycling ? "Cycle" : "Walk",
-      detail: `${Math.round(km * 10) / 10} km`,
-      minutes: 0,
-      kcal: Math.round(weightKg * km * perKgPerKm),
-    };
+  // If no time or distance was specified, cannot estimate
+  if (minutes <= 0 && (!distanceKm || distanceKm <= 0)) {
+    return null;
   }
 
-  return null;
+  // Activity definition
+  const isRun = matchedDef?.id === "running" || matchedDef?.id === "jogging";
+  const isWalk = matchedDef?.id === "walking" || matchedDef?.id === "treadmill";
+
+  // Calculate MET with potential incline/speed grade adjustment
+  let effectiveMet = matchedDef?.met ?? 4.5;
+
+  if ((isWalk || isRun) && (inclinePercent > 0 || speedKmH !== undefined)) {
+    const defaultSpeed = isRun ? 9 : 5;
+    const finalSpeed = speedKmH ?? defaultSpeed;
+    effectiveMet = acsmMet(isRun, finalSpeed, inclinePercent);
+  }
+
+  // Calorie calculation
+  let kcal = 0;
+  if (minutes > 0) {
+    kcal = Math.round((effectiveMet * weightKg * minutes) / 60);
+  } else if (distanceKm) {
+    const factor = matchedDef?.distanceFactor ?? (isRun ? 1.0 : isWalk ? 0.55 : 0.4);
+    kcal = Math.round(weightKg * distanceKm * factor);
+  }
+
+  // Detail text
+  let detail = "";
+  if (minutes > 0) {
+    detail = `${Math.round(minutes)} min`;
+    if (inclinePercent > 0) {
+      detail += `, ${inclinePercent}% incline`;
+    }
+    if (speedKmH !== undefined) {
+      detail += ` @ ${Math.round(speedKmH * 10) / 10} km/h`;
+    }
+  } else if (distanceKm) {
+    detail = `${Math.round(distanceKm * 10) / 10} km`;
+  }
+
+  // Activity name and missing activity check
+  const activityName = matchedDef ? matchedDef.label : "Cardio";
+  const needsActivity = !matchedDef;
+
+  return {
+    activity: matchedDef?.id ?? "other",
+    name: activityName,
+    detail,
+    minutes: Math.round(minutes),
+    distanceKm,
+    kcal,
+    isEstimate: true,
+    needsActivity,
+  };
 }

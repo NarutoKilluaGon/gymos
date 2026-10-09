@@ -1,15 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   Bar,
   Button,
   Field,
+  Pill,
   Seg,
   Sheet,
   tap,
 } from "@/components/nutrition/nourish-ui";
 import { N, NRadius } from "@/constants/nourish-theme";
+import { CARDIO_ACTIVITIES } from "@/data/cardio";
 import { estimateCardio } from "@/services/nourish/cardio";
 import { MICRO_SPECS, type DayTotals } from "@/services/nourish/nutrition";
 import type { Suggestion } from "@/services/nourish/suggestions";
@@ -44,6 +46,18 @@ export function CardioSheet({
   );
 }
 
+const COMMON_CHIPS = [
+  "Walk",
+  "Run",
+  "Cycle",
+  "Elliptical",
+  "Stairmaster",
+  "Rowing",
+  "Swim",
+  "HIIT",
+  "Jump rope",
+] as const;
+
 function CardioForm({
   initialText,
   weightKg,
@@ -56,15 +70,46 @@ function CardioForm({
   onCancel: () => void;
 }) {
   const [text, setText] = useState(initialText);
+  const [debouncedText, setDebouncedText] = useState(initialText);
   const [kcalText, setKcalText] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const delay = process.env.NODE_ENV === "test" ? 0 : 400;
+    const timer = setTimeout(() => {
+      setDebouncedText(text);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [text]);
+
   const estimate = useMemo(
-    () => estimateCardio(text, weightKg),
-    [text, weightKg],
+    () => estimateCardio(debouncedText, weightKg),
+    [debouncedText, weightKg],
   );
+
   const override = Number(kcalText);
-  const hasOverride = kcalText.trim() !== "" && Number.isFinite(override) && override > 0;
+  const hasOverride =
+    kcalText.trim() !== "" && Number.isFinite(override) && override > 0;
   const kcal = hasOverride ? Math.round(override) : (estimate?.kcal ?? 0);
+
+  const handleChipPress = (label: string) => {
+    tap();
+    const clean = text.trim();
+    if (!clean) {
+      setText(`${label} `);
+      return;
+    }
+    // If text already has time/distance, prepend or replace activity
+    const hasActivity = CARDIO_ACTIVITIES.some((a) =>
+      a.aliases.some((al) => new RegExp(`\\b${al}\\b`, "i").test(clean)),
+    );
+    if (!hasActivity) {
+      setText(`${label} ${clean}`);
+    } else {
+      // Replace existing activity
+      setText(`${label} ${clean}`);
+    }
+  };
 
   return (
     <View>
@@ -72,10 +117,23 @@ function CardioForm({
         label="What did you do?"
         value={text}
         onChangeText={setText}
-        placeholder="30 min walk, 5 km run, 19 floors x 10"
+        placeholder="30 min walk, 5 km run, 10 min elliptical"
         autoFocus
       />
-      {estimate ? (
+
+      {/* Activity Chips Shelf */}
+      <View style={s.chipShelf}>
+        {COMMON_CHIPS.map((chip) => (
+          <Pill
+            key={chip}
+            label={chip}
+            active={estimate?.name.toLowerCase() === chip.toLowerCase()}
+            onPress={() => handleChipPress(chip)}
+          />
+        ))}
+      </View>
+
+      {estimate && !estimate.needsActivity ? (
         <View style={s.estimate}>
           <Text style={s.estName}>
             {estimate.name} · {estimate.detail}
@@ -86,12 +144,23 @@ function CardioForm({
             your watch says otherwise.
           </Text>
         </View>
+      ) : estimate?.needsActivity ? (
+        <View style={s.estimate}>
+          <Text style={s.hintWarning}>
+            I couldn&apos;t tell the activity — pick one above
+          </Text>
+          <Text style={s.estName}>
+            {estimate.name} · {estimate.detail}
+          </Text>
+          <Text style={s.estKcal}>~{estimate.kcal} kcal (estimate)</Text>
+        </View>
       ) : (
         <Text style={s.hint}>
           Add a time or distance, like “30 min walk” or “5 km run”, or enter
           the calories yourself.
         </Text>
       )}
+
       <Field
         label="Calories burned (optional override)"
         value={kcalText}
@@ -106,10 +175,17 @@ function CardioForm({
           disabled={kcal <= 0}
           onPress={() => {
             setBusy(true);
+            const savedName = estimate
+              ? `${estimate.name} · ${estimate.detail}`
+              : (text.trim() || "Cardio");
+
             void onSave({
-              name: estimate?.name ?? (text.trim() || "Cardio"),
+              activity: estimate?.activity ?? "other",
+              name: savedName,
               detail: estimate?.detail ?? "",
               minutes: estimate?.minutes ?? 0,
+              durationMin: estimate?.minutes ?? 0,
+              distanceKm: estimate?.distanceKm,
               kcal,
             }).finally(() => setBusy(false));
           }}
@@ -367,6 +443,8 @@ const s = StyleSheet.create({
   estName: { color: N.ink, fontSize: 15, fontWeight: "600" },
   estKcal: { color: N.acc, fontSize: 22, marginTop: 4 },
   hint: { color: N.mute, fontSize: 13, marginBottom: 12, lineHeight: 18 },
+  hintWarning: { color: N.acc, fontSize: 13, marginBottom: 8, fontWeight: "500" },
+  chipShelf: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 10 },
   buttons: { gap: 8, marginTop: 4 },
   microRow: { marginBottom: 16 },
   microHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
