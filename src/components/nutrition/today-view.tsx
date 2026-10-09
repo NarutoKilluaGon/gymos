@@ -342,27 +342,33 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                       onPress={() => setEditing(meal)}
                     />
                   ))}
-                  <View style={s.feelRow}>
-                    {FEEL_OPTIONS.map((option) => (
-                      <Pill
-                        key={option.value}
-                        label={option.label}
-                        active={day.feel[slot] === option.value}
-                        onPress={() =>
-                          void actions.setFeel(dayKey, slot, option.value)
-                        }
-                      />
-                    ))}
+                  <View style={s.sectionSaveRow}>
                     <Pill
-                      label="Save meal"
+                      label="Save as meal"
                       onPress={() =>
                         void actions
                           .saveSection(entries, slot)
                           .then((ok) => {
-                            if (ok) showToast("Saved to Saved › Meals", "success");
+                            if (ok)
+                              showToast("Saved to Kitchen › Meals", "success");
                           })
                       }
                     />
+                  </View>
+                  <View style={s.feelContainer}>
+                    <Text style={s.feelLabel}>How did it feel?</Text>
+                    <View style={s.feelRow}>
+                      {FEEL_OPTIONS.map((option) => (
+                        <Pill
+                          key={option.value}
+                          label={option.label}
+                          active={day.feel[slot] === option.value}
+                          onPress={() =>
+                            void actions.setFeel(dayKey, slot, option.value)
+                          }
+                        />
+                      ))}
+                    </View>
                   </View>
                 </NCard>
               )}
@@ -727,13 +733,26 @@ const s = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   remove: { color: N.dim, fontSize: 16, paddingHorizontal: 4 },
+  sectionSaveRow: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
+    borderTopWidth: 1,
+    borderTopColor: N.line,
+  },
+  feelContainer: {
+    padding: 12,
+    paddingTop: 8,
+  },
+  feelLabel: {
+    color: N.mute,
+    fontSize: 12,
+    marginBottom: 6,
+  },
   feelRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: N.line,
   },
   dock: {
     position: "absolute",

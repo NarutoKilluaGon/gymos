@@ -48,14 +48,16 @@ import {
   restoreMeasurement,
 } from "@/storage/repositories/measurements";
 import {
+  addSavedFood,
   deleteSavedFood,
   getSavedFoods,
   rememberFoods,
   restoreSavedFood,
   type RememberedFood,
   type SavedFood,
+  type SavedFoodExtras,
 } from "@/storage/repositories/saved-foods";
-import type { Meal, MealSlot, Measurement } from "@/types/gymos";
+import type { Meal, MealFood, MealSlot, Measurement } from "@/types/gymos";
 import type {
   CardioLog,
   CardioMap,
@@ -247,8 +249,28 @@ export function useNourish() {
           () => saveSlotAsMeal(meals, slot),
           "Couldn't save meal",
         ),
-      logSaved: (saved: SavedFood, dayKey: string) =>
-        actOnce("logSaved", () => logSavedMeal(saved, dayKey), "Couldn't log"),
+      logSaved: (
+        saved: SavedFood,
+        dayKey: string,
+        options?: { slot?: MealSlot; servingsMultiplier?: number },
+      ) =>
+        actOnce(
+          "logSaved",
+          () => logSavedMeal(saved, dayKey, new Date(), options),
+          "Couldn't log",
+        ),
+      createSavedFood: (
+        name: string,
+        macros?: Partial<
+          Pick<SavedFood, "calories" | "protein" | "carbs" | "fat">
+        >,
+        foods?: MealFood[],
+        extras?: SavedFoodExtras,
+      ) =>
+        act(
+          () => addSavedFood(name, macros, foods, extras),
+          "Couldn't save food",
+        ),
       removeSaved: (id: string) =>
         act(() => deleteSavedFood(id), "Couldn't delete"),
       restoreSaved: (food: SavedFood, index?: number) =>

@@ -280,7 +280,7 @@ export function SuggestionsSheet({
   );
 }
 
-type SavedTab = "meals" | "foods" | "recipes";
+export type SavedTab = "meals" | "foods" | "recipes";
 
 /** Saved meals, remembered foods and recipes. With `onLog` it logs on tap;
  *  without it (Hub) it only manages the list. */
@@ -290,14 +290,17 @@ export function SavedSheet({
   foods,
   onLog,
   onDelete,
+  initialTab,
 }: {
   visible: boolean;
   onClose: () => void;
   foods: readonly SavedFood[];
   onLog?: (food: SavedFood) => void;
   onDelete: (food: SavedFood) => void;
+  initialTab?: SavedTab;
 }) {
-  const [tab, setTab] = useState<SavedTab>("meals");
+  const [userTab, setUserTab] = useState<SavedTab | null>(null);
+  const tab = userTab ?? initialTab ?? "meals";
 
   const meals = foods.filter(isSavedMeal);
   const recipes = foods.filter((f) => f.recipe && !isSavedMeal(f));
@@ -311,12 +314,19 @@ export function SavedSheet({
   const shown = tab === "meals" ? meals : tab === "recipes" ? recipes : singles;
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Saved">
+    <Sheet
+      visible={visible}
+      onClose={() => {
+        setUserTab(null);
+        onClose();
+      }}
+      title="Saved"
+    >
       <View style={s.segWrap}>
         <Seg
           value={tab}
           onChange={(next) => {
-            setTab(next);
+            setUserTab(next as SavedTab);
           }}
           options={[
             { value: "meals", label: `Meals ${meals.length}` },
@@ -328,10 +338,10 @@ export function SavedSheet({
       {shown.length === 0 ? (
         <Text style={s.empty}>
           {tab === "meals"
-            ? "Save a meal from the ⋯ on any meal section in Today."
+            ? "Build a meal here, or log food in Today and tap Save meal."
             : tab === "foods"
-              ? "Foods you confirm appear here, ready to reuse."
-              : "Build a recipe in Kitchen and it shows up here."}
+              ? "Foods you confirm show up here."
+              : "Build a recipe from ingredients; it divides into servings."}
         </Text>
       ) : (
         shown.map((food) => (

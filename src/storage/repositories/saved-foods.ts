@@ -12,6 +12,7 @@ import type {
   Timestamp,
 } from "@/types/gymos";
 import { NUTRIENT_KEYS } from "@/types/gymos";
+import type { DraftItem } from "@/types/nourish";
 import { createId } from "@/utils/id";
 
 const SAVED_FOODS_KEY = "@gymos/saved-foods";
@@ -50,6 +51,8 @@ export type SavedFood = {
   slot?: MealSlot;
   /** A per-serving food computed from a recipe's ingredients. */
   recipe?: boolean;
+  ingredients?: DraftItem[];
+  servings?: number;
   createdAt: Timestamp;
 } & Micronutrients;
 
@@ -66,6 +69,8 @@ export type SavedFoodExtras = {
   qty?: string;
   slot?: MealSlot;
   recipe?: boolean;
+  ingredients?: DraftItem[];
+  servings?: number;
 };
 
 /**
@@ -120,6 +125,8 @@ export async function replaceRecipe(
     Pick<SavedFood, "calories" | "protein" | "carbs" | "fat">
   > &
     Micronutrients,
+  ingredients?: readonly DraftItem[],
+  servings?: number,
 ): Promise<SavedFood> {
   return savedFoodsMutex.runExclusive(async () => {
     const existing = await readSavedFoodsUnlocked();
@@ -131,6 +138,10 @@ export async function replaceRecipe(
       ...macros,
       qty: "1 serving",
       recipe: true,
+      ...(ingredients && ingredients.length > 0
+        ? { ingredients: [...ingredients] }
+        : {}),
+      ...(servings !== undefined ? { servings } : {}),
       createdAt: new Date().toISOString(),
     };
 
