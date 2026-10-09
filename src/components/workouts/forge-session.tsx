@@ -29,6 +29,7 @@ import {
   NoteSheet,
   PlatesSheet,
   RepTargetSheet,
+  SetMenuSheet,
   SummarySheet,
   WorkoutMenuSheet,
 } from "@/components/workouts/forge-sheets";
@@ -38,6 +39,7 @@ import { SummaryStrip } from "@/components/workouts/summary-strip";
 import { Screen } from "@/components/ds/screen";
 import { F } from "@/constants/forge-theme";
 import { useLiveSession, type ForgeData } from "@/hooks/use-forge";
+import { parseRepTarget } from "@/services/forge/build";
 import {
   addSet,
   appendExercise,
@@ -105,6 +107,7 @@ type SheetState =
   | { kind: "targetReps"; index: number }
   | { kind: "plates"; index: number }
   | { kind: "exerciseMenu"; index: number }
+  | { kind: "setMenu"; exerciseIndex: number; setIndex: number }
   | { kind: "workoutMenu" }
   | { kind: "finish" };
 
@@ -375,6 +378,15 @@ export function ForgeSession({
               Boolean(exercise.group);
             const linkedBelow = isSupersetLeader(session, index);
 
+            const leader = linkedAbove ? session.exercises[index - 1] : undefined;
+            const highlightedSetIndices = leader
+              ? exercise.sets
+                  .map((set, sIdx) =>
+                    leader.sets[sIdx]?.completed && !set.completed ? sIdx : -1,
+                  )
+                  .filter((i) => i >= 0)
+              : undefined;
+
             return (
               <ExerciseCard
                 key={exercise.id}
@@ -384,6 +396,7 @@ export function ForgeSession({
                 previous={previous}
                 isLinkedAbove={linkedAbove}
                 isLinkedBelow={linkedBelow}
+                highlightedSetIndices={highlightedSetIndices}
                 onOptionsPress={() => setSheet({ kind: "exerciseMenu", index })}
                 onAddSet={() => update((current) => addSet(current, index, new Date()))}
                 onToggleWarmup={(setIndex) =>
@@ -391,6 +404,9 @@ export function ForgeSession({
                 }
                 onToggleFailure={(setIndex) =>
                   update((current) => toggleFailure(current, index, setIndex, new Date()))
+                }
+                onSetMenu={(setIndex) =>
+                  setSheet({ kind: "setMenu", exerciseIndex: index, setIndex })
                 }
                 onRemoveSet={(setIndex) => {
                   const targetExercise = exercise;
@@ -589,6 +605,43 @@ export function ForgeSession({
                   },
                 });
               }
+            }}
+          />
+        ) : null}
+
+        {sheet.kind === "setMenu" && SetMenuSheet ? (
+          <SetMenuSheet
+            visible={true}
+            onClose={() => setSheet({ kind: "none" })}
+            setNumber={sheet.setIndex + 1}
+            isWarmup={session.exercises[sheet.exerciseIndex]?.sets[sheet.setIndex]?.warmup}
+            isFailure={
+              session.exercises[sheet.exerciseIndex]?.sets[sheet.setIndex]?.toFailure ||
+              parseRepTarget(session.exercises[sheet.exerciseIndex]?.repTarget).kind === "amrap"
+            }
+            onToggleWarmup={() => {
+              const { exerciseIndex, setIndex } = sheet;
+              update((current) => toggleWarmup(current, exerciseIndex, setIndex, new Date()));
+            }}
+            onToggleFailure={() => {
+              const { exerciseIndex, setIndex } = sheet;
+              update((current) => toggleFailure(current, exerciseIndex, setIndex, new Date()));
+            }}
+            onRemove={() => {
+              const { exerciseIndex, setIndex } = sheet;
+              const targetExercise = session.exercises[exerciseIndex];
+              const targetSet = targetExercise?.sets[setIndex];
+              setSheet({ kind: "none" });
+              if (!targetExercise || !targetSet) return;
+              update((current) => removeSet(current, exerciseIndex, setIndex, new Date()));
+              showUndoToast({
+                message: "Set removed",
+                onUndo: () => {
+                  update((current) =>
+                    reinsertSet(current, exerciseIndex, setIndex, targetSet, new Date()),
+                  );
+                },
+              });
             }}
           />
         ) : null}

@@ -5,6 +5,7 @@ import { Font } from "@/constants/design";
 import { F } from "@/constants/forge-theme";
 import { tap } from "@/components/workouts/forge-ui";
 import { SetRow } from "@/components/workouts/set-row";
+import { parseRepTarget } from "@/services/forge/build";
 import type { WorkoutExercise, WorkoutSet } from "@/types/gymos";
 import { displayName, formatSetGroup } from "@/utils/format";
 
@@ -20,11 +21,13 @@ type ExerciseCardProps = {
   previous?: PreviousHistory | null;
   isLinkedAbove?: boolean;
   isLinkedBelow?: boolean;
+  highlightedSetIndices?: number[];
   onOptionsPress: () => void;
   onAddSet: () => void;
   onToggleWarmup: (setIndex: number) => void;
   onToggleFailure?: (setIndex: number) => void;
   onRemoveSet: (setIndex: number) => void;
+  onSetMenu?: (setIndex: number) => void;
   onWeightCommit: (setIndex: number, setId: string, weight: number) => void;
   onRepsCommit: (setIndex: number, setId: string, reps: number) => void;
   onToggleDone: (setIndex: number) => void;
@@ -37,11 +40,13 @@ export function ExerciseCard({
   previous,
   isLinkedAbove = false,
   isLinkedBelow = false,
+  highlightedSetIndices,
   onOptionsPress,
   onAddSet,
   onToggleWarmup,
   onToggleFailure,
   onRemoveSet,
+  onSetMenu,
   onWeightCommit,
   onRepsCommit,
   onToggleDone,
@@ -53,6 +58,15 @@ export function ExerciseCard({
     : "First time";
 
   let workSetCounter = 0;
+
+  const isAssisted = exercise.loadType === "assisted";
+  const isBodyweight =
+    Boolean(exercise.bodyweight) ||
+    exercise.loadType === "bodyweight" ||
+    isAssisted;
+  const isTimed = exercise.loadType === "timed";
+  const repTargetParsed = parseRepTarget(exercise.repTarget);
+  const isPlanAmrap = repTargetParsed.kind === "amrap";
 
   return (
     <View
@@ -110,11 +124,6 @@ export function ExerciseCard({
           {`Hit every rep last time. Up ${unit === "kg" ? "2.5 kg" : "5 lb"}.`}
         </Text>
       ) : null}
-      {exercise.bodyweight ? (
-        <Text style={styles.bodyweightHint}>
-          Bodyweight. The weight box is extra load (minus if assisted).
-        </Text>
-      ) : null}
       {exercise.tip ? (
         <Text style={styles.tipText}>{`Tip · ${exercise.tip}`}</Text>
       ) : null}
@@ -124,8 +133,14 @@ export function ExerciseCard({
       {/* Table Column Headers (rendered once) */}
       <View style={styles.tableHeader}>
         <Text style={[styles.th, styles.thSet]}>SET</Text>
-        <Text style={[styles.th, styles.thInput]}>{unit.toUpperCase()}</Text>
-        <Text style={[styles.th, styles.thInput]}>REPS</Text>
+        <Text style={[styles.th, styles.thInput]}>
+          {isAssisted
+            ? "ASSIST"
+            : isBodyweight
+              ? `+${unit.toUpperCase()}`
+              : unit.toUpperCase()}
+        </Text>
+        <Text style={[styles.th, styles.thInput]}>{isTimed ? "SEC" : "REPS"}</Text>
         <Text style={[styles.th, styles.thPrev]}>PREV</Text>
         <Text style={[styles.th, styles.thCheck]}>✓</Text>
       </View>
@@ -143,25 +158,35 @@ export function ExerciseCard({
             : undefined;
 
           return (
-            <SetRow
-              key={set.id}
-              set={set}
-              setIndex={setIndex}
-              workSetNumber={workSetCounter}
-              unit={unit}
-              bodyweight={exercise.bodyweight}
-              refSet={refSet}
-              onToggleWarmup={() => onToggleWarmup(setIndex)}
-              onToggleFailure={
-                onToggleFailure ? () => onToggleFailure(setIndex) : undefined
-              }
-              onRemove={() => onRemoveSet(setIndex)}
-              onWeightCommit={(weight) =>
-                onWeightCommit(setIndex, set.id, weight)
-              }
-              onRepsCommit={(reps) => onRepsCommit(setIndex, set.id, reps)}
-              onToggleDone={() => onToggleDone(setIndex)}
-            />
+            <View key={set.id}>
+              <SetRow
+                set={set}
+                setIndex={setIndex}
+                workSetNumber={workSetCounter}
+                unit={unit}
+                bodyweight={isBodyweight}
+                isTimed={isTimed}
+                isFailure={isPlanAmrap}
+                isHighlighted={highlightedSetIndices?.includes(setIndex)}
+                refSet={refSet}
+                onToggleWarmup={() => onToggleWarmup(setIndex)}
+                onToggleFailure={
+                  onToggleFailure ? () => onToggleFailure(setIndex) : undefined
+                }
+                onRemove={() => onRemoveSet(setIndex)}
+                onMenu={onSetMenu ? () => onSetMenu(setIndex) : undefined}
+                onWeightCommit={(weight) =>
+                  onWeightCommit(setIndex, set.id, weight)
+                }
+                onRepsCommit={(reps) => onRepsCommit(setIndex, set.id, reps)}
+                onToggleDone={() => onToggleDone(setIndex)}
+              />
+              {setIndex === 0 && isBodyweight ? (
+                <Text style={styles.bodyweightHelper}>
+                  Extra load. Use − for assistance.
+                </Text>
+              ) : null}
+            </View>
           );
         })
       )}
@@ -369,5 +394,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: F.acc,
+  },
+  bodyweightHelper: {
+    fontFamily: Font.sans,
+    fontSize: 12,
+    color: F.mute,
+    marginTop: 4,
+    marginBottom: 6,
+    paddingLeft: 4,
   },
 });

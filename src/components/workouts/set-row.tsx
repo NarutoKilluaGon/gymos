@@ -21,10 +21,14 @@ type SetRowProps = {
   workSetNumber: number;
   unit: "kg" | "lb";
   bodyweight?: boolean;
+  isTimed?: boolean;
+  isFailure?: boolean;
+  isHighlighted?: boolean;
   refSet?: { weight?: number; reps?: number };
   onToggleWarmup: () => void;
   onToggleFailure?: () => void;
   onRemove: () => void;
+  onMenu?: () => void;
   onWeightCommit: (weight: number) => void;
   onRepsCommit: (reps: number) => void;
   onToggleDone: () => void;
@@ -36,37 +40,52 @@ export function SetRow({
   workSetNumber,
   unit,
   bodyweight = false,
+  isTimed = false,
+  isFailure = false,
+  isHighlighted = false,
   refSet,
   onToggleWarmup,
   onToggleFailure,
   onRemove,
+  onMenu,
   onWeightCommit,
   onRepsCommit,
   onToggleDone,
 }: SetRowProps) {
   const checkScale = useRef(new Animated.Value(1)).current;
+  const effectiveFailure = Boolean(set.toFailure) || Boolean(isFailure);
   const weightPlaceholder = refSet?.weight
     ? String(round1(refSet.weight))
     : bodyweight
       ? "+0"
       : "—";
 
-  const repsPlaceholder = refSet?.reps ? String(refSet.reps) : "—";
+  const repsPlaceholder = effectiveFailure
+    ? "max"
+    : refSet?.reps
+      ? String(refSet.reps)
+      : isTimed
+        ? "30"
+        : "—";
 
   const prevText =
-    refSet?.weight !== undefined && refSet?.reps !== undefined
-      ? `${round1(refSet.weight)}×${refSet.reps}`
-      : "—";
+    effectiveFailure && refSet?.reps !== undefined
+      ? String(refSet.reps)
+      : refSet?.weight !== undefined && refSet?.reps !== undefined
+        ? `${round1(refSet.weight)}×${refSet.reps}`
+        : refSet?.reps !== undefined
+          ? String(refSet.reps)
+          : "—";
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, isHighlighted && styles.rowHighlighted]}>
       {/* 1. SET / WARMUP BADGE (tap = warmup, double tap / long tap = failure) */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
           set.warmup
             ? "Warm-up set. Tap to make a work set"
-            : set.toFailure
+            : effectiveFailure
               ? "Taken to failure"
               : "Tap to mark as warm-up"
         }
@@ -78,17 +97,17 @@ export function SetRow({
         style={[
           styles.badge,
           set.warmup && styles.badgeWarm,
-          !set.warmup && set.toFailure && styles.badgeFailure,
+          !set.warmup && effectiveFailure && styles.badgeFailure,
         ]}
       >
         <Text
           style={[
             styles.badgeText,
             set.warmup && styles.badgeWarmText,
-            !set.warmup && set.toFailure && styles.badgeFailureText,
+            !set.warmup && effectiveFailure && styles.badgeFailureText,
           ]}
         >
-          {set.warmup ? "W" : set.toFailure ? `${workSetNumber}F` : String(workSetNumber)}
+          {set.warmup ? "W" : effectiveFailure ? "F" : String(workSetNumber)}
         </Text>
       </Pressable>
 
@@ -106,17 +125,34 @@ export function SetRow({
       {/* 3. REPS INPUT */}
       <View style={styles.inputWrap}>
         <NumberField
-          label={`Set ${setIndex + 1} reps`}
+          label={`Set ${setIndex + 1} ${isTimed ? "seconds" : "reps"}`}
           value={set.reps}
           placeholder={repsPlaceholder}
           onCommit={onRepsCommit}
         />
       </View>
 
-      {/* 4. PREV COLUMN */}
-      <View style={styles.prevWrap}>
-        <Text style={styles.prevText}>{prevText}</Text>
-      </View>
+      {/* 4. PREV COLUMN (tappable to copy into row) */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={prevText !== "—" ? `Copy previous ${prevText}` : "Previous set"}
+        disabled={prevText === "—" || (refSet?.weight === undefined && refSet?.reps === undefined)}
+        onPress={() => {
+          if (refSet?.weight !== undefined) {
+            onWeightCommit(refSet.weight);
+          }
+          if (refSet?.reps !== undefined) {
+            onRepsCommit(refSet.reps);
+          }
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }}
+        onLongPress={onMenu}
+        style={styles.prevWrap}
+      >
+        <Text style={[styles.prevText, prevText !== "—" && styles.prevTextActive]}>
+          {prevText}
+        </Text>
+      </Pressable>
 
       {/* 5. DONE CHECKBOX */}
       <Pressable
@@ -141,7 +177,9 @@ export function SetRow({
           onToggleDone();
         }}
         onLongPress={() => {
-          if (onToggleFailure) {
+          if (onMenu) {
+            onMenu();
+          } else if (onToggleFailure) {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             onToggleFailure();
           }
@@ -151,6 +189,7 @@ export function SetRow({
           style={[
             styles.check,
             set.completed && styles.checkOn,
+            isHighlighted && !set.completed && styles.checkHighlighted,
             { transform: [{ scale: checkScale }] },
           ]}
         >
@@ -233,5 +272,19 @@ const styles = StyleSheet.create({
   checkOn: {
     backgroundColor: F.acc,
     borderColor: F.acc,
+  },
+  rowHighlighted: {
+    backgroundColor: "rgba(217, 164, 65, 0.08)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(217, 164, 65, 0.4)",
+    paddingHorizontal: 4,
+  },
+  checkHighlighted: {
+    borderColor: F.acc,
+    borderWidth: 1.5,
+  },
+  prevTextActive: {
+    color: F.mute,
   },
 });

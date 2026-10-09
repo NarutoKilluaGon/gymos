@@ -43,16 +43,16 @@ import {
 } from "@/services/forge/catalog";
 import { round1, type WeightUnit } from "@/services/forge/load";
 import { DEFAULT_BAR, platesFor } from "@/services/forge/plates";
-import type { CalendarDaySummary } from "@/services/forge/calendar";
-import { getMonthGrid, getMonthStats } from "@/services/forge/calendar";
+import {
+  getMonthGrid,
+  getMonthStats,
+  type CalendarDaySummary,
+} from "@/services/forge/calendar";
 import { dateFromKey } from "@/utils/date";
-import { dayFor } from "@/services/forge/plan";
+import { dayFor, PLAN_TEMPLATES } from "@/services/forge/plan";
 import { displayName, plural } from "@/utils/format";
-import type { Plan } from "@/types/forge";
-import type { WorkoutSession } from "@/types/gymos";
-import { PLAN_TEMPLATES } from "@/services/forge/plan";
-import type { CatalogExercise, LoadType } from "@/types/forge";
-import type { SessionPr } from "@/types/gymos";
+import type { CatalogExercise, LoadType, Plan } from "@/types/forge";
+import type { SessionPr, WorkoutSession } from "@/types/gymos";
 
 const LOAD_TYPES: readonly { type: LoadType; label: string }[] = [
   { type: "barbell", label: "Barbell" },
@@ -737,6 +737,58 @@ export function ExerciseMenuSheet({
       <ListRow
         icon={<Trash2 size={18} color={F.bad} />}
         title="Remove"
+        destructive
+        separator={false}
+        onPress={() => {
+          onClose();
+          onRemove();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+/** Long-press options for a specific set in ForgeSession. */
+export function SetMenuSheet({
+  visible,
+  onClose,
+  setNumber,
+  isWarmup,
+  isFailure,
+  onToggleWarmup,
+  onToggleFailure,
+  onRemove,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  setNumber: number;
+  isWarmup?: boolean;
+  isFailure?: boolean;
+  onToggleWarmup: () => void;
+  onToggleFailure: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title={`Set ${setNumber} options`}>
+      <ListRow
+        icon={<Flame size={18} color={isFailure ? F.bad : F.mute} />}
+        title={isFailure ? "Remove failure mark" : "Mark as to failure"}
+        onPress={() => {
+          onClose();
+          onToggleFailure();
+        }}
+      />
+      <ListRow
+        icon={<Dumbbell size={18} color={isWarmup ? F.warm : F.mute} />}
+        title={isWarmup ? "Make work set" : "Mark as warm-up"}
+        onPress={() => {
+          onClose();
+          onToggleWarmup();
+        }}
+      />
+      <ListRow
+        icon={<Trash2 size={18} color={F.bad} />}
+        title="Remove set"
         destructive
         separator={false}
         onPress={() => {

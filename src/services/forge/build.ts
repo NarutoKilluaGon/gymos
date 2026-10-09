@@ -90,7 +90,7 @@ export function bottomReps(target: string | undefined): number {
  * sets to 60% (minimum 2) and loads to 90%, and never progresses.
  */
 export function buildExercise(input: {
-  exercise: Pick<CatalogExercise, "id" | "name" | "bodyweight">;
+  exercise: Pick<CatalogExercise, "id" | "name" | "bodyweight" | "loadType">;
   target?: Pick<PlanExercise, "sets" | "reps" | "weight" | "tip">;
   /** Work sets from the previous session, or null if none. */
   previous: readonly WorkoutSet[] | null;
@@ -149,6 +149,7 @@ export function buildExercise(input: {
     name: exercise.name,
     sets,
     ...(bodyweight ? { bodyweight: true } : {}),
+    ...(exercise.loadType ? { loadType: exercise.loadType } : {}),
     ...(tip ? { tip } : {}),
     ...(progressed ? { progressed: true } : {}),
     ...(target?.reps ? { repTarget: target.reps } : {}),

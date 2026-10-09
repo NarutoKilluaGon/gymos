@@ -1,3 +1,5 @@
+import type { LoadType } from "./forge";
+
 export type ID = string;
 
 export type Timestamp = string;
@@ -61,6 +63,7 @@ export type WorkoutExercise = {
   sets: WorkoutSet[];
   /** Load is body weight plus the set's (extra) weight. */
   bodyweight?: boolean;
+  loadType?: LoadType;
   note?: string;
   /** Coaching cue carried over from the plan. */
   tip?: string;
