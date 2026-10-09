@@ -1,8 +1,32 @@
 import React from "react";
-import { StyleProp, StyleSheet, Text, TextStyle } from "react-native";
+import { StyleProp, StyleSheet, Text as RNText, TextProps as RNTextProps, TextStyle } from "react-native";
 
-import { Font } from "@/constants/design";
+import { Type } from "@/constants/design";
 import { useTheme } from "@/contexts/theme-context";
+
+export type TypeRole = keyof typeof Type;
+
+export type TextProps = Omit<RNTextProps, "role"> & {
+  role?: TypeRole;
+  style?: StyleProp<TextStyle>;
+};
+
+export function Text({ role = "body", style, ...props }: TextProps) {
+  const theme = useTheme();
+  const baseStyle = Type[role] ?? Type.body;
+
+  // Serif roles or primary headings get ink color by default; meta/eyebrow get mute
+  let defaultColor = theme.ink;
+  if (role === "meta") defaultColor = theme.mute;
+  if (role === "eyebrow") defaultColor = theme.acc;
+
+  return (
+    <RNText
+      style={[{ color: defaultColor }, baseStyle, style]}
+      {...props}
+    />
+  );
+}
 
 export function Eyebrow({
   children,
@@ -14,15 +38,15 @@ export function Eyebrow({
   const theme = useTheme();
 
   return (
-    <Text
+    <RNText
       style={[
-        styles.eyebrow,
+        Type.eyebrow,
         { color: theme.acc },
         style,
       ]}
     >
       {children}
-    </Text>
+    </RNText>
   );
 }
 
@@ -36,32 +60,21 @@ export function Label({
   const theme = useTheme();
 
   return (
-    <Text
+    <RNText
       style={[
-        styles.label,
+        Type.eyebrow,
+        styles.labelMargin,
         { color: theme.mute },
         style,
       ]}
     >
       {children}
-    </Text>
+    </RNText>
   );
 }
 
 const styles = StyleSheet.create({
-  eyebrow: {
-    fontFamily: Font.sans,
-    fontSize: 11,
-    letterSpacing: 2,
-    textTransform: "uppercase",
-    fontWeight: "600",
-  },
-  label: {
-    fontFamily: Font.sans,
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    fontWeight: "500",
+  labelMargin: {
     marginBottom: 6,
   },
 });

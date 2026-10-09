@@ -2,19 +2,27 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CardioSheet } from "@/components/nutrition/more-sheets";
-import { Button, FCard, Label, Pill, fmtInt, tap } from "@/components/workouts/forge-ui";
+import { Button, FCard, Label, Pill, tap } from "@/components/workouts/forge-ui";
 import { F, FSerif } from "@/constants/forge-theme";
 import type { ForgeData } from "@/hooks/use-forge";
 import { useTodayKey } from "@/hooks/use-today-key";
 import { completedSessions, sessionDate } from "@/services/forge/history";
-import { formatSets, fromKg, sessionVolumeKg } from "@/services/forge/load";
+import { fromKg, sessionVolumeKg } from "@/services/forge/load";
 import { dayFor } from "@/services/forge/plan";
 import { activePlan } from "@/services/forge/settings";
-import { durationMs, formatClock } from "@/services/forge/timing";
+import { durationMs } from "@/services/forge/timing";
 import { MONTH_SHORT } from "@/services/nourish/insights";
 import type { CardioLog } from "@/types/nourish";
 import type { WorkoutSession } from "@/types/gymos";
 import { addDaysToKey, dateFromKey, getTodayKey } from "@/utils/date";
+import {
+  displayName,
+  formatDuration,
+  formatPlanTarget,
+  formatSetGroup,
+  formatWeight,
+  plural,
+} from "@/utils/format";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -125,23 +133,23 @@ export function TodayView({
         <Pressable key={session.id} accessibilityRole="button" onPress={() => { tap(); onOpen(session); }}>
           <FCard style={s.card}>
             <Text style={s.meta}>
-              {`Done · ${session.backdated ? "logged" : formatClock(durationMs(session, 0))}`}
+              {`Done · ${session.backdated ? "logged" : formatDuration(durationMs(session, 0))}`}
             </Text>
-            <Text style={s.bigName}>{session.name}</Text>
+            <Text style={s.bigName}>{displayName(session.name)}</Text>
             <Text style={s.meta}>
-              {`${fmtInt(fromKg(sessionVolumeKg(session), unit))} ${unit} · ${session.exercises.length} exercises`}
+              {`${formatWeight(fromKg(sessionVolumeKg(session), unit), unit)} · ${plural(session.exercises.length, "exercise")}`}
             </Text>
             {session.exercises.slice(0, 4).map((exercise) => (
               <View key={exercise.id} style={s.exerciseRow}>
                 <Text style={s.exerciseName} numberOfLines={1}>
-                  {exercise.name}
+                  {displayName(exercise.name)}
                 </Text>
                 <Text style={s.exerciseSets}>
-                  {formatSets(exercise, unit)}
+                  {formatSetGroup(exercise.sets, unit, exercise.bodyweight)}
                 </Text>
               </View>
             ))}
-            {(session.prs ?? []).length > 0 ? <Text style={s.pr}>{`${session.prs?.length} new record${session.prs?.length === 1 ? "" : "s"}`}</Text> : null}
+            {(session.prs ?? []).length > 0 ? <Text style={s.pr}>{plural(session.prs?.length ?? 0, "new record")}</Text> : null}
           </FCard>
         </Pressable>
       ))}
@@ -152,7 +160,7 @@ export function TodayView({
           {cardio.map((entry) => (
             <View key={entry.id} style={s.cardioRow}>
               <View style={{ flexShrink: 1 }}>
-                <Text style={s.lineStrong}>{entry.name}</Text>
+                <Text style={s.lineStrong}>{displayName(entry.name)}</Text>
                 <Text style={s.meta}>{entry.detail}</Text>
               </View>
               <View style={s.cardioRight}>
@@ -173,20 +181,20 @@ export function TodayView({
               ? `${plan?.rotate ? "Next in rotation" : "Planned"}${plan?.deload ? " · deload week" : ""}`
               : "No session planned"}
           </Text>
-          <Text style={s.bigName}>{planned ? planned.name : plan?.rotate && !isToday ? "Nothing logged" : "Rest day"}</Text>
+          <Text style={s.bigName}>{planned ? displayName(planned.name) : plan?.rotate && !isToday ? "Nothing logged" : "Rest day"}</Text>
           {planned ? (
             <>
               <Text style={s.meta}>
-                {`${planned.exercises.length} exercise${planned.exercises.length === 1 ? "" : "s"} · ~${Math.max(20, planned.exercises.length * 10)} min`}
+                {`${plural(planned.exercises.length, "exercise")} · ~${Math.max(20, planned.exercises.length * 10)} min`}
               </Text>
               <View style={s.previewList}>
                 {planned.exercises.map((exercise) => (
                   <View key={exercise.exerciseId} style={s.exerciseRow}>
                     <Text style={s.exerciseName} numberOfLines={1}>
-                      {exercise.name}
+                      {displayName(exercise.name)}
                     </Text>
                     <Text style={s.exerciseSets}>
-                      {`${exercise.sets} × ${exercise.reps}`}
+                      {formatPlanTarget(exercise, unit)}
                     </Text>
                   </View>
                 ))}
@@ -194,7 +202,7 @@ export function TodayView({
               <View style={s.buttonRow}>
                 <View style={{ flex: 1 }}>
                   <Button
-                    label={`Start ${planned.name}`}
+                    label={`Start ${displayName(planned.name)}`}
                     onPress={() => start(planned.id)}
                   />
                 </View>
@@ -219,7 +227,7 @@ export function TodayView({
           ) : (
             <View style={s.pills}>
               {others.map((day) => (
-                <Pill key={day.id} label={day.name} onPress={() => start(day.id)} />
+                <Pill key={day.id} label={displayName(day.name)} onPress={() => start(day.id)} />
               ))}
               <Pill label="Blank workout" onPress={() => start(null)} />
             </View>
@@ -227,11 +235,11 @@ export function TodayView({
           {planned && others.length > 0 ? (
             <View style={s.pills}>
               {others.map((day) => (
-                <Pill key={day.id} label={day.name} onPress={() => start(day.id)} />
+                <Pill key={day.id} label={displayName(day.name)} onPress={() => start(day.id)} />
               ))}
             </View>
           ) : null}
-          <Text style={[s.meta, { marginTop: 14 }]}>{`${lastWeek} workout${lastWeek === 1 ? "" : "s"} in the last 7 days`}</Text>
+          <Text style={[s.meta, { marginTop: 14 }]}>{`${plural(lastWeek, "workout")} in the last 7 days`}</Text>
         </FCard>
       ) : !active ? (
         <View style={s.pills}>

@@ -33,6 +33,7 @@ import {
 } from "@/services/forge/plan";
 import { activePlan, MAX_REST_SECONDS } from "@/services/forge/settings";
 import type { CatalogExercise, ForgeSettings, Plan, PlanExercise } from "@/types/forge";
+import { displayName } from "@/utils/format";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const REST_CHOICES = [
@@ -287,7 +288,7 @@ export function PlanView({
 
               {day.exercises.map((exercise, index) => (
                 <View key={`${exercise.exerciseId}-${index}`} style={s.exRow}>
-                  <Text style={s.exName}>{exercise.name}</Text>
+                  <Text style={s.exName}>{displayName(exercise.name)}</Text>
                   <View style={s.targets}>
                     <NumberField
                       label={`${exercise.name} sets`}

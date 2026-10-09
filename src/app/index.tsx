@@ -73,6 +73,7 @@ import type {
   WorkoutSession,
 } from "@/types/gymos";
 import { getTodayKey } from "@/utils/date";
+import { displayName, formatNumber, plural } from "@/utils/format";
 import { showToast } from "@/utils/toast";
 
 const DEFAULT_WATER = 0;
@@ -122,9 +123,10 @@ function getSuggestion(
   nutritionEnabled: boolean,
 ): string {
   if (activeWorkout) {
-    return `Continue your workout — ${activeWorkout.exercises.length} ${
-      activeWorkout.exercises.length === 1 ? "exercise" : "exercises"
-    } logged.`;
+    return `Continue your workout — ${plural(
+      activeWorkout.exercises.length,
+      "exercise",
+    )} logged.`;
   }
 
   if (waterLitres <= 0) {
@@ -132,7 +134,7 @@ function getSuggestion(
   }
 
   if (waterLitres < DAILY_TARGETS.waterL) {
-    return `Stay hydrated — ${(DAILY_TARGETS.waterL - waterLitres).toFixed(1)}L to go today.`;
+    return `Stay hydrated — ${formatNumber(DAILY_TARGETS.waterL - waterLitres)}L to go today.`;
   }
 
   if (meals.length === 0) {
@@ -140,7 +142,7 @@ function getSuggestion(
   }
 
   if (nutritionEnabled && proteinTarget && protein < proteinTarget * 0.5) {
-    return `Protein is low — ${Math.round(proteinTarget - protein)}g to hit your target.`;
+    return `Protein is low — ${formatNumber(Math.round(proteinTarget - protein))}g to hit your target.`;
   }
 
   if (supplementProgress.total > 0 && supplementProgress.taken < supplementProgress.total) {
@@ -149,7 +151,7 @@ function getSuggestion(
   }
 
   if (steps < stepsTarget * 0.5) {
-    return `Get moving — ${stepsTarget - steps} steps to go today.`;
+    return `Get moving — ${formatNumber(stepsTarget - steps)} steps to go today.`;
   }
 
   const hasSleep = sleep.some((s) => s.endedAt);
@@ -404,8 +406,8 @@ export default function HomeScreen() {
       recentEvents.push({
         id: s.id,
         type: "workout",
-        title: s.name || "Workout session",
-        subtitle: `${s.exercises.length} ${s.exercises.length === 1 ? "exercise" : "exercises"} logged`,
+        title: displayName(s.name || "Workout session"),
+        subtitle: `${plural(s.exercises.length, "exercise")} logged`,
         timestamp: s.endedAt ?? s.startedAt,
       });
     });
@@ -414,8 +416,8 @@ export default function HomeScreen() {
     recentEvents.push({
       id: m.id,
       type: "meal",
-      title: m.name || "Meal",
-      subtitle: `${Math.round(m.calories ?? 0)} kcal · ${Math.round(m.protein ?? 0)}g protein`,
+      title: displayName(m.name || "Meal"),
+      subtitle: `${formatNumber(Math.round(m.calories ?? 0))} kcal · ${formatNumber(Math.round(m.protein ?? 0))}g protein`,
       timestamp:
         (m as { loggedAt?: string; createdAt?: string }).loggedAt ??
         (m as { createdAt?: string }).createdAt ??

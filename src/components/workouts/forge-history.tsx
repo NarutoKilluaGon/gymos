@@ -1,16 +1,17 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { Bar, FCard, Label, fmtInt, tap } from "@/components/workouts/forge-ui";
+import { Bar, FCard, Label, tap } from "@/components/workouts/forge-ui";
 import { F, FSerif } from "@/constants/forge-theme";
 import type { ForgeData } from "@/hooks/use-forge";
 import { muscleBalance } from "@/services/forge/balance";
 import { historyGrid } from "@/services/forge/grid";
 import { completedSessions, sessionDate } from "@/services/forge/history";
 import { fromKg, sessionVolumeKg, type WeightUnit } from "@/services/forge/load";
-import { durationMs, formatClock } from "@/services/forge/timing";
+import { durationMs } from "@/services/forge/timing";
 import { MONTH_SHORT } from "@/services/nourish/insights";
 import type { WorkoutSession } from "@/types/gymos";
 import { addDaysToKey, dateFromKey } from "@/utils/date";
+import { displayName, formatDuration, formatWeight, plural } from "@/utils/format";
 
 export function HistoryView({
   data,
@@ -70,7 +71,7 @@ export function HistoryView({
               <View style={{ flex: 1 }}>
                 <Bar value={entry.share} max={1} color={F.acc} />
               </View>
-              <Text style={s.balValue}>{`${entry.sets} sets`}</Text>
+              <Text style={s.balValue}>{plural(entry.sets, "set")}</Text>
             </View>
           ))}
         </FCard>
@@ -89,7 +90,7 @@ export function HistoryView({
               </View>
               {grid.rows.map((row) => (
                 <View key={row.exerciseId} style={s.gridRow}>
-                  <Text style={[s.gridText, s.gridName]} numberOfLines={1}>{row.name}</Text>
+                  <Text style={[s.gridText, s.gridName]} numberOfLines={1}>{displayName(row.name)}</Text>
                   {row.cells.map((cell, index) => {
                     const column = grid.columns[index];
                     const pr = column?.session.prs?.some((entry) => entry.exerciseId === row.exerciseId);
@@ -117,7 +118,7 @@ export function HistoryView({
               const date = dateFromKey(sessionDate(session));
               const dur = session.backdated
                 ? "logged"
-                : formatClock(durationMs(session, 0));
+                : formatDuration(durationMs(session, 0));
 
               return (
                 <Pressable
@@ -131,14 +132,14 @@ export function HistoryView({
                 >
                   <View style={s.rowLeft}>
                     <Text style={s.workoutName} numberOfLines={1}>
-                      {session.name}
+                      {displayName(session.name)}
                     </Text>
                     <Text style={s.meta}>
-                      {`${date.getDate()} ${MONTH_SHORT[date.getMonth()]} · ${session.exercises.length} exercises · ${dur}`}
+                      {`${date.getDate()} ${MONTH_SHORT[date.getMonth()]} · ${plural(session.exercises.length, "exercise")} · ${dur}`}
                     </Text>
                   </View>
                   <Text style={s.workoutVol}>
-                    {`${fmtInt(fromKg(sessionVolumeKg(session), unit))} ${unit}`}
+                    {formatWeight(fromKg(sessionVolumeKg(session), unit), unit)}
                   </Text>
                 </Pressable>
               );

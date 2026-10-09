@@ -14,6 +14,7 @@ import { HOME } from "@/constants/design";
 import { Spacing, Typography } from "@/constants/theme";
 import type { PlanDay } from "@/types/forge";
 import type { WorkoutSession } from "@/types/gymos";
+import { plural } from "@/utils/format";
 
 type WorkoutCardProps = {
   /** Today's workout, or null if none started yet. */
@@ -27,8 +28,7 @@ type WorkoutCardProps = {
 };
 
 function exerciseCount(day: PlanDay): string {
-  const count = day.exercises.length;
-  return `${count} ${count === 1 ? "exercise" : "exercises"}`;
+  return plural(day.exercises.length, "exercise");
 }
 
 function describeWorkout(workout: WorkoutSession): {
@@ -53,9 +53,7 @@ function describeWorkout(workout: WorkoutSession): {
 
   if (workout.exercises.length > 0) {
     parts.push(
-      `${workout.exercises.length} ${
-        workout.exercises.length === 1 ? "exercise" : "exercises"
-      }, ${totalSets} ${totalSets === 1 ? "set" : "sets"} logged`,
+      `${plural(workout.exercises.length, "exercise")}, ${plural(totalSets, "set")} logged`,
     );
   }
 
@@ -160,7 +158,7 @@ export function WorkoutCard({
 
         <Text style={styles.title}>{finishedToday.name || "Workout done"}</Text>
         <Text style={styles.message}>
-          {finishedToday.exercises.length} {finishedToday.exercises.length === 1 ? "exercise" : "exercises"} completed today. Great work!
+          {plural(finishedToday.exercises.length, "exercise")} completed today. Great work!
         </Text>
 
         <Pressable

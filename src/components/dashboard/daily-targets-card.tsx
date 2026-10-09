@@ -4,6 +4,7 @@ import { GymCard } from "@/components/ui/gym-card";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { GymColors, Spacing, Typography } from "@/constants/theme";
 import { DAILY_TARGETS } from "@/constants/targets";
+import { formatNumber } from "@/utils/format";
 
 type DailyTargetsCardProps = {
   water: number;
@@ -80,7 +81,7 @@ export function DailyTargetsCard({
         <TargetRow
           key="protein"
           label="Protein"
-          value={`${Math.round(protein ?? 0)}g`}
+          value={`${formatNumber(Math.round(protein ?? 0))}g`}
           compact={compact}
         />
       );
@@ -130,7 +131,7 @@ export function DailyTargetsCard({
         <TargetRow
           key="steps"
           label="Steps"
-          value={steps.toLocaleString()}
+          value={formatNumber(steps)}
           compact={compact}
         />
       );

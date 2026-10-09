@@ -144,37 +144,90 @@ export const Font = {
 };
 
 export const Type = {
-  title: {
+  // Serif roles (>= 20px, titles & big numerals only)
+  display: {
     fontFamily: Font.serif,
     fontSize: 34,
-    fontWeight: "300" as const,
     lineHeight: 40,
+    fontWeight: "300" as const,
   },
+  title: {
+    fontFamily: Font.serif,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "300" as const,
+  },
+  section: {
+    fontFamily: Font.serif,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "300" as const,
+  },
+  numeralXL: {
+    fontFamily: Font.serif,
+    fontSize: 40,
+    lineHeight: 44,
+    fontWeight: "300" as const,
+    fontVariant: ["tabular-nums" as const],
+  },
+  numeralM: {
+    fontFamily: Font.serif,
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: "300" as const,
+    fontVariant: ["tabular-nums" as const],
+  },
+
+  // Sans roles (never above 20px)
+  body: {
+    fontFamily: Font.sans,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "400" as const,
+  },
+  rowTitle: {
+    fontFamily: Font.sans,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "500" as const,
+  },
+  meta: {
+    fontFamily: Font.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "400" as const,
+  },
+  eyebrow: {
+    fontFamily: Font.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 1.6,
+    textTransform: "uppercase" as const,
+    fontWeight: "600" as const,
+  },
+  button: {
+    fontFamily: Font.sans,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "600" as const,
+  },
+  input: {
+    fontFamily: Font.sans,
+    fontSize: 17,
+    fontWeight: "400" as const,
+  },
+
+  // Backward compatibility aliases
   titleSm: {
     fontFamily: Font.serif,
     fontSize: 22,
     fontWeight: "300" as const,
     lineHeight: 28,
   },
-  body: {
-    fontFamily: Font.sans,
-    fontSize: 15,
-    lineHeight: 20,
-  },
   caption: {
     fontFamily: Font.sans,
     fontSize: 13,
     lineHeight: 16,
-  },
-  eyebrow: {
-    fontFamily: Font.sans,
-    fontSize: 11,
-    letterSpacing: 2,
-    textTransform: "uppercase" as const,
-  },
-  input: {
-    fontFamily: Font.sans,
-    fontSize: 17,
   },
   numeral: {
     fontFamily: Font.serif,

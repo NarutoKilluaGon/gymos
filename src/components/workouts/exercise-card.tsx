@@ -5,8 +5,8 @@ import { Font } from "@/constants/design";
 import { F } from "@/constants/forge-theme";
 import { tap } from "@/components/workouts/forge-ui";
 import { SetRow } from "@/components/workouts/set-row";
-import { formatSets } from "@/services/forge/load";
 import type { WorkoutExercise, WorkoutSet } from "@/types/gymos";
+import { displayName, formatSetGroup } from "@/utils/format";
 
 type PreviousHistory = {
   exercise: WorkoutExercise;
@@ -44,10 +44,10 @@ export function ExerciseCard({
   onRepsCommit,
   onToggleDone,
 }: ExerciseCardProps) {
-  // Format the "Last" line with middle-dot separators:
-  // e.g., "Last · 25×12 · 27.5×8"
+  // Format the "Last" line with shared set group notation:
+  // e.g., "Last · 3 × 20 @ 35 kg" or "Last · 35 kg × 20, 30 kg × 12"
   const lastLine = previous
-    ? `Last · ${formatSets(previous.exercise, unit).replace(/\s+/g, " · ")}`
+    ? `Last · ${formatSetGroup(previous.sets, unit, previous.exercise.bodyweight)}`
     : "First time";
 
   let workSetCounter = 0;
@@ -72,7 +72,7 @@ export function ExerciseCard({
             <Text style={styles.indexBadgeText}>{exerciseIndex + 1}</Text>
           </View>
           <Text style={styles.exerciseName} numberOfLines={2}>
-            {exercise.name}
+            {displayName(exercise.name)}
           </Text>
         </View>
 

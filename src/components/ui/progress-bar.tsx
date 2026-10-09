@@ -7,6 +7,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { GymColors, Radius, Spacing, Typography } from '@/constants/theme';
+import { formatNumber } from '@/utils/format';
 import { TimingConfig } from '@/utils/motion';
 
 type ProgressBarProps = {
@@ -57,7 +58,7 @@ export function ProgressBar({
         {!hideHeader && (
           <View style={styles.headerCompact}>
             <Text style={styles.valueCompact}>
-              {current.toFixed(current >= 10 ? 0 : 1)} / {target.toFixed(target >= 10 ? 0 : 1)} {unit}
+              {formatNumber(current)} / {formatNumber(target)} {unit}
             </Text>
 
             <Text
@@ -88,7 +89,7 @@ export function ProgressBar({
       {!hideHeader && (
         <View style={styles.header}>
           <Text style={styles.value}>
-            {current.toFixed(1)} / {target.toFixed(1)} {unit}
+            {formatNumber(current)} / {formatNumber(target)} {unit}
           </Text>
 
           <Text
