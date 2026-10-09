@@ -50,7 +50,9 @@ import {
 import {
   deleteSavedFood,
   getSavedFoods,
+  rememberFoods,
   restoreSavedFood,
+  type RememberedFood,
   type SavedFood,
 } from "@/storage/repositories/saved-foods";
 import type { Meal, MealSlot, Measurement } from "@/types/gymos";
@@ -251,6 +253,8 @@ export function useNourish() {
         act(() => deleteSavedFood(id), "Couldn't delete"),
       restoreSaved: (food: SavedFood, index?: number) =>
         act(() => restoreSavedFood(food, index), "Couldn't restore"),
+      rememberFood: (food: RememberedFood) =>
+        act(() => rememberFoods([food]), "Couldn't save food"),
       addRecipe: (name: string, items: readonly DraftItem[], servings: number) =>
         act(() => saveRecipe(name, items, servings), "Couldn't save recipe"),
       addCardio: (

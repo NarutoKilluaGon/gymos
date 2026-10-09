@@ -18,6 +18,10 @@ import {
   localFoodItems,
   reconcileEnergy,
 } from "@/services/nourish/local-food";
+import {
+  findFoodDefinition,
+  calculateFoodMacros,
+} from "@/data/foods";
 import type { SavedFood } from "@/storage/repositories/saved-foods";
 import { pickMicronutrients, type EstimatedFood } from "@/types/gymos";
 import type { DraftItem, DraftSource } from "@/types/nourish";
@@ -54,6 +58,15 @@ export type ResolveOutcome =
       name: string;
       reason: "unreadable" | "unavailable";
     };
+
+export type SegmentStatus = "matched" | "estimated" | "needs-input";
+
+export type SegmentResolution = {
+  segment: string;
+  status: SegmentStatus;
+  item?: DraftItem;
+  reason?: string;
+};
 
 function formatAmount(amount: number): string {
   return String(Math.round(amount * 100) / 100);
@@ -126,7 +139,7 @@ function finalize(items: DraftItem[], eatingOut: boolean): DraftItem[] {
     : sane;
 }
 
-/** Resolve leftover segments with no network: catalog → typical values. */
+/** Resolve leftover segments with no network: catalog → ingredients table → typical values. */
 function resolveOffline(
   segments: readonly string[],
   saved: readonly SavedFood[],
@@ -142,6 +155,34 @@ function resolveOffline(
       continue;
     }
 
+    const parsed = parseLeadingQuantity(segment);
+    const def = findFoodDefinition(parsed.name);
+    if (def) {
+      const amount = parsed.amount !== undefined ? parsed.amount : 1;
+      const macros = calculateFoodMacros(def, amount, parsed.unit, parsed.size);
+      const unitLabel = parsed.unit
+        ? parsed.unit
+        : def.pieceG
+          ? amount === 1
+            ? "piece"
+            : "pieces"
+          : "serving";
+      const formattedQty = `${formatAmount(amount)} ${unitLabel}`.trim();
+      items.push({
+        name: def.name,
+        qty: formattedQty,
+        calories: macros.calories,
+        protein: macros.protein,
+        carbs: macros.carbs,
+        fat: macros.fat,
+        confidence: 0.8,
+        multiplier: 1,
+        source: "local",
+      });
+      usedTypicalValues = true;
+      continue;
+    }
+
     const typical = localFoodItems(segment);
 
     if (!typical) return null;
@@ -154,12 +195,145 @@ function resolveOffline(
 }
 
 /**
+ * Return per-segment resolution results for Kitchen and detailed reviews.
+ * Does not fail all-or-nothing: unresolved ingredients return status: "needs-input".
+ */
+export async function resolveSegments(
+  text: string,
+  options?: {
+    saved?: readonly SavedFood[];
+    eatingOut?: boolean;
+    provider?: DescriptionAiProvider | null;
+  },
+): Promise<SegmentResolution[]> {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  const saved = options?.saved ?? [];
+  const rawSegments = splitDescriptionSegments(trimmed);
+  const results: SegmentResolution[] = [];
+
+  const provider =
+    options?.provider === undefined
+      ? getDescriptionAiProvider()
+      : options.provider;
+
+  for (const segment of rawSegments) {
+    // 1. Saved food for bare names
+    const usual = matchUsualFood(segment, saved);
+    if (usual) {
+      results.push({
+        segment,
+        status: "matched",
+        item: savedFoodToDraft(usual),
+      });
+      continue;
+    }
+
+    // 2. Exact catalog match from food-db
+    const local = resolveSegmentLocally(segment, [...saved]);
+    if (!local.unresolved) {
+      results.push({
+        segment,
+        status: "matched",
+        item: fromEstimated(local),
+      });
+      continue;
+    }
+
+    // 3. Extended ingredient table match
+    const parsed = parseLeadingQuantity(segment);
+    const def = findFoodDefinition(parsed.name);
+    if (def) {
+      const amount = parsed.amount !== undefined ? parsed.amount : 1;
+      const macros = calculateFoodMacros(def, amount, parsed.unit, parsed.size);
+      const unitLabel = parsed.unit
+        ? parsed.unit
+        : def.pieceG
+          ? amount === 1
+            ? "piece"
+            : "pieces"
+          : "serving";
+      const formattedQty = `${formatAmount(amount)} ${unitLabel}`.trim();
+
+      results.push({
+        segment,
+        status: "estimated",
+        item: {
+          name: def.name,
+          qty: formattedQty,
+          calories: macros.calories,
+          protein: macros.protein,
+          carbs: macros.carbs,
+          fat: macros.fat,
+          confidence: 0.8,
+          multiplier: 1,
+          source: "local",
+        },
+      });
+      continue;
+    }
+
+    // 4. Typical values
+    const typical = localFoodItems(segment);
+    if (typical && typical.length > 0) {
+      results.push({
+        segment,
+        status: "estimated",
+        item: typical[0],
+      });
+      continue;
+    }
+
+    // 5. AI provider if available
+    if (provider) {
+      try {
+        const aiEst = await provider.estimate(segment);
+        if (aiEst.foods.length > 0 && !aiEst.foods[0]!.unresolved) {
+          results.push({
+            segment,
+            status: "estimated",
+            item: fromEstimated(aiEst.foods[0]!),
+          });
+          continue;
+        }
+      } catch {
+        // Fall through to needs-input
+      }
+    }
+
+    // 6. Unresolved / Needs input
+    const cleanName = parsed.name || segment;
+    results.push({
+      segment,
+      status: "needs-input",
+      reason: cleanName ? `Don't know '${cleanName}' yet` : "No amount given",
+      item: {
+        name: cleanName,
+        qty: parsed.unit
+          ? `${formatAmount(parsed.amount ?? 1)} ${parsed.unit}`
+          : "1 serving",
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        confidence: 0,
+        multiplier: 1,
+        source: "manual",
+      },
+    });
+  }
+
+  return results;
+}
+
+/**
  * Turn a typed sentence ("2 rotis, dal, paneer bhurji") into reviewable
  * items. Order of trust:
  *   1. the user's own saved foods, for bare names
  *   2. the AI proxy (when configured) for everything else, with catalog
  *      values taking precedence for exact catalog matches
- *   3. offline: the food catalog, then typical staples values
+ *   3. offline: the food catalog, then extended ingredients, then typical staples
  * If any piece can't be resolved by any of these, the whole entry falls
  * back to manual entry rather than silently dropping a food.
  */
@@ -237,4 +411,3 @@ export async function resolveLogText(
     ...(offline.usedTypicalValues ? { notice: LOCAL_ESTIMATE_NOTICE } : {}),
   };
 }
-

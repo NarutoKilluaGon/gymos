@@ -317,6 +317,23 @@ const UNIT_ALIASES: Record<string, string> = {
   bowls: "bowl",
   clove: "clove",
   cloves: "clove",
+  katori: "bowl",
+  katoris: "bowl",
+  glass: "glass",
+  glasses: "glass",
+  sprig: "sprig",
+  sprigs: "sprig",
+  pinch: "pinch",
+  pinches: "pinch",
+  handful: "handful",
+  handfuls: "handful",
+  oz: "oz",
+  ounce: "oz",
+  ounces: "oz",
+  lb: "lb",
+  lbs: "lb",
+  pound: "lb",
+  pounds: "lb",
 };
 
 export function isSameUnit(a: string, b: string): boolean {
