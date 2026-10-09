@@ -1,8 +1,7 @@
 import { completedSessions, sessionDate } from "@/services/forge/history";
-import type { Plan } from "@/types/forge";
 import type { CardioLog } from "@/types/nourish";
 import type { WorkoutSession } from "@/types/gymos";
-import { dateFromKey, toDateKey, getTodayKey } from "@/utils/date";
+import { toDateKey, getTodayKey } from "@/utils/date";
 
 export type CalendarDaySummary = {
   sessions: WorkoutSession[];
