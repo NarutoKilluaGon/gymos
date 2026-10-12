@@ -18,6 +18,8 @@ export type FoodDefinition = {
   sliceG?: number;
   handfulG?: number;
   pinchG?: number;
+  scoopG?: number;
+  plateG?: number;
   isZeroCalorie?: boolean;
 };
 
@@ -52,7 +54,7 @@ export const FOOD_DEFINITIONS: readonly FoodDefinition[] = [
   {
     id: "potato",
     name: "Potato",
-    aliases: ["potato", "potatoes", "aloo"],
+    aliases: ["potato", "potatoes", "aloo", "aalo", "alu"],
     caloriesPer100g: 77,
     proteinPer100g: 2.0,
     carbsPer100g: 17.5,
@@ -312,6 +314,7 @@ export const FOOD_DEFINITIONS: readonly FoodDefinition[] = [
     carbsPer100g: 66.3,
     fatPer100g: 6.9,
     cupG: 80,
+    katoriG: 50,
     tbspG: 10,
     tspG: 3,
   },
@@ -659,6 +662,164 @@ export const FOOD_DEFINITIONS: readonly FoodDefinition[] = [
     cupG: 100,
     isZeroCalorie: true,
   },
+
+  // ---------- Everyday Dishes, Beverages & Proteins (Nourish Fix) ----------
+  {
+    id: "paratha_plain",
+    name: "Paratha",
+    aliases: ["paratha", "parathe", "paranthas", "paranthe", "plain paratha", "parantha"],
+    caloriesPer100g: 290,
+    proteinPer100g: 6.5,
+    carbsPer100g: 42.0,
+    fatPer100g: 11.0,
+    pieceG: 90,
+  },
+  {
+    id: "tea_chai",
+    name: "Chai",
+    aliases: ["chai", "tea", "milk tea", "masala chai tea"],
+    caloriesPer100g: 45,
+    proteinPer100g: 1.5,
+    carbsPer100g: 7.0,
+    fatPer100g: 1.2,
+    cupG: 150,
+    glassG: 150,
+    pieceG: 150,
+  },
+  {
+    id: "coffee_filter",
+    name: "Coffee",
+    aliases: ["coffee", "filter coffee with milk", "milk coffee", "hot coffee"],
+    caloriesPer100g: 40,
+    proteinPer100g: 1.5,
+    carbsPer100g: 5.5,
+    fatPer100g: 1.3,
+    cupG: 150,
+    glassG: 150,
+    pieceG: 150,
+  },
+  {
+    id: "fried_rice_dish",
+    name: "Fried rice",
+    aliases: ["fried rice", "veg fried rice", "fired rice"],
+    caloriesPer100g: 155,
+    proteinPer100g: 3.5,
+    carbsPer100g: 25.0,
+    fatPer100g: 4.5,
+    katoriG: 150,
+    cupG: 160,
+    plateG: 300,
+  },
+  {
+    id: "aloo_sabji_dish",
+    name: "Aloo sabji",
+    aliases: ["aloo sabji", "aloo sabzi", "potato sabzi", "aloo ki sabji", "aloo curry"],
+    caloriesPer100g: 105,
+    proteinPer100g: 1.8,
+    carbsPer100g: 15.0,
+    fatPer100g: 4.5,
+    katoriG: 150,
+    cupG: 160,
+  },
+  {
+    id: "vada_pav_dish",
+    name: "Vada pav",
+    aliases: ["vada pav", "wada pav", "batata vada pav"],
+    caloriesPer100g: 240,
+    proteinPer100g: 6.0,
+    carbsPer100g: 34.0,
+    fatPer100g: 9.0,
+    pieceG: 120,
+  },
+  {
+    id: "aloo_sandwich_dish",
+    name: "Aloo sandwich",
+    aliases: ["aloo sandwich", "potato sandwich"],
+    caloriesPer100g: 200,
+    proteinPer100g: 5.0,
+    carbsPer100g: 30.0,
+    fatPer100g: 7.0,
+    pieceG: 135,
+  },
+  {
+    id: "keema_kaleji_dish",
+    name: "Keema kaleji",
+    aliases: ["keema kaleji", "keema kalegi", "mutton keema kaleji"],
+    caloriesPer100g: 175,
+    proteinPer100g: 18.0,
+    carbsPer100g: 3.0,
+    fatPer100g: 10.0,
+    katoriG: 150,
+    cupG: 180,
+  },
+  {
+    id: "liver_kaleji",
+    name: "Kaleji",
+    aliases: ["kaleji", "liver", "mutton liver", "chicken liver"],
+    caloriesPer100g: 150,
+    proteinPer100g: 22.0,
+    carbsPer100g: 2.5,
+    fatPer100g: 5.5,
+    katoriG: 100,
+    cupG: 100,
+    pieceG: 100,
+  },
+  {
+    id: "frooti_drink",
+    name: "Frooti",
+    aliases: ["frooti", "mango drink", "frooti mango"],
+    caloriesPer100g: 54,
+    proteinPer100g: 0.1,
+    carbsPer100g: 13.5,
+    fatPer100g: 0.0,
+    glassG: 200,
+    pieceG: 200,
+  },
+  {
+    id: "whey_protein_powder",
+    name: "Whey protein",
+    aliases: ["whey protein", "whey", "protein powder", "whey protein scoop"],
+    caloriesPer100g: 400,
+    proteinPer100g: 80.0,
+    carbsPer100g: 6.0,
+    fatPer100g: 5.0,
+    scoopG: 30,
+    tbspG: 15,
+  },
+  {
+    id: "butter_naan_dish",
+    name: "Butter naan",
+    aliases: ["butter naan", "naan", "tandoori naan", "butter roti naan"],
+    caloriesPer100g: 310,
+    proteinPer100g: 8.5,
+    carbsPer100g: 48.0,
+    fatPer100g: 9.5,
+    pieceG: 90,
+  },
+  {
+    id: "biryani_dish",
+    name: "Biryani",
+    aliases: ["biryani", "chicken biryani restaurant", "mutton biryani", "plate biryani"],
+    caloriesPer100g: 160,
+    proteinPer100g: 7.0,
+    carbsPer100g: 20.0,
+    fatPer100g: 6.0,
+    plateG: 350,
+    katoriG: 180,
+    cupG: 200,
+  },
+  {
+    id: "paneer_bhurji_dish",
+    name: "Paneer bhurji",
+    aliases: ["paneer bhurji", "scrambled paneer"],
+    caloriesPer100g: 180,
+    proteinPer100g: 11.0,
+    carbsPer100g: 4.0,
+    fatPer100g: 13.0,
+    katoriG: 150,
+    cupG: 160,
+    plateG: 200,
+  },
 ];
 
 // Pre-sorted alias map for longest-match search
@@ -745,6 +906,10 @@ export function calculateFoodMacros(
     grams = amount * (food.handfulG ?? 28);
   } else if (u.startsWith("pinch")) {
     grams = amount * (food.pinchG ?? 0.5);
+  } else if (u.startsWith("scoop")) {
+    grams = amount * (food.scoopG ?? 30);
+  } else if (u.startsWith("plate")) {
+    grams = amount * (food.plateG ?? 300);
   } else {
     // Countable piece or unit-less
     const basePiece = food.pieceG ?? food.sliceG ?? food.cloveG ?? 100;

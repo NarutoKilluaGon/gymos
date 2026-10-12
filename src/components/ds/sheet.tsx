@@ -121,7 +121,19 @@ export function Sheet({
             </View>
           ) : null}
 
-          {footer ? <View style={styles.footer}>{footer}</View> : null}
+          {footer ? (
+            <View
+              style={[
+                styles.footer,
+                {
+                  borderTopColor: theme.line,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                },
+              ]}
+            >
+              {footer}
+            </View>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -142,6 +154,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     maxHeight: "88%",
     paddingTop: 8,
+    display: "flex",
+    flexDirection: "column",
   },
   grabber: {
     alignSelf: "center",
@@ -168,11 +182,13 @@ const styles = StyleSheet.create({
     fontWeight: "300",
   },
   scroll: {
+    flex: 1,
     flexGrow: 0,
+    flexShrink: 1,
   },
   content: {
     paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingBottom: 16,
   },
   destructiveSection: {
     borderTopWidth: 1,
@@ -182,6 +198,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 12,
   },
 });

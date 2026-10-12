@@ -132,7 +132,7 @@ export async function saveDraft(input: {
   return saved;
 }
 
-/** Patch that scales an entry's whole portion and optionally moves it. */
+/** Patch that scales an entry's whole portion and optionally moves or edits it. */
 export function scaleEntryPatch(
   meal: Meal,
   options: {
@@ -141,18 +141,30 @@ export function scaleEntryPatch(
     /** "HH:MM" to set, or empty/undefined to leave the time alone. */
     at?: string;
     dayKey: string;
+    macros?: Partial<MacroTotals>;
+    name?: string;
+    qty?: string;
   },
 ): MealPatch {
-  const macros =
-    options.factor === 1
-      ? undefined
-      : scaleNutrients(nutritionOf(meal), options.factor);
+  let macros = options.macros;
+  if (!macros) {
+    macros =
+      options.factor === 1
+        ? undefined
+        : scaleNutrients(nutritionOf(meal), options.factor);
+  }
+
+  const qty =
+    options.qty !== undefined
+      ? options.qty
+      : options.factor !== 1
+        ? scaledQty(meal.qty, options.factor)
+        : undefined;
 
   return {
+    ...(options.name ? { name: options.name } : {}),
     ...(macros ? { macros } : {}),
-    ...(options.factor !== 1
-      ? { qty: scaledQty(meal.qty, options.factor) }
-      : {}),
+    ...(qty !== undefined ? { qty } : {}),
     slot: options.slot,
     ...(options.at
       ? { timestamp: timestampForKey(options.dayKey, options.at) }

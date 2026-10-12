@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import { Dumbbell } from "lucide-react-native";
 
 import {
@@ -57,13 +57,22 @@ describe("DS Component Kit", () => {
     expect(r4.toJSON()).toBeTruthy();
   });
 
-  it("renders Seg segmented control", () => {
+  it("renders Seg segmented control and gives each tab an equal flex share", () => {
     const options = [
       { value: "a", label: "A" },
       { value: "b", label: "B" },
+      { value: "c", label: "C" },
     ];
     const r = render(createElement(Seg, { options, value: "a", onChange: () => {} }));
     expect(r.toJSON()).toBeTruthy();
+
+    // Verify each PressableScale item received flex: 1 on its outer Pressable
+    const pressables = r.root.findAllByType(PressableScale);
+    expect(pressables).toHaveLength(3);
+    for (const p of pressables) {
+      const flattened = StyleSheet.flatten(p.props.style);
+      expect(flattened).toMatchObject({ flex: 1 });
+    }
   });
 
   it("renders Chip", () => {

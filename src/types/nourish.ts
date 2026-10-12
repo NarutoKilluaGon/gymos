@@ -44,6 +44,7 @@ export type CardioLog = {
   loggedAt: string;
   durationMin?: number;
   distanceKm?: number;
+  steps?: number;
 };
 export type CardioMap = Record<string, CardioLog[]>;
 

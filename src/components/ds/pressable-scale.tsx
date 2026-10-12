@@ -1,9 +1,10 @@
-import React, { useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import {
   Animated,
   Pressable,
   PressableProps,
   StyleProp,
+  StyleSheet,
   ViewStyle,
 } from "react-native";
 
@@ -16,6 +17,37 @@ export type PressableScaleProps = Omit<PressableProps, "style"> & {
   activeOpacity?: number;
   style?: StyleProp<ViewStyle>;
 };
+
+const LAYOUT_STYLE_KEYS = new Set([
+  "flex",
+  "flexGrow",
+  "flexShrink",
+  "flexBasis",
+  "alignSelf",
+  "width",
+  "height",
+  "minWidth",
+  "maxWidth",
+  "minHeight",
+  "maxHeight",
+  "margin",
+  "marginHorizontal",
+  "marginVertical",
+  "marginTop",
+  "marginBottom",
+  "marginLeft",
+  "marginRight",
+  "marginStart",
+  "marginEnd",
+  "position",
+  "top",
+  "bottom",
+  "left",
+  "right",
+  "start",
+  "end",
+  "zIndex",
+]);
 
 export function PressableScale({
   children,
@@ -31,6 +63,24 @@ export function PressableScale({
 }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+
+  const { outerStyle, innerStyle } = useMemo(() => {
+    const flattened = StyleSheet.flatten(style) as Record<string, any> | undefined;
+    if (!flattened) return { outerStyle: undefined, innerStyle: undefined };
+
+    const outer: Record<string, any> = {};
+    const inner: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(flattened)) {
+      if (LAYOUT_STYLE_KEYS.has(key)) {
+        outer[key] = value;
+      } else {
+        inner[key] = value;
+      }
+    }
+
+    return { outerStyle: outer, innerStyle: inner };
+  }, [style]);
 
   function handlePressIn(e: any) {
     if (!disabled) {
@@ -84,11 +134,12 @@ export function PressableScale({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}
+      style={outerStyle}
       {...rest}
     >
       <Animated.View
         style={[
-          style,
+          innerStyle,
           {
             transform: [{ scale }],
             opacity,

@@ -154,6 +154,8 @@ export function ForgeApp() {
             onAddCardio={actions.addCardio}
             onRemoveCardio={(day, id) => void actions.removeCardio(day, id)}
             onRestoreCardio={(day, log, index) => void actions.restoreCardio(day, log, index)}
+            onSaveSession={actions.save}
+            onDiscardSession={actions.remove}
           />
         ) : null}
         {tab === "plan" ? (

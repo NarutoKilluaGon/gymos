@@ -39,6 +39,7 @@ import {
   getAllMeals,
   restoreMeal,
   updateMealById,
+  type MacroTotals,
   type NewMeal,
 } from "@/storage/repositories/meals";
 import {
@@ -229,6 +230,9 @@ export function useNourish() {
           slot: MealSlot;
           at?: string;
           dayKey: string;
+          macros?: Partial<MacroTotals>;
+          name?: string;
+          qty?: string;
         },
       ) =>
         act(

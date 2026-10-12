@@ -3,7 +3,7 @@ import { AppState, type AppStateStatus } from "react-native";
 
 import { TodayView } from "@/components/nutrition/today-view";
 import { useFoodLogger, type FoodLogger } from "@/hooks/use-food-logger";
-import { resolveLogText } from "@/services/nourish/resolve-log";
+import { resolveLogText, resolveStaged } from "@/services/nourish/resolve-log";
 import { buildDayModel } from "@/services/nourish/day-model";
 import { buildRecords } from "@/services/nourish/insights";
 import { DEFAULT_SETTINGS } from "@/services/nourish/targets";
@@ -41,6 +41,7 @@ jest.mock("@/components/nutrition/nourish-ui", () => ({
 jest.mock("@/services/nourish/resolve-log", () => ({
   ...jest.requireActual("@/services/nourish/resolve-log"),
   resolveLogText: jest.fn(),
+  resolveStaged: jest.fn(),
 }));
 
 // Capture what each sheet is handed so tests can "tap Save" without its form.
@@ -251,6 +252,8 @@ beforeEach(() => {
   appStateHandler = undefined;
   (resolveLogText as jest.Mock).mockReset();
   (resolveLogText as jest.Mock).mockResolvedValue(readyOutcome());
+  (resolveStaged as jest.Mock).mockReset();
+  (resolveStaged as jest.Mock).mockResolvedValue(readyOutcome());
   jest.spyOn(AppState, "addEventListener").mockImplementation(((
     _: string,
     handler: (s: AppStateStatus) => void,
@@ -518,6 +521,11 @@ describe("useFoodLogger date/time context", () => {
         finish = resolve;
       }),
     );
+    (resolveStaged as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
 
     const { logger } = mountLogger({ dayKey: "2026-10-04" });
     await run(async () => {
@@ -533,6 +541,11 @@ describe("useFoodLogger date/time context", () => {
   it("10e. an offline/unreadable lookup opens the manual sheet with the same snapshot", async () => {
     jumpClock(LATE_EVENING);
     (resolveLogText as jest.Mock).mockResolvedValue({
+      status: "manual",
+      name: "Dal",
+      reason: "unreadable",
+    });
+    (resolveStaged as jest.Mock).mockResolvedValue({
       status: "manual",
       name: "Dal",
       reason: "unreadable",

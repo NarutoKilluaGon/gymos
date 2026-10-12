@@ -5,6 +5,7 @@ import { Calendar, MoreHorizontal, Trophy } from "lucide-react-native";
 import { CardioSheet } from "@/components/nutrition/more-sheets";
 import {
   CalendarSheet,
+  StaleSessionSheet,
   TodayMenuSheet,
 } from "@/components/workouts/forge-sheets";
 import { Button, FCard, Label, Pill, tap } from "@/components/workouts/forge-ui";
@@ -17,7 +18,7 @@ import { completedSessions, sessionDate } from "@/services/forge/history";
 import { fromKg, sessionVolumeKg } from "@/services/forge/load";
 import { dayFor, nextRotationDay } from "@/services/forge/plan";
 import { activePlan } from "@/services/forge/settings";
-import { durationMs } from "@/services/forge/timing";
+import { durationMs, finish } from "@/services/forge/timing";
 import { MONTH_SHORT } from "@/services/nourish/insights";
 import type { CardioLog } from "@/types/nourish";
 import type { WorkoutSession } from "@/types/gymos";
@@ -49,6 +50,8 @@ export function TodayView({
   onAddCardio,
   onRemoveCardio,
   onRestoreCardio,
+  onSaveSession,
+  onDiscardSession,
   onGoPlan,
 }: {
   data: ForgeData;
@@ -59,6 +62,8 @@ export function TodayView({
   onAddCardio: (dayKey: string, entry: Omit<CardioLog, "id" | "loggedAt">) => Promise<boolean>;
   onRemoveCardio: (dayKey: string, id: string) => void;
   onRestoreCardio?: (dayKey: string, log: CardioLog, index?: number) => void;
+  onSaveSession?: (session: WorkoutSession) => Promise<boolean>;
+  onDiscardSession?: (id: string) => Promise<boolean>;
   onGoPlan: () => void;
 }) {
   const todayKey = useTodayKey();
@@ -68,6 +73,7 @@ export function TodayView({
   const [cardioOpen, setCardioOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [staleSheetOpen, setStaleSheetOpen] = useState(false);
 
   const dateKey = picked ?? todayKey;
   const isToday = dateKey === todayKey;
@@ -203,7 +209,17 @@ export function TodayView({
         <FCard style={s.card}>
           <Text style={s.meta}>{`Workout in progress · ${active.date ?? ""}`}</Text>
           <Text style={s.bigName}>{active.name}</Text>
-          <Button label="Resume" onPress={() => onOpen(active)} />
+          <Button
+            label="Resume"
+            onPress={() => {
+              const activeDay = sessionDate(active);
+              if (activeDay < todayKey) {
+                setStaleSheetOpen(true);
+              } else {
+                onOpen(active);
+              }
+            }}
+          />
         </FCard>
       ) : null}
 
@@ -480,6 +496,32 @@ export function TodayView({
           onAddAnotherWorkout={() => start(null)}
           onOpenCalendar={() => setCalendarOpen(true)}
           onLogCardio={() => setCardioOpen(true)}
+        />
+      ) : null}
+
+      {active ? (
+        <StaleSessionSheet
+          visible={staleSheetOpen}
+          onClose={() => setStaleSheetOpen(false)}
+          sessionName={active.name}
+          startDate={active.date ?? sessionDate(active)}
+          onFinishAsItWas={() => {
+            setStaleSheetOpen(false);
+            const finished = finish(active, new Date());
+            if (onSaveSession) {
+              void onSaveSession(finished.session);
+            }
+          }}
+          onDiscard={() => {
+            setStaleSheetOpen(false);
+            if (onDiscardSession) {
+              void onDiscardSession(active.id);
+            }
+          }}
+          onResumeToday={() => {
+            setStaleSheetOpen(false);
+            onOpen(active);
+          }}
         />
       ) : null}
     </View>

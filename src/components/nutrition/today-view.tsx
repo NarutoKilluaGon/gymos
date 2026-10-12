@@ -526,7 +526,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         initialAt={editing ? (timeOfDay(editing.timestamp) ?? "") : ""}
         busy={editBusy}
         onClose={() => setEditing(null)}
-        onSave={(factor, slot, at) => {
+        onSave={(factor, slot, at, macros, name, qty) => {
           if (!editing) return;
 
           setEditBusy(true);
@@ -535,6 +535,9 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
               factor,
               slot,
               at,
+              macros,
+              name,
+              qty,
               // The entry's own persisted day, not the one on screen, so an
               // edit left open across midnight can't move it.
               dayKey: dateKeyFromTimestamp(editing.timestamp) ?? dayKey,

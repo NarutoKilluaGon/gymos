@@ -124,6 +124,23 @@ describe("Cardio Unification (Part 10)", () => {
       expect(estimateCardio("45 mins swim", 70)?.minutes).toBe(45);
       expect(estimateCardio("25 minutes hiit", 70)?.minutes).toBe(25);
     });
+
+    it("parses steps and calculates distance and calories accurately", () => {
+      const est1 = estimateCardio("8000 steps", 70);
+      expect(est1).not.toBeNull();
+      expect(est1?.activity).toBe("walking");
+      expect(est1?.steps).toBe(8000);
+      expect(est1?.detail).toContain("8,000 steps");
+      expect(est1?.distanceKm).toBeCloseTo(6.15, 1);
+      expect(est1?.kcal).toBeGreaterThan(200);
+
+      const est2 = estimateCardio("10k steps walk", 70);
+      expect(est2).not.toBeNull();
+      expect(est2?.activity).toBe("walking");
+      expect(est2?.steps).toBe(10000);
+      expect(est2?.detail).toContain("10,000 steps");
+      expect(est2?.kcal).toBeGreaterThan(250);
+    });
   });
 
   describe("looksLikeCardio routing", () => {

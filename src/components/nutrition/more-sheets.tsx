@@ -188,6 +188,7 @@ function CardioForm({
               minutes: estimate?.minutes ?? 0,
               durationMin: estimate?.minutes ?? 0,
               distanceKm: estimate?.distanceKm,
+              steps: estimate?.steps,
               kcal,
             }).finally(() => setBusy(false));
           }}

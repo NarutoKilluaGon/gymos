@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { looksLikeCardio } from "@/services/nourish/cardio";
-import { resolveLogText } from "@/services/nourish/resolve-log";
+import { resolveStaged } from "@/services/nourish/resolve-log";
 import { pickSlot, slotFromText } from "@/services/nourish/slots";
 import type { SavedFood } from "@/storage/repositories/saved-foods";
 import type { MealSlot } from "@/types/gymos";
@@ -132,7 +132,14 @@ export function useFoodLogger(input: {
       setBusy(true);
 
       try {
-        const outcome = await resolveLogText(trimmed, { saved, eatingOut });
+        const outcome = await resolveStaged(
+          trimmed,
+          { saved, eatingOut },
+          (liveItems) => {
+            // Progressive update as proxy answers stream in
+            setReview((prev) => (prev ? { ...prev, items: liveItems } : prev));
+          },
+        );
 
         if (outcome.status === "empty") return false;
 

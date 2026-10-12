@@ -1,0 +1,362 @@
+[
+  {
+    "text": "4 paranthe",
+    "kcalMin": 800,
+    "kcalMax": 1300,
+    "proteinMin": 18,
+    "proteinMax": 36,
+    "source": "IFCT 2017: Plain/stuffed paratha ~220-280 kcal each"
+  },
+  {
+    "text": "1 chai",
+    "kcalMin": 40,
+    "kcalMax": 100,
+    "proteinMin": 1,
+    "proteinMax": 4,
+    "source": "IFCT 2017: Masala tea with milk and sugar (150 ml)"
+  },
+  {
+    "text": "fried rice 1 bowl",
+    "kcalMin": 200,
+    "kcalMax": 360,
+    "proteinMin": 4,
+    "proteinMax": 10,
+    "source": "USDA FDC: Vegetable fried rice 1 bowl (180 g)"
+  },
+  {
+    "text": "half bowl aloo sabji",
+    "kcalMin": 60,
+    "kcalMax": 140,
+    "proteinMin": 1,
+    "proteinMax": 4,
+    "source": "IFCT 2017: Potato curry/sabzi (100 g)"
+  },
+  {
+    "text": "1 vada pav",
+    "kcalMin": 220,
+    "kcalMax": 360,
+    "proteinMin": 5,
+    "proteinMax": 10,
+    "source": "IFCT 2017: Potato vada with pav bread (120 g)"
+  },
+  {
+    "text": "1 aloo sandwich",
+    "kcalMin": 200,
+    "kcalMax": 350,
+    "proteinMin": 4,
+    "proteinMax": 10,
+    "source": "USDA / IFCT: Potato sandwich toasted (140 g)"
+  },
+  {
+    "text": "Keema Kalegi 200 g",
+    "kcalMin": 260,
+    "kcalMax": 420,
+    "proteinMin": 28,
+    "proteinMax": 50,
+    "source": "IFCT 2017 / USDA: Minced mutton with liver curry (200 g)"
+  },
+  {
+    "text": "6 eggs",
+    "kcalMin": 380,
+    "kcalMax": 500,
+    "proteinMin": 30,
+    "proteinMax": 42,
+    "source": "USDA FDC: Whole large eggs (50 g each, ~72 kcal)"
+  },
+  {
+    "text": "1 tablespoon ghee",
+    "kcalMin": 100,
+    "kcalMax": 145,
+    "proteinMin": 0,
+    "proteinMax": 1,
+    "source": "IFCT 2017: Clarified butter (15 g, ~120-135 kcal)"
+  },
+  {
+    "text": "1 tablesppon ghee",
+    "kcalMin": 100,
+    "kcalMax": 145,
+    "proteinMin": 0,
+    "proteinMax": 1,
+    "source": "Typo test: tablespoon ghee (15 g)"
+  },
+  {
+    "text": "200 g curd",
+    "kcalMin": 110,
+    "kcalMax": 180,
+    "proteinMin": 6,
+    "proteinMax": 14,
+    "source": "IFCT 2017: Whole milk yogurt/curd (200 g)"
+  },
+  {
+    "text": "1 frooti 200 ml",
+    "kcalMin": 90,
+    "kcalMax": 140,
+    "proteinMin": 0,
+    "proteinMax": 1,
+    "source": "Commercial mango drink label: 200 ml (~100-110 kcal)"
+  },
+  {
+    "text": "frooti 200 ml",
+    "kcalMin": 90,
+    "kcalMax": 140,
+    "proteinMin": 0,
+    "proteinMax": 1,
+    "source": "Commercial mango drink label: 200 ml"
+  },
+  {
+    "text": "2 rotis",
+    "kcalMin": 140,
+    "kcalMax": 240,
+    "proteinMin": 4,
+    "proteinMax": 8,
+    "source": "IFCT 2017: Whole wheat phulka (2 pieces, ~80 kcal each)"
+  },
+  {
+    "text": "dal",
+    "kcalMin": 120,
+    "kcalMax": 220,
+    "proteinMin": 6,
+    "proteinMax": 14,
+    "source": "IFCT 2017: 1 katori cooked toor/moong dal (~150 g)"
+  },
+  {
+    "text": "dal 1 katori",
+    "kcalMin": 120,
+    "kcalMax": 220,
+    "proteinMin": 6,
+    "proteinMax": 14,
+    "source": "IFCT 2017: 1 katori cooked yellow dal (150 g)"
+  },
+  {
+    "text": "paneer bhurji",
+    "kcalMin": 220,
+    "kcalMax": 380,
+    "proteinMin": 12,
+    "proteinMax": 24,
+    "source": "IFCT 2017: Scrambled cottage cheese curry (150 g)"
+  },
+  {
+    "text": "1 cup rajma",
+    "kcalMin": 180,
+    "kcalMax": 280,
+    "proteinMin": 10,
+    "proteinMax": 18,
+    "source": "IFCT 2017: Cooked red kidney beans (1 cup ~200 g)"
+  },
+  {
+    "text": "2 onions",
+    "kcalMin": 60,
+    "kcalMax": 110,
+    "proteinMin": 1,
+    "proteinMax": 3,
+    "source": "USDA FDC: 2 medium onions (~200 g total)"
+  },
+  {
+    "text": "1 tbsp oil",
+    "kcalMin": 100,
+    "kcalMax": 140,
+    "proteinMin": 0,
+    "proteinMax": 0.5,
+    "source": "USDA FDC: Vegetable cooking oil (14 g, ~120 kcal)"
+  },
+  {
+    "text": "half tomato",
+    "kcalMin": 8,
+    "kcalMax": 20,
+    "proteinMin": 0.2,
+    "proteinMax": 1,
+    "source": "USDA FDC: Half medium tomato (~60 g)"
+  },
+  {
+    "text": "half onion",
+    "kcalMin": 15,
+    "kcalMax": 30,
+    "proteinMin": 0.3,
+    "proteinMax": 1,
+    "source": "USDA FDC: Half medium onion (~50 g)"
+  },
+  {
+    "text": "aalo",
+    "kcalMin": 70,
+    "kcalMax": 150,
+    "proteinMin": 1,
+    "proteinMax": 4,
+    "source": "Typo test: Potato 1 medium (120 g)"
+  },
+  {
+    "text": "kaleji",
+    "kcalMin": 110,
+    "kcalMax": 190,
+    "proteinMin": 18,
+    "proteinMax": 28,
+    "source": "Typo/alias test: Liver (100 g)"
+  },
+  {
+    "text": "fired rice",
+    "kcalMin": 200,
+    "kcalMax": 360,
+    "proteinMin": 4,
+    "proteinMax": 10,
+    "source": "Typo test: Fried rice (1 bowl / 180 g)"
+  },
+  {
+    "text": "1 banana",
+    "kcalMin": 80,
+    "kcalMax": 125,
+    "proteinMin": 0.8,
+    "proteinMax": 2,
+    "source": "USDA FDC: 1 medium banana (118 g)"
+  },
+  {
+    "text": "1 apple",
+    "kcalMin": 70,
+    "kcalMax": 115,
+    "proteinMin": 0.2,
+    "proteinMax": 1,
+    "source": "USDA FDC: 1 medium apple (182 g)"
+  },
+  {
+    "text": "1 cup rice",
+    "kcalMin": 180,
+    "kcalMax": 260,
+    "proteinMin": 3,
+    "proteinMax": 6,
+    "source": "USDA FDC: Cooked white rice (158 g)"
+  },
+  {
+    "text": "100g chicken",
+    "kcalMin": 130,
+    "kcalMax": 200,
+    "proteinMin": 24,
+    "proteinMax": 33,
+    "source": "USDA FDC: Cooked chicken breast (100 g)"
+  },
+  {
+    "text": "250g paneer",
+    "kcalMin": 600,
+    "kcalMax": 850,
+    "proteinMin": 35,
+    "proteinMax": 55,
+    "source": "IFCT 2017: Fresh cottage cheese (250 g)"
+  },
+  {
+    "text": "1 scoop whey protein",
+    "kcalMin": 100,
+    "kcalMax": 140,
+    "proteinMin": 20,
+    "proteinMax": 28,
+    "source": "Standard 30 g scoop whey protein"
+  },
+  {
+    "text": "2 slices bread",
+    "kcalMin": 120,
+    "kcalMax": 180,
+    "proteinMin": 4,
+    "proteinMax": 8,
+    "source": "USDA FDC: 2 slices white or brown bread (~60 g)"
+  },
+  {
+    "text": "1 bowl oats",
+    "kcalMin": 140,
+    "kcalMax": 240,
+    "proteinMin": 4,
+    "proteinMax": 8,
+    "source": "USDA FDC: Cooked rolled oats in water (240 g)"
+  },
+  {
+    "text": "1 glass milk",
+    "kcalMin": 110,
+    "kcalMax": 170,
+    "proteinMin": 6,
+    "proteinMax": 10,
+    "source": "IFCT 2017: Toned cow milk (200 ml)"
+  },
+  {
+    "text": "1 plate biryani",
+    "kcalMin": 400,
+    "kcalMax": 750,
+    "proteinMin": 16,
+    "proteinMax": 35,
+    "source": "IFCT 2017: Chicken biryani restaurant portion (~350 g)"
+  },
+  {
+    "text": "2 idli",
+    "kcalMin": 100,
+    "kcalMax": 160,
+    "proteinMin": 2.5,
+    "proteinMax": 5,
+    "source": "IFCT 2017: Steamed rice-dal cakes (2 pieces, ~100 g)"
+  },
+  {
+    "text": "1 masala dosa",
+    "kcalMin": 250,
+    "kcalMax": 420,
+    "proteinMin": 5,
+    "proteinMax": 10,
+    "source": "IFCT 2017: Fermented crepe with potato masala (1 piece)"
+  },
+  {
+    "text": "1 samosa",
+    "kcalMin": 200,
+    "kcalMax": 320,
+    "proteinMin": 3,
+    "proteinMax": 6,
+    "source": "IFCT 2017: Deep fried potato pastry (1 piece, ~90 g)"
+  },
+  {
+    "text": "2 chapatis",
+    "kcalMin": 140,
+    "kcalMax": 240,
+    "proteinMin": 4,
+    "proteinMax": 8,
+    "source": "IFCT 2017: Wheat chapati (2 pieces)"
+  },
+  {
+    "text": "1 cup coffee",
+    "kcalMin": 30,
+    "kcalMax": 90,
+    "proteinMin": 1,
+    "proteinMax": 3,
+    "source": "Filter coffee with milk and 1 tsp sugar (150 ml)"
+  },
+  {
+    "text": "100 g paneer",
+    "kcalMin": 250,
+    "kcalMax": 340,
+    "proteinMin": 14,
+    "proteinMax": 22,
+    "source": "IFCT 2017: Raw cottage cheese (100 g)"
+  },
+  {
+    "text": "handful almonds",
+    "kcalMin": 140,
+    "kcalMax": 200,
+    "proteinMin": 4,
+    "proteinMax": 7,
+    "source": "USDA FDC: 28 g raw almonds (~23 kernels)"
+  },
+  {
+    "text": "1 bowl chana masala",
+    "kcalMin": 220,
+    "kcalMax": 360,
+    "proteinMin": 8,
+    "proteinMax": 16,
+    "source": "IFCT 2017: Chickpea curry (200 g)"
+  },
+  {
+    "text": "2 butter naan",
+    "kcalMin": 280,
+    "kcalMax": 720,
+    "proteinMin": 7,
+    "proteinMax": 20,
+    "source": "IFCT 2017 / USDA: Tandoori butter naan (2 pieces, ~150-250 kcal each)"
+  },
+  {
+    "text": "1 cup curd",
+    "kcalMin": 110,
+    "kcalMax": 180,
+    "proteinMin": 6,
+    "proteinMax": 14,
+    "source": "IFCT 2017: Plain curd (200 g)"
+  }
+]

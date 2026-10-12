@@ -78,4 +78,21 @@ describe("reopen then finish after a long idle gap", () => {
     expect(reopened.endedAt).toBeUndefined();
     expect(finish(reopened, new Date("2026-01-06T09:05:00.000Z")).session.durationMs).toBe(0);
   });
+
+  it("touch on a running session after a long idle gap turns gap into a pause instead of 700+ hours", () => {
+    const { touch } = require("@/services/forge/ops");
+    const session = running(); // started at 10:00, lastActivity at 11:00 (1 hour elapsed)
+
+    // 10 days later, user resumes or edits the session
+    const tenDaysLater = new Date("2026-01-11T11:00:00.000Z");
+    const touched = touch(session, tenDaysLater);
+
+    // The huge gap minus 5min idle grace became pausedMs
+    expect(touched.lastActivityAt).toBe(tenDaysLater.toISOString());
+    expect(touched.pausedMs).toBeGreaterThan(0);
+
+    // Active duration at resume time is now just ~65 minutes, not 240+ hours!
+    const active = durationMs(touched, tenDaysLater.getTime());
+    expect(active).toBe(65 * MIN);
+  });
 });

@@ -323,6 +323,32 @@ describe("weekly read", () => {
 
     expect(read.actions[0]?.do).toBe("Change your calorie target by -650 kcal a day");
   });
+
+  it("suggests lightening a slot when frequently rated Too full", () => {
+    const meals = [0, 1, 2, 3].flatMap((back) => {
+      const day = addDaysToKey(TODAY, -back);
+
+      return [
+        meal(day, "13:00", { protein: 35, slot: "Lunch" }),
+      ];
+    });
+    const feel = {
+      [addDaysToKey(TODAY, 0)]: { Lunch: 3 as const },
+      [addDaysToKey(TODAY, -1)]: { Lunch: 3 as const },
+      [addDaysToKey(TODAY, -2)]: { Lunch: 3 as const },
+      [addDaysToKey(TODAY, -3)]: { Lunch: 3 as const },
+    };
+    const records = buildRecords(meals, feel, {});
+    const read = buildWeeklyRead({
+      days: recentDays(14, TODAY, records, settings),
+      settings: { kcal: 2000, protein: 30, weeklyRate: 0 },
+      weightSlope: null,
+    });
+
+    const tooFullAction = read.actions.find((a) => a.do.includes("Lighten Lunch"));
+    expect(tooFullAction).toBeDefined();
+    expect(tooFullAction?.why).toContain("Too full");
+  });
 });
 
 import { buildDayModel, burnByDay, workoutCardioByDay } from "@/services/nourish/day-model";

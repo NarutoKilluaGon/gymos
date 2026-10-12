@@ -134,10 +134,18 @@ export function Ring({
             strokeLinecap="round"
             fill="none"
             strokeDasharray={`${circumference * ratio} ${circumference}`}
-            rotation={-90}
-            origin={`${size / 2}, ${size / 2}`}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
-        ) : null}
+        ) : (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={N.card2}
+            strokeWidth={stroke}
+            fill="none"
+          />
+        )}
       </Svg>
       <View style={s.ringCenter}>{children}</View>
     </View>
