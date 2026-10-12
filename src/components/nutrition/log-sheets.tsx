@@ -1,16 +1,13 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-import { Button, Field, Label, Pill, Sheet, tap } from "@/components/nutrition/nourish-ui";
+import { Button, Field, Label, Pill, Sheet } from "@/components/nutrition/nourish-ui";
 import { N, NRadius } from "@/constants/nourish-theme";
 import { parseClock, type FoodLogger } from "@/hooks/use-food-logger";
 import { FoodItemCard } from "@/components/nutrition/food-item-card";
 import { slotForTime } from "@/services/nourish/slots";
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
-
-const STEP = 0.25;
-const MAX_MULTIPLIER = 20;
 
 function SlotPicker({
   value,
@@ -32,43 +29,6 @@ function SlotPicker({
     </View>
   );
 }
-
-function Stepper({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <View style={s.stepper}>
-      <Pressable
-        accessibilityLabel="Smaller portion"
-        hitSlop={8}
-        onPress={() => {
-          tap();
-          onChange(Math.max(STEP, value - STEP));
-        }}
-        style={s.stepBtn}
-      >
-        <Text style={s.stepText}>−</Text>
-      </Pressable>
-      <Text style={s.stepValue}>×{value}</Text>
-      <Pressable
-        accessibilityLabel="Bigger portion"
-        hitSlop={8}
-        onPress={() => {
-          tap();
-          onChange(Math.min(MAX_MULTIPLIER, value + STEP));
-        }}
-        style={s.stepBtn}
-      >
-        <Text style={s.stepText}>+</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 
 /** "Check before saving": nothing is written until the user confirms. */
 export function ReviewSheet({ logger }: { logger: FoodLogger }) {
@@ -345,7 +305,14 @@ export function EditEntrySheet({
 }: {
   meal: Meal | null;
   onClose: () => void;
-  onSave: (factor: number, slot: MealSlot, at: string) => void;
+  onSave: (
+    factor: number,
+    slot: MealSlot,
+    at: string,
+    macros?: { calories: number; protein: number; carbs: number; fat: number },
+    name?: string,
+    qty?: string,
+  ) => void;
   onDelete: () => void;
   initialSlot: MealSlot;
   initialAt: string;
@@ -382,32 +349,46 @@ function EditForm({
   initialSlot: MealSlot;
   initialAt: string;
   busy: boolean;
-  onSave: (factor: number, slot: MealSlot, at: string) => void;
+  onSave: (
+    factor: number,
+    slot: MealSlot,
+    at: string,
+    macros?: { calories: number; protein: number; carbs: number; fat: number },
+    name?: string,
+    qty?: string,
+  ) => void;
   onDelete: () => void;
   onCancel: () => void;
 }) {
-  const [factor, setFactor] = useState(1);
+  const [draftItem, setDraftItem] = useState<DraftItem>(() => ({
+    name: meal.name,
+    qty: meal.qty ?? "1 serving",
+    calories: meal.calories ?? 0,
+    protein: meal.protein ?? 0,
+    carbs: meal.carbs ?? 0,
+    fat: meal.fat ?? 0,
+    multiplier: 1,
+    confidence: meal.confidence ?? 0.9,
+    source: "saved",
+  }));
   const [slot, setSlot] = useState<MealSlot>(initialSlot);
   const [at, setAt] = useState(initialAt);
   const timeOk = parseClock(at) !== null;
 
   return (
     <View>
-      <Text style={s.itemName}>{meal.name}</Text>
-      <Text style={s.itemQty}>
-        {factor !== 1 ? `${factor}× ` : ""}
-        {meal.qty ?? "1 serving"}
-      </Text>
-      <Text style={[s.itemMacros, s.gapBottom]}>
-        {Math.round((meal.calories ?? 0) * factor)} kcal · P{" "}
-        {Math.round((meal.protein ?? 0) * factor)} · C{" "}
-        {Math.round((meal.carbs ?? 0) * factor)} · F{" "}
-        {Math.round((meal.fat ?? 0) * factor)}
-      </Text>
-      <Label>Portion</Label>
-      <View style={s.gapBottom}>
-        <Stepper value={factor} onChange={setFactor} />
-      </View>
+      <FoodItemCard
+        item={draftItem}
+        status={
+          draftItem.calories === 0 &&
+          draftItem.protein === 0 &&
+          draftItem.carbs === 0 &&
+          draftItem.fat === 0
+            ? "needs-input"
+            : "matched"
+        }
+        onChange={setDraftItem}
+      />
       <Label>Meal</Label>
       <SlotPicker value={slot} onChange={setSlot} />
       <Field
@@ -424,7 +405,21 @@ function EditForm({
           label="Save"
           busy={busy}
           disabled={!timeOk}
-          onPress={() => onSave(factor, slot, parseClock(at) ?? "")}
+          onPress={() =>
+            onSave(
+              draftItem.multiplier,
+              slot,
+              parseClock(at) ?? "",
+              {
+                calories: draftItem.calories,
+                protein: draftItem.protein,
+                carbs: draftItem.carbs,
+                fat: draftItem.fat,
+              },
+              draftItem.name,
+              draftItem.qty,
+            )
+          }
         />
         <Button label="Delete" kind="danger" onPress={onDelete} />
         <Button label="Cancel" kind="ghost" onPress={onCancel} />
