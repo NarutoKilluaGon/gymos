@@ -100,6 +100,22 @@ export function buildWeeklyRead(input: {
     });
   }
 
+  const tooFull = rows.find((row) => {
+    const ratings = logged.filter((day) => day.record?.feel[row.slot]).length;
+
+    return (
+      ratings >= MIN_FEEL_RATINGS &&
+      row.feel > 2.4
+    );
+  });
+
+  if (tooFull) {
+    actions.push({
+      do: `Lighten ${tooFull.slot} slightly`,
+      why: `You often rate it "Too full". Smaller portions or spreading food across the day can keep energy steady.`,
+    });
+  }
+
   const weekend = logged.filter((day) => {
     const dow = dateFromKey(day.key).getDay();
 
