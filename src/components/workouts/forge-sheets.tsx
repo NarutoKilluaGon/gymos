@@ -599,6 +599,53 @@ export function SummarySheet({
   );
 }
 
+export function StaleSessionSheet({
+  visible,
+  onClose,
+  sessionName,
+  startDate,
+  onFinishAsItWas,
+  onDiscard,
+  onResumeToday,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  sessionName: string;
+  startDate?: string;
+  onFinishAsItWas: () => void;
+  onDiscard: () => void;
+  onResumeToday: () => void;
+}) {
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Workout left open"
+      footer={<Button kind="ghost" label="Cancel" onPress={onClose} />}
+    >
+      <Text style={s.rowMeta}>
+        {`"${sessionName}" was started ${startDate ? `on ${startDate}` : "previously"} and never finished. What would you like to do?`}
+      </Text>
+      <View style={[s.actions, { marginTop: 16 }]}>
+        <Button
+          label="Finish as it was"
+          onPress={onFinishAsItWas}
+        />
+        <Button
+          kind="ghost"
+          label="Resume today"
+          onPress={onResumeToday}
+        />
+        <Button
+          kind="danger"
+          label="Discard workout"
+          onPress={onDiscard}
+        />
+      </View>
+    </Sheet>
+  );
+}
+
 function SummaryPrRow({
   name,
   prText,

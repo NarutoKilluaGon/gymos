@@ -57,6 +57,7 @@ import {
   toggleSet,
   toggleSuperset,
   toggleWarmup,
+  touch,
 } from "@/services/forge/ops";
 import {
   fromKg,
@@ -336,7 +337,7 @@ export function ForgeSession({
             );
           }}
           onResumeIdle={() => {
-            update((current) => ({ ...current, lastActivityAt: new Date().toISOString() }));
+            update((current) => touch(current, new Date()));
           }}
           onFinishIdle={() => setSheet({ kind: "finish" })}
         />

@@ -197,6 +197,8 @@ export function useForge() {
         act(() => deleteSession(id), "Couldn't delete workout"),
       restore: (session: WorkoutSession) =>
         act(() => saveSession(session), "Couldn't restore workout"),
+      save: (session: WorkoutSession) =>
+        act(() => saveSession(session), "Couldn't save workout"),
       saveSettings: (change: (current: ForgeSettings) => ForgeSettings) =>
         act(() => updateForgeSettings(change), "Couldn't save"),
       addCustom: async (

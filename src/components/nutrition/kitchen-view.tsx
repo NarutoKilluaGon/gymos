@@ -745,6 +745,15 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
         visible={newRecipeOpen}
         onClose={() => setNewRecipeOpen(false)}
         title="New Recipe"
+        footer={
+          recipePerServ ? (
+            <Button
+              label="Save recipe"
+              onPress={() => void saveRecipeAction()}
+              disabled={recipeName.trim() === ""}
+            />
+          ) : undefined
+        }
       >
         <ScrollView style={s.sheetScroll} keyboardShouldPersistTaps="handled">
           <Field
@@ -876,13 +885,6 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
                 <CountUp value={Math.round(recipePerServ.carbs)} /> · F{" "}
                 <CountUp value={Math.round(recipePerServ.fat)} />
               </Text>
-              <View style={s.top}>
-                <Button
-                  label="Save recipe"
-                  onPress={() => void saveRecipeAction()}
-                  disabled={recipeName.trim() === ""}
-                />
-              </View>
             </View>
           ) : null}
         </ScrollView>
@@ -959,6 +961,15 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
         visible={newMealOpen}
         onClose={() => setNewMealOpen(false)}
         title="New Meal"
+        footer={
+          mealItems.length > 0 ? (
+            <Button
+              label="Save meal"
+              onPress={() => void saveMealAction()}
+              disabled={mealName.trim() === ""}
+            />
+          ) : undefined
+        }
       >
         <ScrollView style={s.sheetScroll} keyboardShouldPersistTaps="handled">
           <Field
@@ -1031,14 +1042,6 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
                   g
                 </Text>
               </View>
-
-              <View style={s.top}>
-                <Button
-                  label="Save meal"
-                  onPress={() => void saveMealAction()}
-                  disabled={mealName.trim() === ""}
-                />
-              </View>
             </View>
           ) : null}
         </ScrollView>
@@ -1049,6 +1052,13 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
         visible={newFoodOpen}
         onClose={() => setNewFoodOpen(false)}
         title="New Food"
+        footer={
+          <Button
+            label="Save food"
+            onPress={() => void saveFoodAction()}
+            disabled={foodName.trim() === "" || foodKcal.trim() === ""}
+          />
+        }
       >
         <View style={s.sheetContent}>
           <Field
@@ -1099,11 +1109,6 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
               />
             </View>
           </View>
-          <Button
-            label="Save food"
-            onPress={() => void saveFoodAction()}
-            disabled={foodName.trim() === "" || foodKcal.trim() === ""}
-          />
         </View>
       </Sheet>
     </ScrollView>

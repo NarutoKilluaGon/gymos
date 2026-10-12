@@ -5,11 +5,31 @@ import type {
 } from "@/types/gymos";
 import { createId } from "@/utils/id";
 
-/** Mark the session as just edited (drives idle-time trimming). */
-export const touch = (session: WorkoutSession, now: Date): WorkoutSession => ({
-  ...session,
-  lastActivityAt: now.toISOString(),
-});
+import { IDLE_GRACE_MS, IDLE_LIMIT_MS } from "@/services/forge/timing";
+
+/** Mark the session as just edited (drives idle-time trimming and pause absorption). */
+export const touch = (session: WorkoutSession, now: Date): WorkoutSession => {
+  const nowMs = now.getTime();
+  let next = { ...session };
+
+  if (
+    !next.pausedAt &&
+    !next.endedAt &&
+    !next.backdated &&
+    next.lastActivityAt
+  ) {
+    const lastMs = new Date(next.lastActivityAt).getTime();
+    const gap = nowMs - lastMs;
+
+    if (gap > IDLE_LIMIT_MS) {
+      const absorbedPause = Math.max(0, gap - IDLE_GRACE_MS);
+      next.pausedMs = (next.pausedMs ?? 0) + absorbedPause;
+    }
+  }
+
+  next.lastActivityAt = now.toISOString();
+  return next;
+};
 
 function mapExercise(
   session: WorkoutSession,
