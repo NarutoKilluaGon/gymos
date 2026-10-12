@@ -9,6 +9,7 @@ import {
 } from "@/data/foods";
 import {
   resolveSegments,
+  resolveStaged,
   resolveLogText,
 } from "@/services/nourish/resolve-log";
 
@@ -375,12 +376,19 @@ describe("Part 11: Offline Resolution (resolveSegments & resolveLogText)", () =>
     }
   });
 
-  it("resolveLogText returns manual when an ingredient is unknown", async () => {
-    const out = await resolveLogText(
+  it("resolveStaged returns ready with editable cards even when an ingredient is unknown (never dumps whole sentence to blank form)", async () => {
+    const out = await resolveStaged(
       "1 cup rice, 100g dragonfruit powder",
       { saved: [], provider: null },
     );
 
-    expect(out.status).toBe("manual");
+    expect(out.status).toBe("ready");
+    if (out.status === "ready") {
+      expect(out.items).toHaveLength(2);
+      expect(out.items[0]?.name).toBe("Rice (cooked)");
+      expect(out.items[0]?.calories).toBeGreaterThan(0);
+      expect(out.items[1]?.name).toBe("dragonfruit powder");
+      expect(out.items[1]?.source).toBe("manual");
+    }
   });
 });

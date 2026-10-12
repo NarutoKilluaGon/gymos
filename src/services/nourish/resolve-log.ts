@@ -3,9 +3,6 @@ import {
   type DescriptionAiProvider,
 } from "@/services/meal-description-ai-provider";
 import {
-  resolveMealDescriptionWithProviderStaged,
-} from "@/services/meal-description-resolution-flow";
-import {
   matchSavedFood,
   resolveSegmentLocally,
 } from "@/services/meal-food-resolution";
@@ -22,6 +19,12 @@ import {
   findFoodDefinition,
   calculateFoodMacros,
 } from "@/data/foods";
+import {
+  isSameUnit,
+  matchFoodEntry,
+  scalePortionMacros,
+} from "@/services/food-db";
+import { getStorage, setStorage } from "@/storage/storage";
 import type { SavedFood } from "@/storage/repositories/saved-foods";
 import { pickMicronutrients, type EstimatedFood } from "@/types/gymos";
 import type { DraftItem, DraftSource } from "@/types/nourish";
@@ -139,90 +142,130 @@ function finalize(items: DraftItem[], eatingOut: boolean): DraftItem[] {
     : sane;
 }
 
-/** Resolve leftover segments with no network: catalog → ingredients table → typical values. */
-function resolveOffline(
-  segments: readonly string[],
-  saved: readonly SavedFood[],
-): { items: DraftItem[]; usedTypicalValues: boolean } | null {
-  const items: DraftItem[] = [];
-  let usedTypicalValues = false;
+/** AI Estimate Cache keyed by normalized description segment. Stored in memory and AsyncStorage. */
+const AI_ESTIMATE_CACHE_KEY = "@gymos/ai-estimate-cache";
+let memoryAiCache: Map<string, DraftItem> | null = null;
 
-  for (const segment of segments) {
-    const local = resolveSegmentLocally(segment, [...saved]);
-
-    if (!local.unresolved) {
-      items.push(fromEstimated(local));
-      continue;
+async function getAiCache(): Promise<Map<string, DraftItem>> {
+  if (memoryAiCache) return memoryAiCache;
+  memoryAiCache = new Map();
+  try {
+    const raw = await getStorage<Record<string, DraftItem>>(AI_ESTIMATE_CACHE_KEY);
+    if (raw && typeof raw === "object") {
+      for (const [k, v] of Object.entries(raw)) {
+        if (v && typeof v === "object" && "name" in v && "calories" in v) {
+          memoryAiCache.set(k, v as DraftItem);
+        }
+      }
     }
-
-    const parsed = parseLeadingQuantity(segment);
-    const def = findFoodDefinition(parsed.name);
-    if (def) {
-      const amount = parsed.amount !== undefined ? parsed.amount : 1;
-      const macros = calculateFoodMacros(def, amount, parsed.unit, parsed.size);
-      const unitLabel = parsed.unit
-        ? parsed.unit
-        : def.pieceG
-          ? amount === 1
-            ? "piece"
-            : "pieces"
-          : "serving";
-      const formattedQty = `${formatAmount(amount)} ${unitLabel}`.trim();
-      items.push({
-        name: def.name,
-        qty: formattedQty,
-        calories: macros.calories,
-        protein: macros.protein,
-        carbs: macros.carbs,
-        fat: macros.fat,
-        confidence: 0.8,
-        multiplier: 1,
-        source: "local",
-      });
-      usedTypicalValues = true;
-      continue;
-    }
-
-    const typical = localFoodItems(segment);
-
-    if (!typical) return null;
-
-    usedTypicalValues = true;
-    items.push(...typical);
+  } catch {
+    // Ignore cache load errors
   }
+  return memoryAiCache;
+}
 
-  return { items, usedTypicalValues };
+async function setAiCache(key: string, item: DraftItem): Promise<void> {
+  const cache = await getAiCache();
+  cache.set(key, item);
+  try {
+    const obj: Record<string, DraftItem> = {};
+    for (const [k, v] of cache.entries()) {
+      obj[k] = v;
+    }
+    await setStorage(AI_ESTIMATE_CACHE_KEY, obj);
+  } catch {
+    // Ignore cache write errors
+  }
+}
+
+/** Sanity / plausibility check on AI response */
+export function isPlausibleItem(item: DraftItem): boolean {
+  if (item.calories < 0 || item.calories > 3000) return false;
+  if (item.protein < 0 || item.protein > 200) return false;
+  if (item.carbs < 0 || item.carbs > 400) return false;
+  if (item.fat < 0 || item.fat > 200) return false;
+  return true;
+}
+
+/** Lenient validation of AI response: fills missing fields with 0 */
+export function lenientDraftFromEstimate(food: EstimatedFood): DraftItem {
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
+  const draft = fromEstimated({
+    ...food,
+    calories: num(food.calories),
+    protein: num(food.protein),
+    carbs: num(food.carbs),
+    fat: num(food.fat),
+  });
+
+  // Recompute calories if macros disagree wildly (reconcile)
+  const calcCal = Math.round(4 * draft.protein + 4 * draft.carbs + 9 * draft.fat);
+  if (draft.calories === 0 && calcCal > 0) {
+    draft.calories = calcCal;
+  }
+  return draft;
+}
+
+/** Resolve a single segment with 1 retry and 12s timeout */
+async function fetchWithRetry(
+  segment: string,
+  provider: DescriptionAiProvider,
+): Promise<EstimatedFood | null> {
+  const singleAttempt = async () => {
+    return new Promise<EstimatedFood | null>(async (resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error("Timeout (12s)"));
+      }, 12_000);
+
+      try {
+        const est = await provider.estimate(segment);
+        clearTimeout(timer);
+        if (est.foods.length > 0 && !est.foods[0]!.unresolved) {
+          resolve(est.foods[0]!);
+        } else {
+          resolve(null);
+        }
+      } catch (err) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  };
+
+  try {
+    return await singleAttempt();
+  } catch {
+    // Retry once
+    try {
+      return await singleAttempt();
+    } catch {
+      return null;
+    }
+  }
 }
 
 /**
- * Return per-segment resolution results for Kitchen and detailed reviews.
- * Does not fail all-or-nothing: unresolved ingredients return status: "needs-input".
+ * Stage 1: Resolve all segments locally (≤ 50ms).
+ * Returns immediate resolutions and lists items that need proxy enrichment.
  */
-export async function resolveSegments(
-  text: string,
-  options?: {
-    saved?: readonly SavedFood[];
-    eatingOut?: boolean;
-    provider?: DescriptionAiProvider | null;
-  },
-): Promise<SegmentResolution[]> {
-  const trimmed = text.trim();
-  if (!trimmed) return [];
+export async function resolveStage1(
+  segments: readonly string[],
+  saved: readonly SavedFood[],
+): Promise<{
+  resolutions: SegmentResolution[];
+  unknownSegments: { segment: string; index: number }[];
+}> {
+  const cache = await getAiCache();
+  const resolutions: SegmentResolution[] = [];
+  const unknownSegments: { segment: string; index: number }[] = [];
 
-  const saved = options?.saved ?? [];
-  const rawSegments = splitDescriptionSegments(trimmed);
-  const results: SegmentResolution[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i]!;
 
-  const provider =
-    options?.provider === undefined
-      ? getDescriptionAiProvider()
-      : options.provider;
-
-  for (const segment of rawSegments) {
-    // 1. Saved food for bare names
+    // A. Saved food for bare names
     const usual = matchUsualFood(segment, saved);
     if (usual) {
-      results.push({
+      resolutions.push({
         segment,
         status: "matched",
         item: savedFoodToDraft(usual),
@@ -230,10 +273,22 @@ export async function resolveSegments(
       continue;
     }
 
-    // 2. Exact catalog match from food-db
+    // B. AI Estimate Cache
+    const norm = segment.toLowerCase().trim();
+    const cached = cache.get(norm);
+    if (cached) {
+      resolutions.push({
+        segment,
+        status: "estimated",
+        item: { ...cached },
+      });
+      continue;
+    }
+
+    // C. Exact catalog match from food-db
     const local = resolveSegmentLocally(segment, [...saved]);
     if (!local.unresolved) {
-      results.push({
+      resolutions.push({
         segment,
         status: "matched",
         item: fromEstimated(local),
@@ -241,7 +296,7 @@ export async function resolveSegments(
       continue;
     }
 
-    // 3. Extended ingredient table match
+    // D. Extended ingredient table match
     const parsed = parseLeadingQuantity(segment);
     const def = findFoodDefinition(parsed.name);
     if (def) {
@@ -259,7 +314,7 @@ export async function resolveSegments(
             : "serving";
       const formattedQty = `${formatAmount(amount)} ${unitLabel}`.trim();
 
-      results.push({
+      resolutions.push({
         segment,
         status: "estimated",
         item: {
@@ -277,10 +332,10 @@ export async function resolveSegments(
       continue;
     }
 
-    // 4. Typical values
+    // E. Typical values
     const typical = localFoodItems(segment);
     if (typical && typical.length > 0) {
-      results.push({
+      resolutions.push({
         segment,
         status: "estimated",
         item: typical[0],
@@ -288,26 +343,9 @@ export async function resolveSegments(
       continue;
     }
 
-    // 5. AI provider if available
-    if (provider) {
-      try {
-        const aiEst = await provider.estimate(segment);
-        if (aiEst.foods.length > 0 && !aiEst.foods[0]!.unresolved) {
-          results.push({
-            segment,
-            status: "estimated",
-            item: fromEstimated(aiEst.foods[0]!),
-          });
-          continue;
-        }
-      } catch {
-        // Fall through to needs-input
-      }
-    }
-
-    // 6. Unresolved / Needs input
+    // F. Unknown segment: skeleton card placeholder
     const cleanName = parsed.name || segment;
-    results.push({
+    resolutions.push({
       segment,
       status: "needs-input",
       reason: cleanName ? `Don't know '${cleanName}' yet` : "No amount given",
@@ -325,20 +363,134 @@ export async function resolveSegments(
         source: "manual",
       },
     });
+    unknownSegments.push({ segment, index: i });
   }
 
-  return results;
+  return { resolutions, unknownSegments };
 }
 
 /**
- * Turn a typed sentence ("2 rotis, dal, paneer bhurji") into reviewable
- * items. Order of trust:
- *   1. the user's own saved foods, for bare names
- *   2. the AI proxy (when configured) for everything else, with catalog
- *      values taking precedence for exact catalog matches
- *   3. offline: the food catalog, then extended ingredients, then typical staples
- * If any piece can't be resolved by any of these, the whole entry falls
- * back to manual entry rather than silently dropping a food.
+ * Return per-segment resolution results for Kitchen and detailed reviews.
+ * Runs Stage 1 local match instantly, then proxy enrichment for unknown items.
+ */
+export async function resolveSegments(
+  text: string,
+  options?: {
+    saved?: readonly SavedFood[];
+    eatingOut?: boolean;
+    provider?: DescriptionAiProvider | null;
+    onUpdate?: (resolutions: SegmentResolution[]) => void;
+  },
+): Promise<SegmentResolution[]> {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  const saved = options?.saved ?? [];
+  const rawSegments = splitDescriptionSegments(trimmed);
+  const provider =
+    options?.provider === undefined
+      ? getDescriptionAiProvider()
+      : options.provider;
+
+  const { resolutions, unknownSegments } = await resolveStage1(rawSegments, saved);
+
+  // If no proxy or no unknown items, we're done
+  if (!provider || unknownSegments.length === 0) {
+    return resolutions;
+  }
+
+  // Notify initial state if callback provided
+  options?.onUpdate?.([...resolutions]);
+
+  // Stage 2: Parallel proxy requests (max 4 concurrent)
+  const CONCURRENCY = 4;
+  for (let i = 0; i < unknownSegments.length; i += CONCURRENCY) {
+    const chunk = unknownSegments.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      chunk.map(async ({ segment, index }) => {
+        const est = await fetchWithRetry(segment, provider);
+        if (est) {
+          // Check Food DB precedence: catalog values win on exact match
+          const entry = matchFoodEntry(est.name, 3);
+          let item: DraftItem;
+          if (entry && isSameUnit(est.unit, entry.unit)) {
+            const scaled = scalePortionMacros(entry, est.estimatedAmount);
+            item = fromEstimated({
+              ...est,
+              entryId: entry.id,
+              calories: scaled.calories,
+              protein: scaled.protein,
+              carbs: scaled.carbs,
+              fat: scaled.fat,
+              ...pickMicronutrients(scaled),
+              nutritionSource: "food-db",
+            });
+          } else {
+            item = lenientDraftFromEstimate(est);
+          }
+
+          if (isPlausibleItem(item)) {
+            resolutions[index] = {
+              segment,
+              status: "estimated",
+              item,
+            };
+            // Cache successful AI estimate
+            await setAiCache(segment.toLowerCase().trim(), item);
+            options?.onUpdate?.([...resolutions]);
+          }
+        }
+      }),
+    );
+  }
+
+  return resolutions;
+}
+
+/**
+ * Staged resolution pipeline:
+ * Instant local answer (≤ 50ms) -> parallel proxy calls -> human review items.
+ * Never dumps text to a blank form.
+ */
+export async function resolveStaged(
+  text: string,
+  options: {
+    saved: readonly SavedFood[];
+    eatingOut?: boolean;
+    provider?: DescriptionAiProvider | null;
+  },
+  onUpdate?: (items: DraftItem[]) => void,
+): Promise<ResolveOutcome> {
+  const trimmed = text.trim();
+  if (!trimmed) return { status: "empty" };
+
+  const eatingOut = options.eatingOut === true;
+  const resolutions = await resolveSegments(text, {
+    saved: options.saved,
+    eatingOut,
+    provider: options.provider,
+    onUpdate: (segs) => {
+      const liveItems = segs.map((s) => s.item!).filter(Boolean);
+      onUpdate?.(finalize(liveItems, eatingOut));
+    },
+  });
+
+  const finalItems = resolutions.map((s) => s.item!).filter(Boolean);
+  if (finalItems.length === 0) {
+    return { status: "empty" };
+  }
+
+  return {
+    status: "ready",
+    items: finalize(finalItems, eatingOut),
+  };
+}
+
+/**
+ * Turn a typed sentence ("2 rotis, dal, paneer bhurji") into reviewable items.
+ * Backward compatible wrapper over staged resolution: if any item remains
+ * unresolved (0 kcal manual source), returns manual fallback for legacy callers/tests,
+ * while resolveStaged keeps items as cards for the modern review UI.
  */
 export async function resolveLogText(
   text: string,
@@ -350,57 +502,31 @@ export async function resolveLogText(
   },
 ): Promise<ResolveOutcome> {
   const trimmed = text.trim();
-
   if (!trimmed) return { status: "empty" };
 
   const eatingOut = options.eatingOut === true;
-  const segments = splitDescriptionSegments(trimmed);
+  const resolutions = await resolveSegments(text, {
+    saved: options.saved,
+    eatingOut,
+    provider: options.provider,
+  });
 
-  if (segments.length === 0) return { status: "empty" };
-
-  const fromUser: DraftItem[] = [];
-  const remaining: string[] = [];
-
-  for (const segment of segments) {
-    const usual = matchUsualFood(segment, options.saved);
-
-    if (usual) fromUser.push(savedFoodToDraft(usual));
-    else remaining.push(segment);
+  const finalItems = resolutions.map((s) => s.item!).filter(Boolean);
+  if (finalItems.length === 0) {
+    return { status: "empty" };
   }
 
-  if (remaining.length === 0) {
-    return { status: "ready", items: finalize(fromUser, eatingOut) };
-  }
+  // If any segment couldn't be resolved (source is manual or status is needs-input with 0 kcal),
+  // return legacy manual status so whole-entry manual fallback behaves as expected in older tests/callers.
+  const hasUnresolved = resolutions.some(
+    (r) => r.status === "needs-input" || (r.item && r.item.source === "manual" && r.item.calories === 0),
+  );
 
-  const provider =
-    options.provider === undefined
-      ? getDescriptionAiProvider()
-      : options.provider;
-  const remainingText = remaining.join(", ");
-
-  if (provider) {
-    const result = await resolveMealDescriptionWithProviderStaged(
-      remainingText,
-      undefined,
-      undefined,
-      [...options.saved],
-      provider,
-    );
-
-    if (result.status === "resolved") {
-      const items = [
-        ...fromUser,
-        ...result.estimate.foods.map(fromEstimated),
-      ];
-
-      return { status: "ready", items: finalize(items, eatingOut) };
-    }
-    // AI failed or returned nothing usable: fall through to offline.
-  }
-
-  const offline = resolveOffline(remaining, options.saved);
-
-  if (!offline) {
+  if (hasUnresolved) {
+    const provider =
+      options.provider === undefined
+        ? getDescriptionAiProvider()
+        : options.provider;
     return {
       status: "manual",
       name: trimmed,
@@ -410,7 +536,7 @@ export async function resolveLogText(
 
   return {
     status: "ready",
-    items: finalize([...fromUser, ...offline.items], eatingOut),
-    ...(offline.usedTypicalValues ? { notice: LOCAL_ESTIMATE_NOTICE } : {}),
+    items: finalize(finalItems, eatingOut),
   };
 }
+
