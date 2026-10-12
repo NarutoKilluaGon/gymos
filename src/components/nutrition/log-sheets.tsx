@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Button, Field, Label, Pill, Sheet, tap } from "@/components/nutrition/nourish-ui";
 import { N, NRadius } from "@/constants/nourish-theme";
 import { parseClock, type FoodLogger } from "@/hooks/use-food-logger";
-import { confidenceLabel } from "@/services/nourish/nutrition";
+import { FoodItemCard } from "@/components/nutrition/food-item-card";
 import { slotForTime } from "@/services/nourish/slots";
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
@@ -69,57 +69,6 @@ function Stepper({
   );
 }
 
-function ItemRow({
-  item,
-  onChange,
-  onRemove,
-}: {
-  item: DraftItem;
-  onChange: (next: DraftItem) => void;
-  onRemove: () => void;
-}) {
-  const k = item.multiplier;
-  const conf = confidenceLabel(item.confidence);
-
-  return (
-    <View style={s.item}>
-      <View style={s.itemHead}>
-        <View style={s.itemMain}>
-          <Text style={s.itemName}>{item.name}</Text>
-          <Text style={s.itemQty}>
-            {k !== 1 ? `${k}× ` : ""}
-            {item.qty}
-          </Text>
-        </View>
-        <Pressable
-          accessibilityLabel={`Remove ${item.name}`}
-          hitSlop={10}
-          onPress={() => {
-            tap();
-            onRemove();
-          }}
-        >
-          <Text style={s.remove}>✕</Text>
-        </Pressable>
-      </View>
-      <Text style={s.itemMacros}>
-        {Math.round(item.calories * k)} kcal · P {Math.round(item.protein * k)} · C{" "}
-        {Math.round(item.carbs * k)} · F {Math.round(item.fat * k)}
-      </Text>
-      <View style={s.itemFoot}>
-        <View style={s.conf}>
-          <View style={[s.dot, { backgroundColor: conf.color }]} />
-          <Text style={s.confText}>{conf.label}</Text>
-          {item.note ? <Text style={s.confText}> · {item.note}</Text> : null}
-        </View>
-        <Stepper
-          value={k}
-          onChange={(multiplier) => onChange({ ...item, multiplier })}
-        />
-      </View>
-    </View>
-  );
-}
 
 /** "Check before saving": nothing is written until the user confirms. */
 export function ReviewSheet({ logger }: { logger: FoodLogger }) {
@@ -154,9 +103,16 @@ export function ReviewSheet({ logger }: { logger: FoodLogger }) {
         </Text>
       ) : null}
       {items.map((item, index) => (
-        <ItemRow
+        <FoodItemCard
           key={`${item.name}-${index}`}
           item={item}
+          status={
+            item.calories === 0 && item.protein === 0 && item.carbs === 0 && item.fat === 0
+              ? "needs-input"
+              : item.source === "saved" || item.source === "catalog"
+                ? "matched"
+                : "estimated"
+          }
           onChange={(next) =>
             setReview((r) =>
               r ? { ...r, items: r.items.map((x, i) => (i === index ? next : x)) } : r,
