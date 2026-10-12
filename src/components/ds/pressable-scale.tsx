@@ -74,9 +74,27 @@ export function PressableScale({
     for (const [key, value] of Object.entries(flattened)) {
       if (LAYOUT_STYLE_KEYS.has(key)) {
         outer[key] = value;
+        // Keep sizing constraints (minHeight, height, minWidth, width) on inner container
+        // too so flex alignment (alignItems, justifyContent) applies across the full intended height/width.
+        if (
+          key === "minHeight" ||
+          key === "height" ||
+          key === "minWidth" ||
+          key === "width"
+        ) {
+          inner[key] = value;
+        }
       } else {
         inner[key] = value;
       }
+    }
+
+    // If outer specifies flex or width: 100%, stretch the inner view to fill it
+    if (outer.flex !== undefined && inner.flex === undefined) {
+      inner.flex = 1;
+    }
+    if (outer.width !== undefined && inner.width === undefined) {
+      inner.width = "100%";
     }
 
     return { outerStyle: outer, innerStyle: inner };
