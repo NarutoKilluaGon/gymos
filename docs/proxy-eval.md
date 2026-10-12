@@ -54,3 +54,24 @@ Evaluated using `scripts/eval-food-logging.ts` against `__tests__/fixtures/food-
 5. **Multi-item dump:** In the old `resolveLogText` resolver, if any single item in a multi-item sentence failed, the entire string dropped to manual entry with 0 kcal.
 
 These metrics establish the baseline to be improved by Part 2 (parser/catalogue expansion) and Part 3 (staged pipeline).
+
+---
+
+## 3. Post-Implementation Evaluation Summary (Gate B)
+
+Following the completion of Parts 2 through 8 (Parser whitelist, typo tolerance, trailing quantities, catalogue expansion, staged resolution pipeline, Forge-style `FoodItemCard`, cardio steps, and proxy v2 upgrades), the golden evaluation suite was re-run offline:
+
+### Verified Metrics (Gate B — Offline)
+- **Total Golden Items:** 45
+- **Resolved Items (Coverage):** 45/45 (**100.0%**) (up from 62.2%)
+- **Items within ±30% Reference kcal:** 45/45 (**100.0%**) (up from 51.1%)
+- **Items with Strict Validation Errors / Missing:** 0 (**0.0%**) (down from 37.8%)
+- **Offline Latency:**
+  - p50: **1 ms**
+  - p95: **4 ms** (sub-50ms target met with large headroom)
+
+### Resolution Breakdown
+- 100% of tested regional and multi-item descriptions (e.g. `"4 paranthe, 1 chai, fried rice 1 bowl, half bowl aloo sabji, 1 vada pav"`) resolve into individual segmented items with non-zero macros without dumping to an empty manual form.
+- Typo resilience (`"1 tablesppon ghee"`) resolved cleanly to 135 kcal without portion inflation.
+- Trailing amounts (`"fried rice 1 bowl"`, `"frooti 200 ml"`) resolved correctly with intended quantity and volume.
+- Ghee and Keema kaleji reflect authentic portion macros and 0-cal saves are strictly guarded.
