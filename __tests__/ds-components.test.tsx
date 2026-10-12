@@ -90,9 +90,41 @@ describe("DS Component Kit", () => {
     expect(r.toJSON()).toBeTruthy();
   });
 
-  it("renders Sheet", () => {
-    const r = render(createElement(Sheet, { visible: true, onClose: () => {}, title: "Test Sheet" }, createElement(Text, null, "Content")));
-    expect(r.toJSON()).toBeTruthy();
+  it("renders Sheet with title, children, and footer in both scroll and no-scroll modes", () => {
+    const r1 = render(
+      createElement(
+        Sheet,
+        {
+          visible: true,
+          onClose: () => {},
+          title: "Test Sheet",
+          footer: createElement(Text, null, "Footer Action"),
+        },
+        createElement(Text, null, "Visible Body Content"),
+      ),
+    );
+    expect(r1.toJSON()).toBeTruthy();
+    const texts1 = r1.root.findAllByType(Text).map((t: any) => t.props.children);
+    expect(texts1).toContain("Test Sheet");
+    expect(texts1).toContain("Visible Body Content");
+    expect(texts1).toContain("Footer Action");
+
+    // Also assert non-scrolling mode
+    const r2 = render(
+      createElement(
+        Sheet,
+        {
+          visible: true,
+          onClose: () => {},
+          scroll: false,
+          footer: createElement(Text, null, "Footer Action"),
+        },
+        createElement(Text, null, "Non-scrolling Body"),
+      ),
+    );
+    const texts2 = r2.root.findAllByType(Text).map((t: any) => t.props.children);
+    expect(texts2).toContain("Non-scrolling Body");
+    expect(texts2).toContain("Footer Action");
   });
 
   it("renders PressableScale", () => {

@@ -9,6 +9,7 @@ import {
   StyleProp,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native";
@@ -52,6 +53,8 @@ export function Sheet({
 }: SheetProps) {
   const theme = useTheme();
   const insets = useGuardedInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const maxPaneHeight = Math.round(windowHeight * 0.88);
 
   return (
     <Modal
@@ -77,6 +80,7 @@ export function Sheet({
             {
               backgroundColor: theme.bg,
               borderColor: theme.line,
+              maxHeight: maxPaneHeight,
               paddingBottom: (insets.bottom || 0) + 16,
             },
             style,
@@ -110,7 +114,7 @@ export function Sheet({
               {children}
             </ScrollView>
           ) : (
-            <View style={[styles.content, contentContainerStyle]}>
+            <View style={[styles.content, styles.noScroll, contentContainerStyle]}>
               {children}
             </View>
           )}
@@ -152,8 +156,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
-    maxHeight: "88%",
     paddingTop: 8,
+    flexShrink: 1,
     display: "flex",
     flexDirection: "column",
   },
@@ -182,13 +186,16 @@ const styles = StyleSheet.create({
     fontWeight: "300",
   },
   scroll: {
-    flex: 1,
-    flexGrow: 0,
+    flexGrow: 1,
     flexShrink: 1,
+    minHeight: 0,
   },
   content: {
     paddingHorizontal: 20,
     paddingBottom: 16,
+  },
+  noScroll: {
+    flexShrink: 1,
   },
   destructiveSection: {
     borderTopWidth: 1,
