@@ -14,6 +14,7 @@ export type CardioEstimate = {
   detail: string;
   minutes: number;
   distanceKm?: number;
+  steps?: number;
   kcal: number;
   isEstimate: boolean;
   needsActivity?: boolean;
@@ -25,6 +26,7 @@ const DESCENT_FACTOR = 1.3;
 const JOULES_PER_KCAL = 4184;
 const GRAVITY = 9.8;
 const KM_PER_MILE = 1.609;
+const STEPS_PER_KM = 1300;
 
 // Build comprehensive regex for detecting cardio
 const ALL_ALIASES = CARDIO_ACTIVITIES.flatMap((a) => a.aliases);
@@ -43,6 +45,8 @@ const EXTRA_CARDIO_TERMS = [
   "climb",
   "climbed",
   "climbing",
+  "step",
+  "steps",
 ];
 
 const ALIAS_PATTERN_STR = ALL_ALIASES.concat(EXTRA_CARDIO_TERMS)
@@ -50,7 +54,7 @@ const ALIAS_PATTERN_STR = ALL_ALIASES.concat(EXTRA_CARDIO_TERMS)
   .join("|");
 
 export const CARDIO_PATTERN = new RegExp(
-  `\\b(${ALIAS_PATTERN_STR})\\b|\\d+\\s*(?:km|kms|kilometers?|kilometres?|mi|miles?)\\b`,
+  `\\b(${ALIAS_PATTERN_STR})\\b|\\d+\\s*(?:km|kms|kilometers?|kilometres?|mi|miles?|steps?)\\b`,
   "i",
 );
 
@@ -138,7 +142,7 @@ export function estimateCardio(
       : 0;
   minutes = Math.round(minutes * 10) / 10;
 
-  // 4. PARSE DISTANCE
+  // 4. PARSE DISTANCE & STEPS
   // Avoid matching incomplete "mi" while typing "min"
   let distanceKm: number | undefined;
   const isTypingMi = /(?:^|\s)\d+(?:\.\d+)?\s*mi$/i.test(lower);
@@ -151,6 +155,20 @@ export function estimateCardio(
       const unit = distMatch[2].toLowerCase();
       distanceKm = unit.startsWith("mi") ? val * KM_PER_MILE : val;
       distanceKm = Math.round(distanceKm * 100) / 100;
+    }
+  }
+
+  // Parse steps (e.g. "8000 steps", "10k steps", "5000 step")
+  let steps: number | undefined;
+  const stepsMatch = lower.match(
+    /\b(\d+(?:\.\d+)?)\s*(k)?\s*steps?\b/i,
+  );
+  if (stepsMatch) {
+    const rawVal = Number(stepsMatch[1]);
+    const isK = Boolean(stepsMatch[2]);
+    steps = Math.round(isK ? rawVal * 1000 : rawVal);
+    if (!distanceKm) {
+      distanceKm = Math.round((steps / STEPS_PER_KM) * 100) / 100;
     }
   }
 
@@ -174,10 +192,10 @@ export function estimateCardio(
 
   // Activity definition
   const isRun = matchedDef?.id === "running" || matchedDef?.id === "jogging";
-  const isWalk = matchedDef?.id === "walking" || matchedDef?.id === "treadmill";
+  const isWalk = matchedDef?.id === "walking" || matchedDef?.id === "treadmill" || (!matchedDef && Boolean(steps));
 
   // Calculate MET with potential incline/speed grade adjustment
-  let effectiveMet = matchedDef?.met ?? 4.5;
+  let effectiveMet = matchedDef?.met ?? (steps ? 3.5 : 4.5);
 
   if ((isWalk || isRun) && (inclinePercent > 0 || speedKmH !== undefined)) {
     const defaultSpeed = isRun ? 9 : 5;
@@ -196,7 +214,12 @@ export function estimateCardio(
 
   // Detail text
   let detail = "";
-  if (minutes > 0) {
+  if (steps) {
+    detail = `${steps.toLocaleString()} steps`;
+    if (distanceKm) {
+      detail += ` (${Math.round(distanceKm * 10) / 10} km)`;
+    }
+  } else if (minutes > 0) {
     detail = `${Math.round(minutes)} min`;
     if (inclinePercent > 0) {
       detail += `, ${inclinePercent}% incline`;
@@ -209,15 +232,17 @@ export function estimateCardio(
   }
 
   // Activity name and missing activity check
-  const activityName = matchedDef ? matchedDef.label : "Cardio";
-  const needsActivity = !matchedDef;
+  const activityName = matchedDef ? matchedDef.label : (steps ? "Walking" : "Cardio");
+  const activityId = matchedDef ? matchedDef.id : (steps ? "walking" : "other");
+  const needsActivity = !matchedDef && !steps;
 
   return {
-    activity: matchedDef?.id ?? "other",
+    activity: activityId,
     name: activityName,
     detail,
     minutes: Math.round(minutes),
     distanceKm,
+    steps,
     kcal,
     isEstimate: true,
     needsActivity,
