@@ -49,13 +49,78 @@ const NUMBER_WORDS: Record<string, number> = {
   ten: 10,
 };
 
-const UNITS_REGEX_STR =
-  "teaspoons?|tsp|tablespoons?|tbsp|cups?|bowls?|katoris?|glasses?|glass|" +
-  "millilitres?|milliliters?|ml|litres?|liters?|l|" +
-  "grams?|gm|gms|g|kilograms?|kilos?|kg|kgs|" +
-  "ounces?|oz|pounds?|lbs?|lb|" +
-  "pieces?|pcs?|pc|slices?|cloves?|sprigs?|" +
-  "pinches?|pinch|handfuls?|handful|servings?|plates?";
+const CANONICAL_UNITS: readonly string[] = [
+  "tablespoon", "tablespoons", "tbsp",
+  "teaspoon", "teaspoons", "tsp",
+  "gram", "grams", "gm", "gms", "g",
+  "kilogram", "kilograms", "kilo", "kilos", "kg",
+  "millilitre", "milliliters", "milliliter", "millilitres", "ml",
+  "litre", "liters", "liter", "litres", "l",
+  "cup", "cups",
+  "bowl", "bowls",
+  "katori", "katoris",
+  "glass", "glasses",
+  "piece", "pieces", "pc", "pcs",
+  "slice", "slices",
+  "clove", "cloves",
+  "pinch", "pinches",
+  "handful", "handfuls",
+  "serving", "servings",
+  "plate", "plates",
+  "scoop", "scoops",
+  "oz", "ounce", "ounces",
+  "lb", "pound", "pounds",
+];
+
+export function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = i;
+    for (let j = 1; j <= b.length; j++) {
+      const val =
+        a[i - 1] === b[j - 1]
+          ? row[j - 1]!
+          : Math.min(row[j - 1]!, row[j]!, prev) + 1;
+      row[j - 1] = prev;
+      prev = val;
+    }
+    row[b.length] = prev;
+  }
+  return row[b.length]!;
+}
+
+/** Match or fuzzy-correct candidate word against canonical units (distance <= 2 for words >= 4 chars). */
+export function matchOrFuzzyUnit(candidate: string): string | null {
+  const norm = candidate.toLowerCase().trim();
+  if (!norm) return null;
+
+  // Exact match first
+  for (const u of CANONICAL_UNITS) {
+    if (norm === u) return norm;
+  }
+
+  // Fuzzy match only for candidate words of length >= 4 with distance <= 2
+  if (norm.length >= 4) {
+    let bestMatch: string | null = null;
+    let bestDist = 3;
+    for (const u of CANONICAL_UNITS) {
+      if (u.length >= 4 && Math.abs(u.length - norm.length) <= 2) {
+        const d = levenshtein(norm, u);
+        if (d <= 2 && d < bestDist) {
+          bestDist = d;
+          bestMatch = u;
+        }
+      }
+    }
+    if (bestMatch) return bestMatch;
+  }
+
+  return null;
+}
 
 const SIZES_REGEX_STR = "small|medium|large";
 
@@ -194,7 +259,7 @@ export function parseLeadingQuantity(text: string): ParsedQuantity {
 
   // 6. Word numbers: "three eggs", "two rotis", "a banana"
   const wordNumRegex = new RegExp(
-    `^(a|an|one|two|three|four|five|six|seven|eight|nine|ten)(?:\\s+(${UNITS_REGEX_STR}))?\\s+(.+)$`,
+    `^(a|an|one|two|three|four|five|six|seven|eight|nine|ten)(?:\\s+([a-zA-Z]+))?\\s+(.+)$`,
     "i",
   );
   const wordMatch = trimmed.match(wordNumRegex);
@@ -205,7 +270,32 @@ export function parseLeadingQuantity(text: string): ParsedQuantity {
     return parseRest(val, remainder, possibleUnit);
   }
 
-  // Fallback: no leading quantity
+  // 7. Trailing quantities: "fried rice 1 bowl", "keema kalegi 200 gm", "frooti 200 ml", "rice 1 cup"
+  const trailingRegex =
+    /^(.*?)\s+(\d+(?:[\s-]+\d+\/\d+|\/\d+|\.\d+)?|\d*\s*[½¼¾⅓⅔⅛])\s*([a-zA-Z]+)?$/;
+  const trailingMatch = trimmed.match(trailingRegex);
+  if (trailingMatch) {
+    const candidateName = trailingMatch[1]!.trim();
+    const candidateVal = parseFractionValue(trailingMatch[2]!);
+    const rawUnit = trailingMatch[3];
+    if (candidateName && candidateVal !== null && candidateVal > 0) {
+      const matchedUnit = rawUnit ? matchOrFuzzyUnit(rawUnit) : null;
+      if (rawUnit && matchedUnit) {
+        return {
+          name: cleanFoodName(candidateName),
+          amount: Math.round(candidateVal * 100) / 100,
+          unit: matchedUnit,
+        };
+      } else if (!rawUnit) {
+        return {
+          name: cleanFoodName(candidateName),
+          amount: Math.round(candidateVal * 100) / 100,
+        };
+      }
+    }
+  }
+
+  // Fallback: no quantity found
   return { name: trimmed };
 }
 
@@ -219,40 +309,71 @@ function parseRest(
   initialUnit?: string,
 ): ParsedQuantity {
   let rest = remainderText.trim();
-  let unit = initialUnit ? initialUnit.trim().toLowerCase() : undefined;
+  let unit: string | undefined;
   let size: "small" | "medium" | "large" | undefined;
 
-  // Check if initialUnit is actually a size modifier
-  if (unit && /^(small|medium|large)$/i.test(unit)) {
-    size = unit.toLowerCase() as "small" | "medium" | "large";
-    unit = undefined;
+  // Check initialUnit against size or valid unit whitelist
+  if (initialUnit) {
+    const lowerInitial = initialUnit.toLowerCase().trim();
+    if (/^(small|medium|large)$/i.test(lowerInitial)) {
+      size = lowerInitial as "small" | "medium" | "large";
+    } else {
+      const matched = matchOrFuzzyUnit(lowerInitial);
+      if (matched) {
+        unit = matched;
+      } else {
+        // Not a unit! Reattach to remainder: e.g. "1 vada pav" -> "vada pav"
+        rest = `${initialUnit} ${rest}`.trim();
+      }
+    }
   }
 
-  // Check if rest starts with a recognized unit if initialUnit wasn't given
+  // Check if rest starts with a recognized unit if unit wasn't found yet
   if (!unit) {
-    const unitLeadMatch = rest.match(
-      new RegExp(`^(${UNITS_REGEX_STR})\\b(?:\\s+of)?\\s+(.+)$`, "i"),
-    );
-    if (unitLeadMatch) {
-      const matchedUnit = unitLeadMatch[1]!.toLowerCase();
-      if (/^(small|medium|large)$/i.test(matchedUnit)) {
-        size = matchedUnit as "small" | "medium" | "large";
+    const firstWordMatch = rest.match(/^([a-zA-Z]+)\b(?:\s+of)?(?:\s+(.*))?$/);
+    if (firstWordMatch) {
+      const candidateWord = firstWordMatch[1]!;
+      const afterCandidate = (firstWordMatch[2] ?? "").trim();
+
+      if (/^(small|medium|large)$/i.test(candidateWord)) {
+        size = candidateWord.toLowerCase() as "small" | "medium" | "large";
+        rest = afterCandidate;
       } else {
-        unit = matchedUnit;
+        const matched = matchOrFuzzyUnit(candidateWord);
+        if (matched) {
+          unit = matched;
+          rest = afterCandidate;
+        }
       }
-      rest = unitLeadMatch[2]!.trim();
     }
   } else {
-    // If unit was captured directly attached or adjacent, strip leading "of" from rest
     rest = cleanFoodName(rest);
   }
 
-  // Check for size in rest: "medium onion", "small tomato"
+  // Check for size modifier in rest if not already set: "medium onion", "small tomato"
   if (!size) {
     const sizeMatch = rest.match(new RegExp(`^(${SIZES_REGEX_STR})\\s+(.+)$`, "i"));
     if (sizeMatch) {
       size = sizeMatch[1]!.toLowerCase() as "small" | "medium" | "large";
       rest = sizeMatch[2]!.trim();
+    }
+  }
+
+  // Check for trailing secondary quantity in rest (e.g. "1 frooti 200 ml")
+  if (rest) {
+    const subTrailing = rest.match(/^(.*?)\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/);
+    if (subTrailing) {
+      const subName = subTrailing[1]!.trim();
+      const subVal = Number(subTrailing[2]);
+      const subUnit = matchOrFuzzyUnit(subTrailing[3]!);
+      if (subName && Number.isFinite(subVal) && subUnit) {
+        return {
+          name: cleanFoodName(subName),
+          amount: Math.round(subVal * 100) / 100,
+          unit: subUnit,
+          ...(size ? { size } : {}),
+        };
+      }
     }
   }
 

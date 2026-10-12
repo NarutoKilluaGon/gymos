@@ -345,11 +345,11 @@
   },
   {
     "text": "2 butter naan",
-    "kcalMin": 480,
+    "kcalMin": 280,
     "kcalMax": 720,
-    "proteinMin": 12,
+    "proteinMin": 7,
     "proteinMax": 20,
-    "source": "IFCT 2017 / USDA: Tandoori butter naan (2 pieces, ~180 g)"
+    "source": "IFCT 2017 / USDA: Tandoori butter naan (2 pieces, ~150-250 kcal each)"
   },
   {
     "text": "1 cup curd",

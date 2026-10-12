@@ -246,14 +246,17 @@ export async function resolveSegments(
     const def = findFoodDefinition(parsed.name);
     if (def) {
       const amount = parsed.amount !== undefined ? parsed.amount : 1;
-      const macros = calculateFoodMacros(def, amount, parsed.unit, parsed.size);
+      const effectiveUnit = parsed.unit || (def.katoriG ? "katori" : undefined);
+      const macros = calculateFoodMacros(def, amount, effectiveUnit, parsed.size);
       const unitLabel = parsed.unit
         ? parsed.unit
-        : def.pieceG
-          ? amount === 1
-            ? "piece"
-            : "pieces"
-          : "serving";
+        : def.katoriG
+          ? "katori"
+          : def.pieceG
+            ? amount === 1
+              ? "piece"
+              : "pieces"
+            : "serving";
       const formattedQty = `${formatAmount(amount)} ${unitLabel}`.trim();
 
       results.push({

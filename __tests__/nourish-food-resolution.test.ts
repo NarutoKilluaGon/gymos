@@ -193,6 +193,43 @@ describe("Part 11: meal description parsing", () => {
         unit: "glass",
       });
     });
+
+    it("does not treat food words as units ('1 vada pav' -> amount 1, name 'vada pav')", () => {
+      const parsed = parseLeadingQuantity("1 vada pav");
+      expect(parsed.amount).toBe(1);
+      expect(parsed.unit).toBeUndefined();
+      expect(parsed.name).toBe("vada pav");
+    });
+
+    it("fuzzy-corrects common unit typos ('tablesppon' -> 'tablespoon')", () => {
+      const parsed = parseLeadingQuantity("1 tablesppon ghee");
+      expect(parsed.amount).toBe(1);
+      expect(parsed.unit).toBe("tablespoon");
+      expect(parsed.name).toBe("ghee");
+    });
+
+    it("parses trailing quantities accurately", () => {
+      expect(parseLeadingQuantity("fried rice 1 bowl")).toMatchObject({
+        name: "fried rice",
+        amount: 1,
+        unit: "bowl",
+      });
+      expect(parseLeadingQuantity("keema kalegi 200 gm")).toMatchObject({
+        name: "keema kalegi",
+        amount: 200,
+        unit: "gm",
+      });
+      expect(parseLeadingQuantity("frooti 200 ml")).toMatchObject({
+        name: "frooti",
+        amount: 200,
+        unit: "ml",
+      });
+      expect(parseLeadingQuantity("1 frooti 200 ml")).toMatchObject({
+        name: "frooti",
+        amount: 200,
+        unit: "ml",
+      });
+    });
   });
 });
 
