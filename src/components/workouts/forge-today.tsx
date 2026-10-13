@@ -3,12 +3,12 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Trophy } from "lucide-react-native";
 
 import { CardioSheet } from "@/components/nutrition/more-sheets";
-import { DateNavigator } from "@/components/ds";
+import { CardioSection, DateNavigator } from "@/components/ds";
 import {
   CalendarSheet,
   StaleSessionSheet,
 } from "@/components/workouts/forge-sheets";
-import { Button, FCard, Label, Pill, tap } from "@/components/workouts/forge-ui";
+import { Button, FCard, Pill, tap } from "@/components/workouts/forge-ui";
 import { Font } from "@/constants/design";
 import { F, FSerif } from "@/constants/forge-theme";
 import type { ForgeData } from "@/hooks/use-forge";
@@ -252,38 +252,20 @@ export function TodayView({
 
       {/* CARDIO SECTION WITH UNDO REMOVAL */}
       {cardio.length > 0 ? (
-        <FCard style={s.card}>
-          <Label>Cardio</Label>
-          {cardio.map((entry, index) => (
-            <View key={entry.id} style={s.cardioRow}>
-              <View style={{ flexShrink: 1 }}>
-                <Text style={s.lineStrong}>{displayName(entry.name)}</Text>
-                <Text style={s.meta}>
-                  {entry.durationMin
-                    ? `${entry.durationMin} min · ${entry.kcal} kcal`
-                    : `${entry.kcal} kcal`}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${entry.name}`}
-                hitSlop={8}
-                style={s.cardioRemoveBtn}
-                onPress={() => {
-                  onRemoveCardio(dateKey, entry.id);
-                  showUndoToast({
-                    message: `Removed ${displayName(entry.name)}`,
-                    onUndo: () => {
-                      onRestoreCardio?.(dateKey, entry, index);
-                    },
-                  });
-                }}
-              >
-                <Text style={s.removeText}>Remove</Text>
-              </Pressable>
-            </View>
-          ))}
-        </FCard>
+        <CardioSection
+          entries={cardio}
+          onAddPress={() => setCardioOpen(true)}
+          onRemovePress={(entry, index) => {
+            const originalLog = cardio.find((c) => c.id === entry.id);
+            onRemoveCardio(dateKey, entry.id);
+            showUndoToast({
+              message: `Removed ${displayName(entry.name)}`,
+              onUndo: () => {
+                if (originalLog) onRestoreCardio?.(dateKey, originalLog, index);
+              },
+            });
+          }}
+        />
       ) : null}
 
       {/* NOT STARTED / REST DAY CARD */}

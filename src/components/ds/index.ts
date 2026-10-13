@@ -16,3 +16,4 @@ export * from "./bar";
 export * from "./field";
 export * from "./count-up";
 export * from "./date-navigator";
+export * from "./cardio-section";

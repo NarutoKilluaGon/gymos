@@ -554,7 +554,7 @@ export default function HomeScreen() {
               <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(245, 158, 11, 0.15)" }]}>
                 <Activity size={18} color="#f59e0b" />
               </View>
-              <Text style={styles.shelfLabel}>Log cardio</Text>
+              <Text style={styles.shelfLabel}>Cardio</Text>
             </PressableScale>
 
             <PressableScale

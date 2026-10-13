@@ -33,7 +33,7 @@ import {
   SavedSheet,
   SuggestionsSheet,
 } from "@/components/nutrition/more-sheets";
-import { DateNavigator } from "@/components/ds/date-navigator";
+import { CardioSection, DateNavigator } from "@/components/ds";
 import {
   Bar,
   NCard,
@@ -442,63 +442,32 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         })}
 
         <View style={s.section}>
-          <View style={s.sectionHead}>
-            <Text style={s.sectionTitle}>Cardio</Text>
-            <Pill
-              label="Cardio"
-              icon={<Plus size={14} color={N.ink} />}
-              onPress={() => setCardioText("")}
-            />
-          </View>
-          {day.burn.length === 0 ? (
-            <Text style={s.empty}>
-              Log cardio to add part of it back to today’s budget.
-            </Text>
-          ) : (
-            <NCard style={s.rows}>
-              {day.burn.map((entry, index) => (
-                <View
-                  key={entry.id}
-                  style={[s.entry, index < day.burn.length - 1 && s.entryLine]}
-                >
-                  <View style={s.entryMain}>
-                    <Text style={s.entryName}>{entry.name}</Text>
-                    <Text style={s.mute}>
-                      {[entry.detail, entry.source === "workouts" ? "from Workouts" : ""]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </Text>
-                  </View>
-                  <Text style={s.entryKcal}>{fmtInt(entry.kcal)} kcal</Text>
-                  {entry.removable ? (
-                    <Pressable
-                      accessibilityLabel={`Remove ${entry.name}`}
-                      hitSlop={10}
-                      onPress={() => {
-                        tap();
-                        const cardioLogs = data?.cardio[dayKey] ?? [];
-                        const targetLog = cardioLogs.find((b) => b.id === entry.id);
-                        const targetIndex = cardioLogs.findIndex((b) => b.id === entry.id);
-                        if (!targetLog) return;
-                        void actions.removeCardio(dayKey, entry.id).then((ok) => {
-                          if (ok) {
-                            showUndoToast({
-                              message: `${targetLog.name} removed`,
-                              onUndo: () => {
-                                void actions.restoreCardio(dayKey, targetLog, targetIndex);
-                              },
-                            });
-                          }
-                        });
-                      }}
-                    >
-                      <Text style={s.remove}>✕</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ))}
-            </NCard>
-          )}
+          <CardioSection
+            entries={day.burn}
+            cardStyle={false}
+            emptyText="Log cardio to add part of it back to today’s budget."
+            onAddPress={() => {
+              tap();
+              setCardioText("");
+            }}
+            onRemovePress={(entry) => {
+              tap();
+              const cardioLogs = data?.cardio[dayKey] ?? [];
+              const targetLog = cardioLogs.find((b) => b.id === entry.id);
+              const targetIndex = cardioLogs.findIndex((b) => b.id === entry.id);
+              if (!targetLog) return;
+              void actions.removeCardio(dayKey, entry.id).then((ok) => {
+                if (ok) {
+                  showUndoToast({
+                    message: `${targetLog.name} removed`,
+                    onUndo: () => {
+                      void actions.restoreCardio(dayKey, targetLog, targetIndex);
+                    },
+                  });
+                }
+              });
+            }}
+          />
         </View>
       </ScrollView>
 
