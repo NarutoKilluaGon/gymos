@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Button, Field, Label, Pill, Sheet } from "@/components/nutrition/nourish-ui";
 import { N, NRadius } from "@/constants/nourish-theme";
-import { parseClock, type FoodLogger } from "@/hooks/use-food-logger";
+import { clock, parseClock, type FoodLogger } from "@/hooks/use-food-logger";
 import { FoodItemCard } from "@/components/nutrition/food-item-card";
 import { slotForTime } from "@/services/nourish/slots";
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
@@ -93,12 +93,23 @@ export function ReviewSheet({ logger }: { logger: FoodLogger }) {
         value={review?.slot ?? "Snacks"}
         onChange={(slot) => setReview((r) => (r ? { ...r, slot } : r))}
       />
-      {review && review.at !== "" ? (
+      {review ? (
         <View style={s.timeRow}>
           <Field
             label="Eaten at (24h)"
             value={review.at}
-            onChangeText={(at) => setReview((r) => (r ? { ...r, at } : r))}
+            onChangeText={(at) => {
+              const parsed = parseClock(at);
+              setReview((r) =>
+                r
+                  ? {
+                      ...r,
+                      at,
+                      ...(parsed ? { slot: slotForTime(parsed) } : {}),
+                    }
+                  : r,
+              );
+            }}
             placeholder="13:30"
             keyboardType="numbers-and-punctuation"
             maxLength={5}
@@ -141,9 +152,9 @@ export function ManualSheet({ logger }: { logger: FoodLogger }) {
           key={manual.name + (manual.slot ?? "")}
           initialName={manual.name}
           initialSlot={manual.slot}
-          at={manual.at}
+          initialAt={manual.at}
           busy={busy}
-          onSave={(item, slot) => void logger.saveManual(item, slot)}
+          onSave={(item, slot, at) => void logger.saveManual(item, slot, at)}
           onCancel={() => setManual(null)}
         />
       ) : null}
@@ -154,16 +165,16 @@ export function ManualSheet({ logger }: { logger: FoodLogger }) {
 function ManualForm({
   initialName,
   initialSlot,
-  at,
+  initialAt,
   busy,
   onSave,
   onCancel,
 }: {
   initialName: string;
   initialSlot?: MealSlot;
-  at?: string;
+  initialAt?: string;
   busy: boolean;
-  onSave: (item: DraftItem, slot: MealSlot) => void;
+  onSave: (item: DraftItem, slot: MealSlot, at?: string) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initialName);
@@ -172,9 +183,11 @@ function ManualForm({
   const [p, setP] = useState("");
   const [c, setC] = useState("");
   const [f, setF] = useState("");
-  const [slot, setSlot] = useState<MealSlot>(() => defaultSlotForManual(initialSlot, at));
+  const [at, setAt] = useState(() => initialAt || clock(new Date()));
+  const [slot, setSlot] = useState<MealSlot>(() => defaultSlotForManual(initialSlot, initialAt));
   const [touched, setTouched] = useState(false);
 
+  const timeOk = !at || parseClock(at) !== null;
   const values = [kcal, p, c, f].map(num);
   const invalid = values.some((v) => Number.isNaN(v));
   const protein = values[1] ?? 0;
@@ -182,7 +195,7 @@ function ManualForm({
   const fat = values[3] ?? 0;
   const calories = values[0] ?? Math.round(4 * protein + 4 * carbs + 9 * fat);
   const hasNumbers = values.some((v) => v !== null);
-  const ok = name.trim().length > 0 && hasNumbers && !invalid;
+  const ok = name.trim().length > 0 && hasNumbers && !invalid && timeOk;
 
   return (
     <View>
@@ -257,15 +270,35 @@ function ManualForm({
             ? "Add a food name."
             : invalid
               ? "Numbers only, zero or more."
-              : "Add at least one number."}
+              : !hasNumbers
+                ? "Add at least one number."
+                : "Use HH:MM, like 13:30"}
         </Text>
       ) : null}
       <Label>Meal</Label>
       <SlotPicker value={slot} onChange={setSlot} />
+      <View style={s.timeRow}>
+        <Field
+          label="Eaten at (24h)"
+          value={at}
+          onChangeText={(newAt) => {
+            setAt(newAt);
+            const parsed = parseClock(newAt);
+            if (parsed) {
+              setSlot(slotForTime(parsed));
+            }
+          }}
+          placeholder="13:30"
+          keyboardType="numbers-and-punctuation"
+          maxLength={5}
+        />
+        {!timeOk ? <Text style={s.error}>Use HH:MM, like 13:30</Text> : null}
+      </View>
       <View style={s.manualButtons}>
         <Button
           label="Save"
           busy={busy}
+          disabled={!timeOk}
           onPress={() => {
             setTouched(true);
 
@@ -284,6 +317,7 @@ function ManualForm({
                 source: "manual",
               },
               slot,
+              at,
             );
           }}
         />
