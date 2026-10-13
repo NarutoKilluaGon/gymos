@@ -11,6 +11,9 @@ import {
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
+  Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +21,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   EditEntrySheet,
@@ -90,6 +94,38 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const [savedOpen, setSavedOpen] = useState(false);
   const [editing, setEditing] = useState<Meal | null>(null);
   const [editBusy, setEditBusy] = useState(false);
+
+  const insets = useSafeAreaInsets();
+  const keyboardHeight = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      const h = e.endCoordinates.height;
+      // When keyboard shows inside a tab screen, keyboard overlaps the bottom area.
+      // Offset dock by keyboard height minus screen bottom inset (if any) or directly by keyboard height.
+      Animated.timing(keyboardHeight, {
+        toValue: Math.max(0, h - (insets.bottom || 0)),
+        duration: e.duration || 200,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardHeight, {
+        toValue: 0,
+        duration: e?.duration || 200,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [insets.bottom, keyboardHeight]);
 
   const day = model(dayKey);
   const prevKey = addDaysToKey(dayKey, -1);
@@ -490,7 +526,14 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         </View>
       </ScrollView>
 
-      <View style={s.dock}>
+      <Animated.View
+        style={[
+          s.dock,
+          {
+            transform: [{ translateY: Animated.multiply(keyboardHeight, -1) }],
+          },
+        ]}
+      >
         <TextInput
           value={input}
           onChangeText={setInput}
@@ -515,8 +558,19 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         >
           <Send size={18} color={N.accInk} />
         </Pressable>
-      </View>
-      {logger.busy ? <Text style={s.working}>Working it out…</Text> : null}
+      </Animated.View>
+      {logger.busy ? (
+        <Animated.Text
+          style={[
+            s.working,
+            {
+              transform: [{ translateY: Animated.multiply(keyboardHeight, -1) }],
+            },
+          ]}
+        >
+          Working it out…
+        </Animated.Text>
+      ) : null}
 
       <ReviewSheet logger={logger} />
       <ManualSheet logger={logger} />
