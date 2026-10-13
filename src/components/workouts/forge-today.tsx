@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Calendar, MoreHorizontal, Trophy } from "lucide-react-native";
+import { MoreHorizontal, Trophy } from "lucide-react-native";
 
 import { CardioSheet } from "@/components/nutrition/more-sheets";
+import { DateNavigator } from "@/components/ds";
 import {
   CalendarSheet,
   StaleSessionSheet,
@@ -137,55 +138,14 @@ export function TodayView({
   return (
     <View style={s.root}>
       {/* COMPACT DATE ROW */}
-      <View style={s.dateRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Previous day"
-          hitSlop={8}
-          style={s.stepBtn}
-          onPress={() => stepDay(-1)}
-        >
-          <Text style={s.stepText}>‹</Text>
-        </Pressable>
-
-        <View style={s.dateCenter}>
-          <Text style={s.dateTitle}>{isToday ? "Today" : dayLabel(dateKey)}</Text>
-          {isToday ? (
-            <Text style={s.dateSubtitle}>{dayLabel(dateKey)}</Text>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back to today"
-              style={s.jumpChip}
-              onPress={() => setPicked(null)}
-            >
-              <Text style={s.jumpChipText}>Back to today</Text>
-            </Pressable>
-          )}
-        </View>
-
-        <View style={s.dateActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Next day"
-            disabled={isToday}
-            hitSlop={8}
-            style={[s.stepBtn, isToday && s.stepBtnDisabled]}
-            onPress={() => stepDay(1)}
-          >
-            <Text style={[s.stepText, isToday && s.stepTextDisabled]}>›</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Workout calendar"
-            hitSlop={8}
-            style={s.iconBtn}
-            onPress={() => setCalendarOpen(true)}
-          >
-            <Calendar size={18} color={F.mute} />
-          </Pressable>
-
+      <DateNavigator
+        dateKey={dateKey}
+        todayKey={todayKey}
+        onStep={stepDay}
+        onOpenCalendar={() => setCalendarOpen(true)}
+        onBackToToday={() => setPicked(null)}
+        accentColor={F.acc}
+        extraAction={
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Today options"
@@ -195,8 +155,8 @@ export function TodayView({
           >
             <MoreHorizontal size={18} color={F.mute} />
           </Pressable>
-        </View>
-      </View>
+        }
+      />
 
       {!isToday ? (
         <Text style={s.meta}>

@@ -26,6 +26,7 @@ jest.mock("expo-router", () => ({
 
 // lucide-react-native ships ESM that Jest's transform ignores; decoration only.
 jest.mock("lucide-react-native", () => ({
+  Calendar: () => null,
   ChevronLeft: () => null,
   ChevronRight: () => null,
   Plus: () => null,
@@ -50,6 +51,7 @@ jest.mock("@/components/nutrition/log-sheets", () => ({
 
 jest.mock("@/components/nutrition/more-sheets", () => ({
   CardioSheet: () => null,
+  DayPickerSheet: () => null,
   MicrosSheet: () => null,
   SuggestionsSheet: () => null,
   SavedSheet: () => null,

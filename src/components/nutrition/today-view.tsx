@@ -1,8 +1,6 @@
 import * as Haptics from "expo-haptics";
 import {
   Bookmark,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   RotateCcw,
   Send,
@@ -30,10 +28,12 @@ import {
 } from "@/components/nutrition/log-sheets";
 import {
   CardioSheet,
+  DayPickerSheet,
   MicrosSheet,
   SavedSheet,
   SuggestionsSheet,
 } from "@/components/nutrition/more-sheets";
+import { DateNavigator } from "@/components/ds/date-navigator";
 import {
   Bar,
   NCard,
@@ -61,22 +61,10 @@ import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
 import {
   addDaysToKey,
-  dateFromKey,
   dateKeyFromTimestamp,
   getTodayKey,
 } from "@/utils/date";
 import { showToast, showUndoToast } from "@/utils/toast";
-
-const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTH_SHORT = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-function formatShortDate(key: string): string {
-  const date = dateFromKey(key);
-  return `${WEEKDAY_SHORT[date.getDay()]} ${date.getDate()} ${MONTH_SHORT[date.getMonth()]}`;
-}
 
 type Nourish = ReturnType<typeof useNourish>;
 
@@ -86,6 +74,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   // null follows "today" (so it rolls over at midnight); a string is a past
   // day the user deliberately navigated to and stays put.
   const [picked, setPicked] = useState<string | null>(null);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const dayKey = picked ?? todayKey;
   const [input, setInput] = useState("");
   const [cardioText, setCardioText] = useState<string | null>(null);
@@ -157,6 +146,17 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     [day],
   );
 
+  const loggedDayKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (!records) return keys;
+    for (const [k, r] of records.entries()) {
+      if ((r.meals?.length ?? 0) > 0) {
+        keys.add(k);
+      }
+    }
+    return keys;
+  }, [records]);
+
   // Resolved from the clock at tap time, never from render state, so a stale
   // render can't file a new entry under yesterday. A picked past day stays.
   const resolveDay = useCallback(() => {
@@ -211,7 +211,6 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     );
   }
 
-  const isToday = dayKey === todayKey;
   const { totals, targets } = day;
   const allowance = day.budget - data.settings.kcal;
   const uncertainty = Math.round(totals.uncertainty / 10) * 10;
@@ -271,37 +270,14 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={s.dayStrip}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Previous day"
-            hitSlop={8}
-            onPress={() => {
-              tap();
-              stepDay(-1);
-            }}
-            style={s.dayNavBtn}
-          >
-            <ChevronLeft size={20} color={N.ink} />
-          </Pressable>
-          <View style={s.dayTitleWrap}>
-            <Text style={s.dayTitle}>{dayTitle(dayKey, todayKey)}</Text>
-            <Text style={s.daySubtitle}> · {formatShortDate(dayKey)}</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Next day"
-            hitSlop={8}
-            disabled={isToday}
-            onPress={() => {
-              tap();
-              stepDay(1);
-            }}
-            style={[s.dayNavBtn, isToday && s.hidden]}
-          >
-            <ChevronRight size={20} color={N.ink} />
-          </Pressable>
-        </View>
+        <DateNavigator
+          dateKey={dayKey}
+          todayKey={todayKey}
+          onStep={stepDay}
+          onOpenCalendar={() => setDayPickerOpen(true)}
+          onBackToToday={() => setPicked(null)}
+          accentColor={N.acc}
+        />
 
         <NCard style={s.hero}>
           <Ring value={totals.calories} max={day.budget} size={132}>
@@ -653,6 +629,14 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
             }
           });
         }}
+      />
+      <DayPickerSheet
+        visible={dayPickerOpen}
+        onClose={() => setDayPickerOpen(false)}
+        selectedKey={dayKey}
+        todayKey={todayKey}
+        loggedDayKeys={loggedDayKeys}
+        onSelectDay={(key) => setPicked(key === todayKey ? null : key)}
       />
     </View>
   );
