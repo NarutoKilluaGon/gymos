@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { MoreHorizontal, Trophy } from "lucide-react-native";
+import { Trophy } from "lucide-react-native";
 
 import { CardioSheet } from "@/components/nutrition/more-sheets";
 import { DateNavigator } from "@/components/ds";
 import {
   CalendarSheet,
   StaleSessionSheet,
-  TodayMenuSheet,
 } from "@/components/workouts/forge-sheets";
 import { Button, FCard, Label, Pill, tap } from "@/components/workouts/forge-ui";
 import { Font } from "@/constants/design";
@@ -73,7 +72,6 @@ export function TodayView({
   const [picked, setPicked] = useState<string | null>(null);
   const [cardioOpen, setCardioOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [staleSheetOpen, setStaleSheetOpen] = useState(false);
 
   const dateKey = picked ?? todayKey;
@@ -145,17 +143,6 @@ export function TodayView({
         onOpenCalendar={() => setCalendarOpen(true)}
         onBackToToday={() => setPicked(null)}
         accentColor={F.acc}
-        extraAction={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Today options"
-            hitSlop={8}
-            style={s.iconBtn}
-            onPress={() => setMenuOpen(true)}
-          >
-            <MoreHorizontal size={18} color={F.mute} />
-          </Pressable>
-        }
       />
 
       {!isToday ? (
@@ -416,8 +403,11 @@ export function TodayView({
         </View>
       ) : null}
 
-      {/* SECONDARY CARDIO ACTION */}
+      {/* SECONDARY ACTIONS */}
       <View style={s.pills}>
+        {done.length > 0 ? (
+          <Pill label="Add another workout" onPress={() => start(null)} />
+        ) : null}
         <Pill label="Log cardio" onPress={() => setCardioOpen(true)} />
       </View>
 
@@ -445,17 +435,6 @@ export function TodayView({
           onStartPastWorkout={(key) => {
             start(null, key);
           }}
-        />
-      ) : null}
-
-      {typeof TodayMenuSheet === "function" ? (
-        <TodayMenuSheet
-          visible={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          hasFinishedWorkout={done.length > 0}
-          onAddAnotherWorkout={() => start(null)}
-          onOpenCalendar={() => setCalendarOpen(true)}
-          onLogCardio={() => setCardioOpen(true)}
         />
       ) : null}
 
