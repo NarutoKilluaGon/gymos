@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   BackHandler,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -126,7 +127,7 @@ export function ForgeApp() {
 
   return (
     <ThemeProvider theme={FORGE}>
-      <Screen keyboardShouldPersistTaps="handled">
+      <Screen scroll={false}>
         <ScreenHeader eyebrow="FORGE" title="Workouts" />
         <View style={s.tabs}>
           <Seg
@@ -139,44 +140,51 @@ export function ForgeApp() {
           />
         </View>
 
-        {tab === "today" ? (
-          <TodayView
-            data={data}
-            unit={unit}
-            weightKg={forge.weightKg}
-            onGoPlan={() => setTab("plan")}
-            onOpen={(session) => void openSession(session)}
-            onStart={(input) => {
-              void actions.begin(input).then((session) => {
-                if (session) setOpen(session);
-              });
-            }}
-            onAddCardio={actions.addCardio}
-            onRemoveCardio={(day, id) => void actions.removeCardio(day, id)}
-            onRestoreCardio={(day, log, index) => void actions.restoreCardio(day, log, index)}
-            onSaveSession={actions.save}
-            onDiscardSession={actions.remove}
-          />
-        ) : null}
-        {tab === "plan" ? (
-          <PlanView
-            data={data}
-            unit={unit}
-            onSave={actions.saveSettings}
-            onCreateExercise={actions.addCustom}
-            onRenameCustom={actions.renameCustom}
-            drafts={planDrafts}
-          />
-        ) : null}
-        {tab === "history" ? (
-          <HistoryView
-            data={data}
-            unit={unit}
-            onOpen={(session) => void openSession(session)}
-            onDelete={actions.remove}
-            onRestore={actions.restore}
-          />
-        ) : null}
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={s.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {tab === "today" ? (
+            <TodayView
+              data={data}
+              unit={unit}
+              weightKg={forge.weightKg}
+              onGoPlan={() => setTab("plan")}
+              onOpen={(session) => void openSession(session)}
+              onStart={(input) => {
+                void actions.begin(input).then((session) => {
+                  if (session) setOpen(session);
+                });
+              }}
+              onAddCardio={actions.addCardio}
+              onRemoveCardio={(day, id) => void actions.removeCardio(day, id)}
+              onRestoreCardio={(day, log, index) => void actions.restoreCardio(day, log, index)}
+              onSaveSession={actions.save}
+              onDiscardSession={actions.remove}
+            />
+          ) : null}
+          {tab === "plan" ? (
+            <PlanView
+              data={data}
+              unit={unit}
+              onSave={actions.saveSettings}
+              onCreateExercise={actions.addCustom}
+              onRenameCustom={actions.renameCustom}
+              drafts={planDrafts}
+            />
+          ) : null}
+          {tab === "history" ? (
+            <HistoryView
+              data={data}
+              unit={unit}
+              onOpen={(session) => void openSession(session)}
+              onDelete={actions.remove}
+              onRestore={actions.restore}
+            />
+          ) : null}
+        </ScrollView>
       </Screen>
     </ThemeProvider>
   );
@@ -184,5 +192,7 @@ export function ForgeApp() {
 
 const s = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  tabs: { marginBottom: 16 },
+  tabs: { marginBottom: 12 },
+  scroll: { flex: 1 },
+  content: { paddingBottom: 120 },
 });
