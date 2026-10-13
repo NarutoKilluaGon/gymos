@@ -87,16 +87,20 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const insets = useSafeAreaInsets();
   const keyboardHeight = useRef(new Animated.Value(0)).current;
 
+  const BASE_DOCK_BOTTOM = 12 + (insets.bottom || 0);
+
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSub = Keyboard.addListener(showEvent, (e) => {
       const h = e.endCoordinates.height;
-      // When keyboard shows inside a tab screen, keyboard overlaps the bottom area.
-      // Offset dock by keyboard height minus screen bottom inset (if any) or directly by keyboard height.
+      // When the keyboard appears, it covers the bottom tab bar and bottom insets.
+      // The dock's resting bottom edge is BASE_DOCK_BOTTOM (12 + insets.bottom).
+      // To place the dock's bottom edge exactly at the top of the keyboard (flush with 0 gap),
+      // we shift it upward by (keyboardHeight - BASE_DOCK_BOTTOM).
       Animated.timing(keyboardHeight, {
-        toValue: Math.max(0, h - (insets.bottom || 0)),
+        toValue: Math.max(0, h - BASE_DOCK_BOTTOM),
         duration: e.duration || 200,
         useNativeDriver: false,
       }).start();
@@ -114,7 +118,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
       showSub.remove();
       hideSub.remove();
     };
-  }, [insets.bottom, keyboardHeight]);
+  }, [BASE_DOCK_BOTTOM, keyboardHeight]);
 
   const day = model(dayKey);
   const prevKey = addDaysToKey(dayKey, -1);
@@ -266,7 +270,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   return (
     <View style={s.fill}>
       <ScrollView
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={[s.scroll, { paddingBottom: BASE_DOCK_BOTTOM + 72 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -475,6 +479,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         style={[
           s.dock,
           {
+            bottom: BASE_DOCK_BOTTOM,
             transform: [{ translateY: Animated.multiply(keyboardHeight, -1) }],
           },
         ]}
@@ -509,6 +514,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           style={[
             s.working,
             {
+              bottom: BASE_DOCK_BOTTOM + 56,
               transform: [{ translateY: Animated.multiply(keyboardHeight, -1) }],
             },
           ]}
@@ -857,19 +863,23 @@ const s = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: N.card,
+    backgroundColor: N.card2,
     borderRadius: NRadius.pill,
     borderWidth: 1,
-    borderColor: N.line,
+    borderColor: `${N.acc}55`,
     paddingLeft: 18,
     paddingRight: 6,
     paddingVertical: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  dockInput: { flex: 1, color: N.ink, fontSize: 15, paddingVertical: 8 },
+  dockInput: { flex: 1, color: N.ink, fontSize: 16, minHeight: 44, paddingVertical: 8 },
   send: {
     width: 44,
     height: 44,
@@ -881,7 +891,6 @@ const s = StyleSheet.create({
   sendOff: { opacity: 0.4 },
   working: {
     position: "absolute",
-    bottom: 68,
     alignSelf: "center",
     color: N.mute,
     fontSize: 12,
