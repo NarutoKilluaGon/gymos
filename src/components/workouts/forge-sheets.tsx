@@ -1354,39 +1354,41 @@ function CalendarCellView({
   }, [index, dotOpacity]);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Day ${cell.dayNumber}`}
-      onPress={onPress}
-      style={[
-        s.calCell,
-        !cell.isCurrentMonth && s.calCellFaded,
-        cell.isToday && s.calCellToday,
-        isInspected && s.calCellInspected,
-      ]}
-    >
-      <Animated.View
+    <View style={s.calCellWrapper}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Day ${cell.dayNumber}`}
+        onPress={onPress}
         style={[
-          s.calCellContent,
-          isInspected && { transform: [{ scale: ringScale }] },
+          s.calCell,
+          !cell.isCurrentMonth && s.calCellFaded,
+          cell.isToday && s.calCellToday,
+          isInspected && s.calCellInspected,
         ]}
       >
-        <Text
+        <Animated.View
           style={[
-            s.calCellNum,
-            !cell.isCurrentMonth && s.calCellNumFaded,
-            cell.isToday && s.calCellNumToday,
-            isInspected && s.calCellNumInspected,
+            s.calCellContent,
+            isInspected && { transform: [{ scale: ringScale }] },
           ]}
         >
-          {cell.dayNumber}
-        </Text>
-        <Animated.View style={[s.calDotsRow, { opacity: dotOpacity }]}>
-          {cell.hasStrength ? <View style={s.calStrengthDot} /> : null}
-          {cell.hasCardio ? <View style={s.calCardioDot} /> : null}
+          <Text
+            style={[
+              s.calCellNum,
+              !cell.isCurrentMonth && s.calCellNumFaded,
+              cell.isToday && s.calCellNumToday,
+              isInspected && s.calCellNumInspected,
+            ]}
+          >
+            {cell.dayNumber}
+          </Text>
+          <Animated.View style={[s.calDotsRow, { opacity: dotOpacity }]}>
+            {cell.hasStrength ? <View style={s.calStrengthDot} /> : null}
+            {cell.hasCardio ? <View style={s.calCardioDot} /> : null}
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1652,11 +1654,10 @@ const s = StyleSheet.create({
   calMonthTitle: { color: F.ink, fontSize: 16, fontWeight: "600" },
   calWeekdaysRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     marginBottom: 8,
   },
   calWeekdayLabel: {
-    width: 38,
+    width: "14.2857%",
     textAlign: "center",
     color: F.dim,
     fontSize: 12,
@@ -1665,11 +1666,15 @@ const s = StyleSheet.create({
   calGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 4,
+  },
+  calCellWrapper: {
+    width: "14.2857%",
+    padding: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   calCell: {
-    width: 38,
+    width: "100%",
     height: 44,
     alignItems: "center",
     justifyContent: "center",

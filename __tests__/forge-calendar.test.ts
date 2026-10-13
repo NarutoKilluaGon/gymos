@@ -201,6 +201,20 @@ describe("getMonthGrid", () => {
     // = 3 + 31 = 34, padded to 35 (5 rows). Let's verify.
     expect(grid.length).toBeGreaterThanOrEqual(35);
   });
+
+  it("always returns a multiple of 7 cells and starts on Monday across all months", () => {
+    // Test across every month of 2026 (starting on different weekdays)
+    for (let month = 0; month < 12; month++) {
+      const grid = getMonthGrid(2026, month, summaryMap, "2026-10-09");
+      expect(grid.length % 7).toBe(0);
+      expect(grid.length).toBeGreaterThanOrEqual(28);
+
+      // Verify that the very first cell in the grid corresponds to a Monday (Day 1 of week in JS is Mon)
+      const firstCell = grid[0]!;
+      const firstCellDate = new Date(`${firstCell.key}T12:00:00Z`);
+      expect(firstCellDate.getUTCDay()).toBe(1); // 1 = Monday
+    }
+  });
 });
 
 /* ------------------------------------------------------------------ */
