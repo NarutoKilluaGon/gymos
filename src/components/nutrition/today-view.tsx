@@ -365,18 +365,6 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                   <Text style={s.emptyTitle}>{slot}</Text>
                   <Text style={s.emptySub}>Nothing logged</Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add food to ${slot}`}
-                  hitSlop={4}
-                  style={s.compactAddBtn}
-                  onPress={() => {
-                    tap();
-                    logger.openManual(slot);
-                  }}
-                >
-                  <Plus size={18} color={N.acc} />
-                </Pressable>
               </View>
             );
           }
@@ -390,18 +378,6 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                     {fmtInt(kcal)} kcal · {Math.round(protein)}g protein
                   </Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add food to ${slot}`}
-                  hitSlop={8}
-                  style={s.sectionAddBtn}
-                  onPress={() => {
-                    tap();
-                    logger.openManual(slot);
-                  }}
-                >
-                  <Plus size={18} color={N.ink} />
-                </Pressable>
               </View>
               <NCard style={s.rows}>
                 {entries.map((meal, index) => (
@@ -776,12 +752,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontVariant: ["tabular-nums"],
   },
-  sectionAddBtn: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   emptyRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -811,12 +781,6 @@ const s = StyleSheet.create({
   emptySub: {
     fontSize: 13,
     color: N.dim,
-  },
-  compactAddBtn: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
   },
   empty: { color: N.dim, fontSize: 14, paddingVertical: 6 },
   rows: { padding: 0, overflow: "hidden" },
