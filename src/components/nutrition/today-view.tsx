@@ -1,6 +1,7 @@
 import * as Haptics from "expo-haptics";
 import {
   Bookmark,
+  Pencil,
   Plus,
   RotateCcw,
   Send,
@@ -36,9 +37,12 @@ import {
 import { CardioSection, DateNavigator } from "@/components/ds";
 import {
   Bar,
+  Button,
+  Field,
   NCard,
   Pill,
   Ring,
+  Sheet,
   fmtInt,
   tap,
 } from "@/components/nutrition/nourish-ui";
@@ -56,8 +60,17 @@ import {
   type Suggestion,
   type SuggestionCandidate,
 } from "@/services/nourish/suggestions";
+import {
+  groupIntoOccasions,
+  type EatingOccasion,
+} from "@/services/nourish/timeline-occasions";
+import {
+  getOccasionTitles,
+  setOccasionTitle,
+  type OccasionTitlesMap,
+} from "@/storage/repositories/occasion-titles";
 import { isSavedMeal, type SavedFood } from "@/storage/repositories/saved-foods";
-import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
+import type { Meal, MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
 import {
   addDaysToKey,
@@ -83,6 +96,21 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const [savedOpen, setSavedOpen] = useState(false);
   const [editing, setEditing] = useState<Meal | null>(null);
   const [editBusy, setEditBusy] = useState(false);
+  const [occasionTitles, setOccasionTitles] = useState<OccasionTitlesMap>({});
+  const [renamingOccasion, setRenamingOccasion] = useState<EatingOccasion | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    void getOccasionTitles().then((titles) => {
+      if (active && Object.keys(titles).length > 0) {
+        setOccasionTitles(titles);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const insets = useSafeAreaInsets();
   const keyboardHeight = useRef(new Animated.Value(0)).current;
@@ -148,6 +176,30 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         (day?.meals ?? []).map((meal) => slotOfMeal(meal)),
       ),
     [day],
+  );
+
+  const occasions = useMemo(
+    () => groupIntoOccasions(day?.meals ?? [], occasionTitles),
+    [day?.meals, occasionTitles],
+  );
+
+  const handleSaveOccasionTitle = useCallback(
+    async (newTitle: string) => {
+      if (!renamingOccasion) return;
+      const id = renamingOccasion.id;
+      await setOccasionTitle(id, newTitle);
+      setOccasionTitles((prev) => {
+        const next = { ...prev };
+        if (!newTitle.trim()) {
+          delete next[id];
+        } else {
+          next[id] = newTitle.trim();
+        }
+        return next;
+      });
+      setRenamingOccasion(null);
+    },
+    [renamingOccasion],
   );
 
   const loggedDayKeys = useMemo(() => {
@@ -352,30 +404,31 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           ) : null}
         </ScrollView>
 
-        {MEAL_SLOTS.map((slot) => {
-          const entries = day.bySlot[slot];
-          const kcal = entries.reduce((sum, m) => sum + (m.calories ?? 0), 0);
-          const protein = entries.reduce((sum, m) => sum + (m.protein ?? 0), 0);
-          const isEmpty = entries.length === 0;
-
-          if (isEmpty) {
-            return (
-              <View key={slot} style={s.emptyRow}>
-                <View style={s.emptyRowMain}>
-                  <Text style={s.emptyTitle}>{slot}</Text>
-                  <Text style={s.emptySub}>Nothing logged</Text>
-                </View>
-              </View>
-            );
-          }
+        {occasions.map((occasion) => {
+          const { meals: entries, totals: occasionTotals, slot, title, id } = occasion;
 
           return (
-            <View key={slot} style={s.section}>
+            <View key={id} style={s.section}>
               <View style={s.sectionHead}>
                 <View style={s.sectionTitleRow}>
-                  <Text style={s.sectionTitle}>{slot}</Text>
+                  <View style={s.sectionTitleWrap}>
+                    <Text style={s.sectionTitle}>{title}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Rename ${title}`}
+                      hitSlop={8}
+                      onPress={() => {
+                        tap();
+                        setRenamingOccasion(occasion);
+                        setRenameInput(title);
+                      }}
+                      style={s.renameBtn}
+                    >
+                      <Pencil size={13} color={N.mute} />
+                    </Pressable>
+                  </View>
                   <Text style={s.sectionSub}>
-                    {fmtInt(kcal)} kcal · {Math.round(protein)}g protein
+                    {fmtInt(occasionTotals.calories)} kcal · {Math.round(occasionTotals.protein)}g protein
                   </Text>
                 </View>
               </View>
@@ -589,6 +642,28 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         loggedDayKeys={loggedDayKeys}
         onSelectDay={(key) => setPicked(key === todayKey ? null : key)}
       />
+      <Sheet
+        visible={renamingOccasion !== null}
+        onClose={() => setRenamingOccasion(null)}
+        title="Rename occasion"
+        footer={
+          <Button
+            label="Save title"
+            kind="primary"
+            onPress={() => void handleSaveOccasionTitle(renameInput)}
+          />
+        }
+      >
+        <View style={{ gap: 12, paddingBottom: 16 }}>
+          <Field
+            label="Occasion title"
+            value={renameInput}
+            onChangeText={setRenameInput}
+            placeholder="e.g. Pre-workout, Post-workout, Late snack"
+            autoFocus
+          />
+        </View>
+      </Sheet>
     </View>
   );
 }
@@ -746,41 +821,21 @@ const s = StyleSheet.create({
     gap: 8,
     flex: 1,
   },
+  sectionTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  renameBtn: {
+    padding: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sectionTitle: { fontFamily: NSerif, fontWeight: "400", fontSize: 20, color: N.ink },
   sectionSub: {
     color: N.mute,
     fontSize: 12,
     fontVariant: ["tabular-nums"],
-  },
-  emptyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: N.card,
-    borderRadius: NRadius.control,
-    borderWidth: 1,
-    borderColor: N.line,
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 4,
-    marginTop: 10,
-    minHeight: 48,
-  },
-  emptyRowMain: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
-  },
-  emptyTitle: {
-    fontFamily: NSerif,
-    fontWeight: "400",
-    fontSize: 17,
-    color: N.ink,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: N.dim,
   },
   empty: { color: N.dim, fontSize: 14, paddingVertical: 6 },
   rows: { padding: 0, overflow: "hidden" },

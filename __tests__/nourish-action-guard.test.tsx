@@ -29,12 +29,18 @@ jest.mock("lucide-react-native", () => ({
   Calendar: () => null,
   ChevronLeft: () => null,
   ChevronRight: () => null,
+  Pencil: () => null,
   Plus: () => null,
   Send: () => null,
   RotateCcw: () => null,
   Bookmark: () => null,
   Utensils: () => null,
   Sparkles: () => null,
+}));
+
+jest.mock("@/storage/repositories/occasion-titles", () => ({
+  getOccasionTitles: jest.fn().mockResolvedValue({}),
+  setOccasionTitle: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/components/nutrition/nourish-ui", () => ({
