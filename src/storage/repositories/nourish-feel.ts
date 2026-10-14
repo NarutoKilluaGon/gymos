@@ -1,6 +1,5 @@
 import { createMutex } from "@/storage/mutex";
 import { getStorage, setStorage } from "@/storage/storage";
-import { MEAL_SLOTS, type MealSlot } from "@/types/gymos";
 import type { FeelMap, FeelValue } from "@/types/nourish";
 
 const FEEL_KEY = "@gymos/nourish-feel";
@@ -21,10 +20,8 @@ function clean(raw: unknown): FeelMap {
 
     const dayFeel: FeelMap[string] = {};
 
-    for (const slot of MEAL_SLOTS) {
-      const value = (slots as Record<string, unknown>)[slot];
-
-      if (isFeel(value)) dayFeel[slot] = value;
+    for (const [key, value] of Object.entries(slots as Record<string, unknown>)) {
+      if (isFeel(value)) dayFeel[key] = value;
     }
 
     if (Object.keys(dayFeel).length > 0) out[day] = dayFeel;
@@ -39,18 +36,18 @@ export async function getFeelMap(): Promise<FeelMap> {
   );
 }
 
-/** Set how a meal felt; choosing the current value again clears it. */
+/** Set how an occasion or meal felt; choosing the current value again clears it. */
 export async function toggleFeel(
   dateKey: string,
-  slot: MealSlot,
+  key: string,
   value: FeelValue,
 ): Promise<void> {
   await feelMutex.runExclusive(async () => {
     const map = clean(await getStorage<unknown>(FEEL_KEY));
     const day = { ...(map[dateKey] ?? {}) };
 
-    if (day[slot] === value) delete day[slot];
-    else day[slot] = value;
+    if (day[key] === value) delete day[key];
+    else day[key] = value;
 
     if (Object.keys(day).length === 0) delete map[dateKey];
     else map[dateKey] = day;

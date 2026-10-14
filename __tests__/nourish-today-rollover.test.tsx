@@ -317,7 +317,7 @@ describe("Nourish TodayView day handling", () => {
 
     // Feel and cardio removal act on what is on screen: the new day's entries.
     view.press("Just right");
-    expect(view.actions.setFeel).toHaveBeenLastCalledWith("2026-10-05", "Snacks", 2);
+    expect(view.actions.setFeel).toHaveBeenLastCalledWith("2026-10-05", "occasion-b", 2);
     view.press("Remove Run");
     expect(view.actions.removeCardio).toHaveBeenLastCalledWith("2026-10-05", "run-1");
   });

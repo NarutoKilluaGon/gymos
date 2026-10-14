@@ -1,4 +1,4 @@
-import type { CardioActivity, MealSlot, Micronutrients } from "@/types/gymos";
+import type { CardioActivity, Micronutrients } from "@/types/gymos";
 
 /** Carb/fat calorie shares, stored as "carbPct,fatPct" (protein is set in
  *  grams, so the split covers what is left). */
@@ -30,7 +30,7 @@ export type NourishSettings = {
 };
 
 export type FeelValue = 1 | 2 | 3;
-export type DayFeel = Partial<Record<MealSlot, FeelValue>>;
+export type DayFeel = Record<string, FeelValue>;
 /** Keyed by "YYYY-MM-DD". */
 export type FeelMap = Record<string, DayFeel>;
 

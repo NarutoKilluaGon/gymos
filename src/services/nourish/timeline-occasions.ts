@@ -1,5 +1,6 @@
 import { DEFAULT_SLOT_TIME, slotOfMeal, timeOfDay } from "@/services/nourish/slots";
 import type { Meal, MealSlot } from "@/types/gymos";
+import type { FeelValue } from "@/types/nourish";
 
 export const OCCASION_GAP_MINUTES = 45;
 
@@ -9,6 +10,7 @@ export type EatingOccasion = {
   startTime: string; // "HH:MM" or ""
   slot: MealSlot;
   title: string;
+  feel?: FeelValue;
   totals: {
     calories: number;
     protein: number;
@@ -40,6 +42,7 @@ function getMealTimeMs(meal: Meal): number {
 export function groupIntoOccasions(
   meals: readonly Meal[],
   customTitles?: Record<string, string>,
+  dayFeel?: Record<string, FeelValue>,
 ): EatingOccasion[] {
   if (!meals || meals.length === 0) return [];
 
@@ -68,14 +71,14 @@ export function groupIntoOccasions(
       lastTimeMs = mealTimeMs;
     } else {
       // Finalize previous occasion
-      occasions.push(buildOccasion(currentMeals, customTitles));
+      occasions.push(buildOccasion(currentMeals, customTitles, dayFeel));
       currentMeals = [meal];
       lastTimeMs = mealTimeMs;
     }
   }
 
   if (currentMeals.length > 0) {
-    occasions.push(buildOccasion(currentMeals, customTitles));
+    occasions.push(buildOccasion(currentMeals, customTitles, dayFeel));
   }
 
   return occasions;
@@ -84,13 +87,65 @@ export function groupIntoOccasions(
 function buildOccasion(
   meals: Meal[],
   customTitles?: Record<string, string>,
+  dayFeel?: Record<string, FeelValue>,
 ): EatingOccasion {
   const firstMeal = meals[0];
   const slot = slotOfMeal(firstMeal);
   const time = timeOfDay(firstMeal.timestamp) ?? DEFAULT_SLOT_TIME[slot] ?? "";
-  const id = `occasion-${firstMeal.id}`;
   const defaultTitle = time ? `${time} · ${slot}` : slot;
-  const title = customTitles?.[id] || defaultTitle;
+
+  // Stable key resolution:
+  // If any meal in this occasion already has a custom title, keep that stable occasion key.
+  let matchedKey: string | undefined;
+  let customTitle: string | undefined;
+
+  for (const m of meals) {
+    const candidate = `occasion-${m.id}`;
+    if (customTitles?.[candidate] || customTitles?.[m.id]) {
+      customTitle = customTitles?.[candidate] ?? customTitles?.[m.id];
+      matchedKey = candidate;
+      break;
+    }
+  }
+
+  // Also check if any meal already has a feel key if no title matched
+  if (!matchedKey && dayFeel) {
+    for (const m of meals) {
+      const candidate = `occasion-${m.id}`;
+      if (dayFeel[candidate] !== undefined || dayFeel[m.id] !== undefined) {
+        matchedKey = candidate;
+        break;
+      }
+    }
+  }
+
+  const id = matchedKey ?? `occasion-${firstMeal.id}`;
+  const title = customTitle || defaultTitle;
+
+  // Feel resolution:
+  // 1. Check matched occasion id (or raw id)
+  let feel: FeelValue | undefined =
+    dayFeel?.[id] ?? dayFeel?.[id.replace("occasion-", "")];
+
+  // 2. Check each meal's key in the cluster
+  if (feel === undefined && dayFeel) {
+    for (const m of meals) {
+      const candidate = `occasion-${m.id}`;
+      if (dayFeel[candidate] !== undefined) {
+        feel = dayFeel[candidate];
+        break;
+      }
+      if (dayFeel[m.id] !== undefined) {
+        feel = dayFeel[m.id];
+        break;
+      }
+    }
+  }
+
+  // 3. Legacy slot fallback
+  if (feel === undefined && dayFeel?.[slot] !== undefined) {
+    feel = dayFeel[slot];
+  }
 
   const totals = meals.reduce(
     (acc, m) => ({
@@ -108,6 +163,7 @@ function buildOccasion(
     startTime: time,
     slot,
     title,
+    feel,
     totals,
   };
 }

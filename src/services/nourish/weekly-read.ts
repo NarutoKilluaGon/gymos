@@ -1,4 +1,5 @@
 import { daysOnTarget, mealByMeal, type DayView } from "@/services/nourish/insights";
+import { groupIntoOccasions } from "@/services/nourish/timeline-occasions";
 import { suggestCalorieAdjustment } from "@/services/nourish/weight";
 import type { NourishSettings } from "@/types/nourish";
 import { dateFromKey } from "@/utils/date";
@@ -101,7 +102,12 @@ export function buildWeeklyRead(input: {
   }
 
   const tooFull = rows.find((row) => {
-    const ratings = logged.filter((day) => day.record?.feel[row.slot]).length;
+    const ratings = logged.filter((day) => {
+      if (day.record?.feel[row.slot] !== undefined) return true;
+      const dayMeals = day.record?.meals ?? [];
+      const occasions = groupIntoOccasions(dayMeals, undefined, day.record?.feel);
+      return occasions.some((o) => o.slot === row.slot && o.feel !== undefined);
+    }).length;
 
     return (
       ratings >= MIN_FEEL_RATINGS &&

@@ -144,6 +144,113 @@ describe("timeline-occasions grouping", () => {
     expect(occasions[0].title).toBe("08:30 · Breakfast");
     expect(occasions[0].meals).toHaveLength(2);
   });
+
+  it("two same-slot occasions with different ratings do not share a rating", () => {
+    const snack1 = makeMeal({
+      id: "s1",
+      name: "Apple",
+      timestamp: "2026-10-10T15:00:00.000Z",
+      slot: "Snacks",
+    });
+    const snack2 = makeMeal({
+      id: "s2",
+      name: "Protein Bar",
+      timestamp: "2026-10-10T17:30:00.000Z",
+      slot: "Snacks",
+    });
+
+    const dayFeel = {
+      "occasion-s1": 2 as const,
+      "occasion-s2": 3 as const,
+    };
+
+    const occasions = groupIntoOccasions([snack1, snack2], undefined, dayFeel);
+    expect(occasions).toHaveLength(2);
+    expect(occasions[0].slot).toBe("Snacks");
+    expect(occasions[1].slot).toBe("Snacks");
+    expect(occasions[0].feel).toBe(2);
+    expect(occasions[1].feel).toBe(3);
+  });
+
+  it("preserves renamed title when adding an earlier item to the occasion", () => {
+    const mealB = makeMeal({
+      id: "b",
+      name: "Rice & Dal",
+      timestamp: "2026-10-10T13:00:00.000Z",
+      slot: "Lunch",
+    });
+
+    // Occasion originally had mealB and was renamed to "Work Lunch"
+    const initialOccasions = groupIntoOccasions([mealB]);
+    expect(initialOccasions[0].id).toBe("occasion-b");
+
+    const customTitles = { "occasion-b": "Work Lunch" };
+
+    // Now user logs mealA eaten earlier (12:40, 20m before mealB)
+    const mealA = makeMeal({
+      id: "a",
+      name: "Salad",
+      timestamp: "2026-10-10T12:40:00.000Z",
+      slot: "Lunch",
+    });
+
+    const updatedOccasions = groupIntoOccasions([mealA, mealB], customTitles);
+    expect(updatedOccasions).toHaveLength(1);
+    expect(updatedOccasions[0].title).toBe("Work Lunch");
+    expect(updatedOccasions[0].id).toBe("occasion-b");
+    expect(updatedOccasions[0].meals).toHaveLength(2);
+  });
+
+  it("editing an entry's time so it moves to another occasion", () => {
+    const mealA = makeMeal({
+      id: "a",
+      name: "Oatmeal",
+      timestamp: "2026-10-10T08:00:00.000Z",
+      slot: "Breakfast",
+    });
+    const mealB = makeMeal({
+      id: "b",
+      name: "Chicken Bowl",
+      timestamp: "2026-10-10T13:00:00.000Z",
+      slot: "Lunch",
+    });
+    const mealC = makeMeal({
+      id: "c",
+      name: "Boiled Eggs",
+      timestamp: "2026-10-10T08:20:00.000Z",
+      slot: "Breakfast",
+    });
+
+    const customTitles = {
+      "occasion-a": "Morning Fuel",
+      "occasion-b": "Afternoon Lunch",
+    };
+    const dayFeel = {
+      "occasion-a": 2 as const,
+      "occasion-b": 1 as const,
+    };
+
+    // Before edit: mealA and mealC are in Occasion 1 (Breakfast), mealB is in Occasion 2 (Lunch)
+    const before = groupIntoOccasions([mealA, mealB, mealC], customTitles, dayFeel);
+    expect(before).toHaveLength(2);
+    expect(before[0].title).toBe("Morning Fuel");
+    expect(before[0].meals.map((m) => m.id)).toEqual(["a", "c"]);
+    expect(before[0].feel).toBe(2);
+    expect(before[1].title).toBe("Afternoon Lunch");
+    expect(before[1].meals.map((m) => m.id)).toEqual(["b"]);
+    expect(before[1].feel).toBe(1);
+
+    // Edit mealC's time to 13:10 (moving it to Occasion 2)
+    const editedMealC = { ...mealC, timestamp: "2026-10-10T13:10:00.000Z", slot: "Lunch" as const };
+    const after = groupIntoOccasions([mealA, mealB, editedMealC], customTitles, dayFeel);
+    expect(after).toHaveLength(2);
+    expect(after[0].title).toBe("Morning Fuel");
+    expect(after[0].meals.map((m) => m.id)).toEqual(["a"]);
+    expect(after[0].feel).toBe(2);
+    expect(after[1].title).toBe("Afternoon Lunch");
+    expect(after[1].meals.map((m) => m.id)).toEqual(["b", "c"]);
+    expect(after[1].feel).toBe(1);
+  });
 });
 
 describe("occasion-titles storage repository", () => {

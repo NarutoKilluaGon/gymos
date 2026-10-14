@@ -243,8 +243,8 @@ export function useNourish() {
         act(() => deleteMeal(id), "Couldn't delete"),
       restoreEntry: (meal: Meal) =>
         act(() => restoreMeal(meal), "Couldn't restore"),
-      setFeel: (dayKey: string, slot: MealSlot, value: FeelValue) =>
-        act(() => toggleFeel(dayKey, slot, value), "Couldn't save"),
+      setFeel: (dayKey: string, key: string, value: FeelValue) =>
+        act(() => toggleFeel(dayKey, key, value), "Couldn't save"),
       repeatInto: (source: readonly Meal[], toKey: string) =>
         actOnce("repeatInto", () => repeatDay(source, toKey), "Couldn't repeat"),
       saveSection: (meals: readonly Meal[], slot: MealSlot) =>

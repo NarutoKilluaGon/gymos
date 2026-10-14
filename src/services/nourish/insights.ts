@@ -5,6 +5,7 @@ import {
   type DayTotals,
 } from "@/services/nourish/nutrition";
 import { slotOfMeal } from "@/services/nourish/slots";
+import { groupIntoOccasions } from "@/services/nourish/timeline-occasions";
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DayFeel, FeelMap, NourishSettings } from "@/types/nourish";
 import {
@@ -232,9 +233,20 @@ export function mealByMeal(logged: readonly DayView[]): {
         protein += meal.protein ?? 0;
       }
 
-      const felt = day.record?.feel[slot];
-
-      if (felt) feels.push(felt);
+      const dayMeals = day.record?.meals ?? [];
+      const occasions = groupIntoOccasions(dayMeals, undefined, day.record?.feel);
+      const slotOccasions = occasions.filter((o) => o.slot === slot);
+      let foundOccasionFeel = false;
+      for (const occ of slotOccasions) {
+        if (occ.feel !== undefined) {
+          feels.push(occ.feel);
+          foundOccasionFeel = true;
+        }
+      }
+      if (!foundOccasionFeel) {
+        const felt = day.record?.feel[slot];
+        if (felt) feels.push(felt);
+      }
     }
 
     return {

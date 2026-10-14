@@ -179,8 +179,8 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   );
 
   const occasions = useMemo(
-    () => groupIntoOccasions(day?.meals ?? [], occasionTitles),
-    [day?.meals, occasionTitles],
+    () => groupIntoOccasions(day?.meals ?? [], occasionTitles, day?.feel),
+    [day?.meals, occasionTitles, day?.feel],
   );
 
   const handleSaveOccasionTitle = useCallback(
@@ -461,9 +461,9 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                       <Pill
                         key={option.value}
                         label={option.label}
-                        active={day.feel[slot] === option.value}
+                        active={(occasion.feel ?? day.feel[id] ?? day.feel[slot]) === option.value}
                         onPress={() =>
-                          void actions.setFeel(dayKey, slot, option.value)
+                          void actions.setFeel(dayKey, id, option.value)
                         }
                       />
                     ))}
