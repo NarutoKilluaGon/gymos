@@ -144,12 +144,17 @@ function resolveFromFoodDb(
   const def = findFoodDefinition(parsed.name);
   if (def) {
     const finalAmount = explicitAmount ?? parsed.amount ?? 1;
-    const finalUnit = explicit?.unit?.trim() || parsed.unit;
+    const effectiveUnit = parsed.unit || (def.katoriG ? "katori" : undefined);
+    const finalUnit = explicit?.unit?.trim() || effectiveUnit;
     const macros = calculateFoodMacros(def, finalAmount, finalUnit, parsed.size);
+    const displayUnit =
+      explicit?.unit?.trim() ||
+      parsed.unit ||
+      (def.katoriG ? "bowl" : def.pieceG ? "piece" : "serving");
     return {
       name: def.name,
       estimatedAmount: finalAmount,
-      unit: finalUnit || (def.katoriG ? "bowl" : def.pieceG ? "piece" : "serving"),
+      unit: displayUnit,
       calories: macros.calories,
       protein: macros.protein,
       carbs: macros.carbs,

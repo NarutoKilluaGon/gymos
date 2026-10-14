@@ -81,6 +81,7 @@ export const FOOD_DATABASE: FoodEntry[] = [
   { id: "chicken-curry", name: "Chicken curry", amount: 150, unit: "g", calories: 280, protein: 24, carbs: 10, fat: 16, fiber: 1, sodium: 500, potassium: 400, calcium: 30, iron: 2, magnesium: 30, zinc: 2, vitaminA: 40, vitaminC: 4, vitaminD: 0.1, vitaminB12: 1.5, folate: 15 },
   { id: "egg-curry", name: "Egg curry", amount: 150, unit: "g", calories: 250, protein: 13, carbs: 8, fat: 18, fiber: 1, sodium: 450, potassium: 350, calcium: 60, iron: 2.5, magnesium: 25, zinc: 1.5, vitaminA: 150, vitaminC: 3, vitaminD: 1.5, vitaminB12: 1.2, folate: 30 },
   { id: "egg-bhurji", name: "Egg bhurji", amount: 1, unit: "plate", calories: 220, protein: 13, carbs: 6, fat: 16, fiber: 1, sodium: 400, potassium: 350, calcium: 60, iron: 2.5, magnesium: 25, zinc: 1.5, vitaminA: 160, vitaminC: 4, vitaminD: 1.8, vitaminB12: 1.2, folate: 35 },
+  { id: "paneer-bhurji", name: "Paneer bhurji", amount: 1, unit: "plate", calories: 270, protein: 17, carbs: 6, fat: 20, fiber: 2, sodium: 450, potassium: 300, calcium: 350, iron: 1.5, magnesium: 40, zinc: 1.5, vitaminA: 180, vitaminC: 8, vitaminD: 0.1, vitaminB12: 0.8, folate: 30 },
   { id: "pav-bhaji", name: "Pav bhaji", amount: 1, unit: "plate", calories: 400, protein: 10, carbs: 60, fat: 14, fiber: 6, sodium: 700, potassium: 800, calcium: 80, iron: 2.5, magnesium: 50, zinc: 0.8, vitaminA: 300, vitaminC: 20, vitaminD: 0, vitaminB12: 0, folate: 60 },
   { id: "misal-pav", name: "Misal pav", amount: 1, unit: "plate", calories: 380, protein: 14, carbs: 55, fat: 12, fiber: 7, sodium: 800, potassium: 700, calcium: 90, iron: 3.5, magnesium: 60, zinc: 1.2, vitaminA: 100, vitaminC: 10, vitaminD: 0, vitaminB12: 0, folate: 80 },
   { id: "vada-pav", name: "Vada pav", amount: 1, unit: "piece", calories: 290, protein: 7, carbs: 40, fat: 12, fiber: 3, sodium: 450, potassium: 500, calcium: 30, iron: 1.8, magnesium: 30, zinc: 0.5, vitaminA: 5, vitaminC: 8, vitaminD: 0, vitaminB12: 0, folate: 40 },
@@ -163,8 +164,18 @@ export function getFoodEntry(id: string): FoodEntry | undefined {
   return FOOD_DATABASE.find((entry) => entry.id === id);
 }
 
+/**
+ * Trivial qualifiers stripped when matching food names, so "plain curd"
+ * matches "Curd" and "boiled eggs" matches "Boiled egg".
+ * Note: Catalog values are rough offline ESTIMATES / approximations for
+ * the stated portion, never laboratory-grade measurements.
+ * Whole-phrase matching: only exact normalized equality matches;
+ * partial-word overlap is never auto-applied.
+ */
+const TRIVIAL_QUALIFIERS = new Set(["a", "an", "the", "plain", "boiled"]);
+
 /** Normalized for matching: lowercase, punctuation → spaces, collapsed,
- *  then plural-insensitive (trailing "s" stripped from longer words).
+ *  trivial qualifiers stripped, then plural-insensitive (trailing "s" stripped from longer words).
  *  Singularization applies symmetrically to queries and entry names, so
  *  existing exact matches ("Oats" ↔ "oats") keep working while plural
  *  variants ("eggs", "omelettes", "2 cups") also resolve. Exported so
@@ -176,8 +187,14 @@ export function normalizeFoodName(value: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  return collapsed
-    .split(" ")
+  const words = collapsed.split(" ").filter(Boolean);
+  const filtered =
+    words.length > 1 && collapsed !== "plain dosa"
+      ? words.filter((word) => !TRIVIAL_QUALIFIERS.has(word))
+      : words;
+  const finalWords = filtered.length > 0 ? filtered : words;
+
+  return finalWords
     .map((word) =>
       word.length > 3 && word.endsWith("s") && !word.endsWith("ss")
         ? word.slice(0, -1)
@@ -198,10 +215,19 @@ const FOOD_NAME_ALIASES: Record<string, string> = {
   yogurt: "Curd",
   yoghurt: "Curd",
   dahi: "Curd",
+  "plain curd": "Curd",
   egg: "Boiled egg",
+  eggs: "Boiled egg",
+  "boiled egg": "Boiled egg",
+  "boiled eggs": "Boiled egg",
   omelette: "Omelette (2 eggs)",
   "egg omelette": "Omelette (2 eggs)",
   roti: "Roti (phulka)",
+  rotis: "Roti (phulka)",
+  dal: "Dal tadka",
+  daal: "Dal tadka",
+  "dal tadka": "Dal tadka",
+  "paneer bhurji": "Paneer bhurji",
   bhatura: "Bhatura",
   bhature: "Bhatura",
   bhatoora: "Bhatura",
@@ -445,15 +471,27 @@ export function isConvertibleUnit(statedUnit: string, baseUnit: string): boolean
 export function getUnitConversionRatio(
   statedUnit: string,
   baseUnit: string,
+  foodId?: string,
 ): number {
   const s = normalizeUnit(statedUnit);
   const b = normalizeUnit(baseUnit);
 
   if (s === b || !s || !b) return 1;
 
-  // Grams to bowl/cup
-  if (s === "g" && (b === "bowl" || b === "cup")) return 1 / 150;
-  if ((s === "bowl" || s === "cup") && b === "g") return 150;
+  if (foodId === "oats") {
+    if ((s === "bowl" || s === "katori") && b === "g") return 40;
+    if (s === "g" && (b === "bowl" || b === "katori")) return 1 / 40;
+    if (s === "cup" && b === "g") return 80;
+    if (s === "g" && b === "cup") return 1 / 80;
+  }
+
+  // Grams to cup (standard 200g dairy/staple cup)
+  if (s === "cup" && b === "g") return 200;
+  if (s === "g" && b === "cup") return 1 / 200;
+
+  // Grams to bowl/katori
+  if ((s === "bowl" || s === "katori") && b === "g") return 150;
+  if (s === "g" && (b === "bowl" || b === "katori")) return 1 / 150;
 
   // Grams to plate
   if (s === "g" && b === "plate") return 1 / 300;
@@ -487,7 +525,11 @@ export function scalePortionMacros(
 ): MacroTotals {
   let unitFactor = 1;
   if (statedUnit && baseUnit) {
-    unitFactor = getUnitConversionRatio(statedUnit, baseUnit);
+    unitFactor = getUnitConversionRatio(
+      statedUnit,
+      baseUnit,
+      (base as Partial<FoodEntry>).id,
+    );
   }
 
   const effectiveAmount = amount * unitFactor;

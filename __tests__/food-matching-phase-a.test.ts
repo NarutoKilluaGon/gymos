@@ -338,4 +338,61 @@ describe("Phase A: Food matching, parsing, and precedence", () => {
       }
     });
   });
+
+  describe("4. Regression: Common inputs resolution & trivial qualifier normalization", () => {
+    it("resolves '2 rotis' with plural normalization to Roti (phulka) 2 pieces (160 kcal)", () => {
+      const resolved = resolveSegmentLocally("2 rotis");
+      expect(resolved.unresolved).toBeUndefined();
+      expect(resolved.name).toBe("Roti (phulka)");
+      expect(resolved.estimatedAmount).toBe(2);
+      expect(resolved.calories).toBe(160);
+      expect(resolved.protein).toBe(6);
+    });
+
+    it("resolves 'boiled eggs' with trivial qualifier 'boiled' and plural 'eggs' to Boiled egg", () => {
+      const resolved = resolveSegmentLocally("boiled eggs");
+      expect(resolved.unresolved).toBeUndefined();
+      expect(resolved.name).toBe("Boiled egg");
+      expect(resolved.calories).toBeGreaterThan(0);
+    });
+
+    it("resolves 'dal tadka' to Dal tadka", () => {
+      const resolved = resolveSegmentLocally("dal tadka");
+      expect(resolved.unresolved).toBeUndefined();
+      expect(resolved.name).toBe("Dal tadka");
+      expect(resolved.calories).toBeGreaterThan(0);
+    });
+
+    it("resolves 'plain curd' with trivial qualifier 'plain' to Curd", () => {
+      const resolved = resolveSegmentLocally("plain curd");
+      expect(resolved.unresolved).toBeUndefined();
+      expect(resolved.name).toBe("Curd");
+      expect(resolved.calories).toBeGreaterThan(0);
+    });
+
+    it("resolves multi-item description '2 roti, dal, paneer bhurji' to 3 distinct valid rows", () => {
+      const rows = resolveMealDescription("2 roti, dal, paneer bhurji");
+      expect(rows.length).toBe(3);
+
+      expect(rows[0]?.name).toBe("Roti (phulka)");
+      expect(rows[0]?.estimatedAmount).toBe(2);
+      expect(rows[0]?.calories).toBe(160);
+      expect(rows[0]?.unresolved).toBeUndefined();
+
+      expect(rows[1]?.name).toBe("Dal tadka");
+      expect(rows[1]?.calories).toBeGreaterThan(0);
+      expect(rows[1]?.unresolved).toBeUndefined();
+
+      expect(rows[2]?.name).toBe("Paneer bhurji");
+      expect(rows[2]?.calories).toBeGreaterThan(0);
+      expect(rows[2]?.unresolved).toBeUndefined();
+    });
+
+    it("does not allow partial-word overlap despite qualifiers", () => {
+      // Partial word must never match
+      expect(matchFoodEntry("boiled", 3)).toBeUndefined();
+      expect(matchFoodEntry("plain", 3)).toBeUndefined();
+      expect(matchFoodEntry("curd rice", 3)?.name).not.toBe("Curd");
+    });
+  });
 });
