@@ -9,8 +9,13 @@ function isFeel(value: unknown): value is FeelValue {
   return value === 1 || value === 2 || value === 3;
 }
 
-/** Keep only well-formed ratings so a hand-edited record can't crash. */
-function clean(raw: unknown): FeelMap {
+export const MAX_FEEL_KEYS_PER_DAY = 20;
+
+/** Keep only well-formed ratings and cap per day so it cannot grow unbounded. */
+export function clean(
+  raw: unknown,
+  validMealIdsForDay?: (day: string) => Set<string>,
+): FeelMap {
   const out: FeelMap = {};
 
   if (typeof raw !== "object" || raw === null) return out;
@@ -19,9 +24,21 @@ function clean(raw: unknown): FeelMap {
     if (typeof slots !== "object" || slots === null) continue;
 
     const dayFeel: FeelMap[string] = {};
+    const validMealIds = validMealIdsForDay?.(day);
+    let count = 0;
 
     for (const [key, value] of Object.entries(slots as Record<string, unknown>)) {
-      if (isFeel(value)) dayFeel[key] = value;
+      if (!isFeel(value)) continue;
+
+      // Prune stale occasion keys if valid meal IDs are provided
+      if (validMealIds && key.startsWith("occasion-")) {
+        const mealId = key.replace("occasion-", "");
+        if (!validMealIds.has(mealId)) continue;
+      }
+
+      dayFeel[key] = value;
+      count++;
+      if (count >= MAX_FEEL_KEYS_PER_DAY) break;
     }
 
     if (Object.keys(dayFeel).length > 0) out[day] = dayFeel;

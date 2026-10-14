@@ -167,3 +167,69 @@ function buildOccasion(
     totals,
   };
 }
+
+/**
+ * Occasion Identity Rule:
+ * An occasion is a temporal eating event defined by its cluster of meals, not by any single item.
+ * When the FIRST (earliest) entry of a titled or rated occasion is moved to another time:
+ * - The occasion's identity (custom title and feel rating) remains with the cluster of
+ *   remaining entries at the original time.
+ * - The moved entry leaves the occasion and starts fresh at its new time (unrated, default title).
+ * - To preserve this invariant, when editing a meal's timestamp, if that meal's ID was the key
+ *   anchor for an occasion with remaining meals, the anchor key (in customTitles and feelMap)
+ *   is transferred to the new earliest entry of the remaining cluster.
+ */
+export function transferOccasionAnchor(params: {
+  movedMealId: string;
+  remainingMeals: readonly Meal[];
+  customTitles?: Record<string, string>;
+  dayFeel?: Record<string, FeelValue>;
+}): {
+  customTitles?: Record<string, string>;
+  dayFeel?: Record<string, FeelValue>;
+  oldAnchorKey: string;
+  newAnchorKey: string;
+} | null {
+  const { movedMealId, remainingMeals, customTitles, dayFeel } = params;
+  if (!remainingMeals || remainingMeals.length === 0) return null;
+
+  const oldAnchorKey = `occasion-${movedMealId}`;
+  const sortedRemaining = [...remainingMeals].sort((a, b) =>
+    a.timestamp.localeCompare(b.timestamp),
+  );
+  const newAnchorKey = `occasion-${sortedRemaining[0].id}`;
+
+  const hasTitle =
+    customTitles?.[oldAnchorKey] !== undefined || customTitles?.[movedMealId] !== undefined;
+  const hasFeel =
+    dayFeel?.[oldAnchorKey] !== undefined || dayFeel?.[movedMealId] !== undefined;
+
+  if (!hasTitle && !hasFeel) return null;
+
+  const nextTitles = customTitles ? { ...customTitles } : undefined;
+  if (nextTitles) {
+    const title = nextTitles[oldAnchorKey] ?? nextTitles[movedMealId];
+    if (title) {
+      nextTitles[newAnchorKey] = title;
+      delete nextTitles[oldAnchorKey];
+      delete nextTitles[movedMealId];
+    }
+  }
+
+  const nextFeel = dayFeel ? { ...dayFeel } : undefined;
+  if (nextFeel) {
+    const feel = nextFeel[oldAnchorKey] ?? nextFeel[movedMealId];
+    if (feel) {
+      nextFeel[newAnchorKey] = feel;
+      delete nextFeel[oldAnchorKey];
+      delete nextFeel[movedMealId];
+    }
+  }
+
+  return {
+    customTitles: nextTitles,
+    dayFeel: nextFeel,
+    oldAnchorKey,
+    newAnchorKey,
+  };
+}

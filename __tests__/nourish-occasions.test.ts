@@ -1,5 +1,10 @@
-import { groupIntoOccasions, OCCASION_GAP_MINUTES } from "@/services/nourish/timeline-occasions";
+import {
+  groupIntoOccasions,
+  transferOccasionAnchor,
+  OCCASION_GAP_MINUTES,
+} from "@/services/nourish/timeline-occasions";
 import { getOccasionTitles, setOccasionTitle } from "@/storage/repositories/occasion-titles";
+import { clean as cleanFeel, MAX_FEEL_KEYS_PER_DAY } from "@/storage/repositories/nourish-feel";
 import type { Meal } from "@/types/gymos";
 
 function makeMeal(overrides: Partial<Meal> & { id: string; timestamp: string }): Meal {
@@ -250,6 +255,127 @@ describe("timeline-occasions grouping", () => {
     expect(after[1].title).toBe("Afternoon Lunch");
     expect(after[1].meals.map((m) => m.id)).toEqual(["b", "c"]);
     expect(after[1].feel).toBe(1);
+  });
+
+  it("1. moving the FIRST entry of a titled, rated occasion: title and rating stay with remaining entries", () => {
+    const meal1 = makeMeal({
+      id: "m1",
+      name: "Dosa",
+      timestamp: "2026-10-10T12:00:00.000Z",
+      slot: "Lunch",
+    });
+    const meal2 = makeMeal({
+      id: "m2",
+      name: "Sambar",
+      timestamp: "2026-10-10T12:20:00.000Z",
+      slot: "Lunch",
+    });
+
+    let customTitles: Record<string, string> = { "occasion-m1": "Sunday Feast" };
+    let dayFeel: Record<string, 1 | 2 | 3> = { "occasion-m1": 2 };
+
+    // Move meal1 (the first entry) away to 20:00 (Dinner)
+    const transfer = transferOccasionAnchor({
+      movedMealId: "m1",
+      remainingMeals: [meal2],
+      customTitles,
+      dayFeel,
+    });
+    expect(transfer).not.null;
+    expect(transfer?.newAnchorKey).toBe("occasion-m2");
+    customTitles = transfer!.customTitles!;
+    dayFeel = transfer!.dayFeel!;
+
+    const movedMeal1 = { ...meal1, timestamp: "2026-10-10T20:00:00.000Z", slot: "Dinner" as const };
+    const occasions = groupIntoOccasions([meal2, movedMeal1], customTitles, dayFeel);
+
+    expect(occasions).toHaveLength(2);
+    // The occasion that keeps the remaining entry (meal2 at 12:20) retains the title and rating
+    expect(occasions[0].title).toBe("Sunday Feast");
+    expect(occasions[0].feel).toBe(2);
+    expect(occasions[0].id).toBe("occasion-m2");
+    expect(occasions[0].meals.map((m) => m.id)).toEqual(["m2"]);
+
+    // The moved entry at 20:00 starts fresh (unrated and default title)
+    expect(occasions[1].title).toContain("Dinner");
+    expect(occasions[1].feel).toBeUndefined();
+    expect(occasions[1].id).toBe("occasion-m1");
+    expect(occasions[1].meals.map((m) => m.id)).toEqual(["m1"]);
+  });
+
+  it("2. adding an entry that merges two occasions with titles and ratings: earlier occasion wins deterministically", () => {
+    const meal1 = makeMeal({
+      id: "m1",
+      name: "Early Snack",
+      timestamp: "2026-10-10T12:00:00.000Z",
+      slot: "Lunch",
+    });
+    const meal2 = makeMeal({
+      id: "m2",
+      name: "Late Lunch",
+      timestamp: "2026-10-10T13:00:00.000Z",
+      slot: "Lunch",
+    });
+
+    const customTitles = {
+      "occasion-m1": "Pre-Workout Lunch",
+      "occasion-m2": "Post-Workout Lunch",
+    };
+    const dayFeel = {
+      "occasion-m1": 1 as const, // Light
+      "occasion-m2": 3 as const, // Too full
+    };
+
+    // Before merge: separated by 60m (>45m)
+    const before = groupIntoOccasions([meal1, meal2], customTitles, dayFeel);
+    expect(before).toHaveLength(2);
+    expect(before[0].title).toBe("Pre-Workout Lunch");
+    expect(before[0].feel).toBe(1);
+    expect(before[1].title).toBe("Post-Workout Lunch");
+    expect(before[1].feel).toBe(3);
+
+    // Add bridging meal at 12:35 (<=45m to both m1 and m2)
+    const bridge = makeMeal({
+      id: "bridge",
+      name: "Protein Shake",
+      timestamp: "2026-10-10T12:35:00.000Z",
+      slot: "Lunch",
+    });
+
+    const merged = groupIntoOccasions([meal1, bridge, meal2], customTitles, dayFeel);
+    expect(merged).toHaveLength(1);
+    // Earlier occasion (m1 at 12:00) wins title and feel deterministically
+    expect(merged[0].title).toBe("Pre-Workout Lunch");
+    expect(merged[0].feel).toBe(1);
+    expect(merged[0].id).toBe("occasion-m1");
+    expect(merged[0].meals.map((m) => m.id)).toEqual(["m1", "bridge", "m2"]);
+  });
+
+  it("3. clean() in nourish-feel prunes stale occasion keys and caps per day to prevent unbounded growth", () => {
+    const raw: Record<string, Record<string, number>> = {
+      "2026-10-10": {
+        Lunch: 2,
+        "occasion-active1": 1,
+        "occasion-deleted1": 3,
+        "occasion-deleted2": 2,
+      },
+    };
+
+    const validMealIds = new Set(["active1"]);
+    const cleaned = cleanFeel(raw, (day) => (day === "2026-10-10" ? validMealIds : new Set()));
+
+    expect(cleaned["2026-10-10"].Lunch).toBe(2);
+    expect(cleaned["2026-10-10"]["occasion-active1"]).toBe(1);
+    expect(cleaned["2026-10-10"]["occasion-deleted1"]).toBeUndefined();
+    expect(cleaned["2026-10-10"]["occasion-deleted2"]).toBeUndefined();
+
+    // Verify hard cap
+    const bloated: Record<string, number> = {};
+    for (let i = 0; i < 50; i++) {
+      bloated[`occasion-${i}`] = 2;
+    }
+    const capped = cleanFeel({ "2026-10-10": bloated });
+    expect(Object.keys(capped["2026-10-10"]).length).toBeLessThanOrEqual(MAX_FEEL_KEYS_PER_DAY);
   });
 });
 
