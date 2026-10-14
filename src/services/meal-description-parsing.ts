@@ -6,13 +6,32 @@
  */
 
 /**
+ * Recognized multi-item combined dish names that contain conjunctions
+ * ("and", "with", "&") which should NOT be split into separate items.
+ */
+const COMBINED_DISH_CONJUNCTIONS: { pattern: RegExp; replacement: string }[] = [
+  { pattern: /\b(chole|chhole)\s+(?:and|with|&)\s+(bhatur(?:e|a|as)?)\b/gi, replacement: "$1 $2" },
+  { pattern: /\b(pav|pao)\s+(?:and|with|&)\s+(bhaji)\b/gi, replacement: "$1 $2" },
+  { pattern: /\b(puri|poori)\s+(?:and|with|&)\s+(bhaji)\b/gi, replacement: "$1 $2" },
+  { pattern: /\b(rajma)\s+(?:and|with|&)\s+(chawal)\b/gi, replacement: "$1 $2" },
+  { pattern: /\b(dal|daal)\s+(?:and|with|&)\s+(chawal)\b/gi, replacement: "$1 $2" },
+  { pattern: /\b(idli)\s+(?:and|with|&)\s+(sambar)\b/gi, replacement: "$1 $2" },
+  { pattern: /\b(vada|wada)\s+(?:and|with|&)\s+(sambar)\b/gi, replacement: "$1 $2" },
+  { pattern: /\b(makki(?:\s+di)?\s+roti)\s+(?:and|with|&)\s+(sarson(?:\s+da)?\s+saag)\b/gi, replacement: "$1 $2" },
+];
+
+/**
  * Split a typed description into candidate food segments on punctuation
  * (never inside decimals like "1.5"), food-list conjunctions
  * ("and"/"with"/"plus" as whole words — "coriander" stays intact),
- * and newlines.
+ * and newlines. Combined dish names with "and"/"with" are kept together.
  */
 export function splitDescriptionSegments(description: string): string[] {
-  return description
+  let text = description;
+  for (const { pattern, replacement } of COMBINED_DISH_CONJUNCTIONS) {
+    text = text.replace(pattern, replacement);
+  }
+  return text
     .split(/\r?\n+|[;,+&]+|\.\s+|\s+(?:and|with|plus)\s+/i)
     .map((part) => part.trim())
     .filter((part) => part.length > 0);

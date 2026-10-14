@@ -8,11 +8,16 @@
 
 import type { EstimatedFood } from "@/types/gymos";
 import {
+  isConvertibleUnit,
   isSameUnit,
   matchFoodEntry,
   normalizeFoodName,
   scalePortionMacros,
 } from "@/services/food-db";
+import {
+  findFoodDefinition,
+  calculateFoodMacros,
+} from "@/data/foods";
 import {
   parseLeadingQuantity,
   splitDescriptionSegments,
@@ -43,7 +48,12 @@ function resolveFoodByName(
     return undefined;
   }
 
-  const entry = matchFoodEntry(name, 3);
+  let entry = matchFoodEntry(name, 3);
+
+  if (entry?.id === "chole-bhature-plate" && (unit === "piece" || unit === "pieces")) {
+    const pieceEntry = matchFoodEntry("Chole bhature (piece)", 3);
+    if (pieceEntry) entry = pieceEntry;
+  }
 
   if (!entry) {
     return undefined;
@@ -56,7 +66,7 @@ function resolveFoodByName(
 
   // A stated unit other than the catalog's would need a conversion this
   // app does not do.
-  if (unit !== "" && !isSameUnit(unit, entry.unit)) {
+  if (unit !== "" && !isSameUnit(unit, entry.unit) && !isConvertibleUnit(unit, entry.unit)) {
     if (!opts?.retainEntryOnUnitMismatch) {
       return undefined;
     }
@@ -75,12 +85,12 @@ function resolveFoodByName(
     };
   }
 
-  const scaled = scalePortionMacros(entry, finalAmount);
+  const scaled = scalePortionMacros(entry, finalAmount, unit || undefined, entry.unit);
 
   return {
     name: entry.name,
     estimatedAmount: finalAmount,
-    unit: entry.unit,
+    unit: unit || entry.unit,
     entryId: entry.id,
     calories: scaled.calories,
     protein: scaled.protein,
@@ -119,12 +129,36 @@ function resolveFromFoodDb(
       ? explicit.amount
       : undefined;
 
-  return resolveFoodByName(
+  const fromDb = resolveFoodByName(
     parsed.name,
     explicitAmount ?? parsed.amount,
     explicit?.unit?.trim() || parsed.unit || "",
     { retainEntryOnUnitMismatch: true },
   );
+
+  if (fromDb && !fromDb.unresolved) {
+    return fromDb;
+  }
+
+  // Fallback: check exact whole-phrase match in extended ingredient catalog
+  const def = findFoodDefinition(parsed.name);
+  if (def) {
+    const finalAmount = explicitAmount ?? parsed.amount ?? 1;
+    const finalUnit = explicit?.unit?.trim() || parsed.unit;
+    const macros = calculateFoodMacros(def, finalAmount, finalUnit, parsed.size);
+    return {
+      name: def.name,
+      estimatedAmount: finalAmount,
+      unit: finalUnit || (def.katoriG ? "bowl" : def.pieceG ? "piece" : "serving"),
+      calories: macros.calories,
+      protein: macros.protein,
+      carbs: macros.carbs,
+      fat: macros.fat,
+      nutritionSource: "food-db",
+    };
+  }
+
+  return fromDb;
 }
 
 /**
@@ -220,8 +254,8 @@ function unresolvedFood(raw: string): EstimatedFood {
 }
 
 /**
- * Resolve one food segment locally: exact catalog match with scaled
- * 16-nutrient nutrition, then the user's own saved foods, otherwise an
+ * Resolve one food segment locally: exact saved food match, then
+ * exact catalog match with scaled 16-nutrient nutrition, otherwise an
  * explicitly-unresolved row for manual entry. Pure, synchronous,
  * offline — no network, no provider, no fabrication.
  */
@@ -239,19 +273,27 @@ export function resolveSegmentLocally(
   const amount = parsed.amount;
   const unit = parsed.unit ?? "";
 
-  return (
-    resolveFromFoodDb(text) ??
-    (parsed.name
-      ? resolveFromSavedFood(parsed.name, amount, unit, savedFoods)
-      : undefined) ??
-    unresolvedFood(text)
-  );
+  // 1. Exact saved food FIRST
+  if (parsed.name) {
+    const saved = resolveFromSavedFood(parsed.name, amount, unit, savedFoods);
+    if (saved) {
+      return saved;
+    }
+  }
+
+  // 2. Exact catalog match SECOND
+  const dbMatch = resolveFromFoodDb(text);
+  if (dbMatch && !dbMatch.unresolved) {
+    return dbMatch;
+  }
+
+  return dbMatch ?? unresolvedFood(text);
 }
 
 /**
  * Resolve a whole description locally: split into segments, resolve
- * each against the Food DB then saved foods. Every distinct food becomes
- * its own row — resolved rows carry catalog/user nutrition, the rest
+ * each against saved foods then Food DB. Every distinct food becomes
+ * its own row — resolved rows carry user/catalog nutrition, the rest
  * carry `unresolved: true` for manual entry. Blank input yields no rows.
  */
 export function resolveMealDescription(
@@ -288,8 +330,8 @@ export type FoodResolveResult =
   | { status: "none" };
 
 /**
- * Resolve one "+ Add food" entry locally: exact Food DB match, then the
- * user's saved foods, otherwise a single explicitly-unresolved row for
+ * Resolve one "+ Add food" entry locally: exact saved food FIRST, then
+ * exact Food DB match, otherwise a single explicitly-unresolved row for
  * manual entry. Synchronous and offline — no provider, no network, no
  * pending queue, no fabricated nutrition.
  */
@@ -311,6 +353,25 @@ export function resolveFoodForMeal(
       : undefined;
   const unit = input.unit?.trim() || undefined;
 
+  const parsed = parseLeadingQuantity(raw);
+  const finalAmount = amount ?? parsed.amount;
+  const finalUnit = unit ?? parsed.unit ?? "";
+
+  // 1. Exact saved food FIRST
+  if (parsed.name) {
+    const saved = resolveFromSavedFood(
+      parsed.name,
+      finalAmount,
+      finalUnit,
+      savedFoods,
+    );
+
+    if (saved) {
+      return { status: "resolved", foods: [saved] };
+    }
+  }
+
+  // 2. Exact catalog match SECOND
   const local = resolveFromFoodDb(raw, { amount, unit });
 
   if (local) {
@@ -322,37 +383,42 @@ export function resolveFoodForMeal(
       : { status: "resolved", foods: [local] };
   }
 
-  const parsed = parseLeadingQuantity(raw);
-
-  if (parsed.name) {
-    const saved = resolveFromSavedFood(
-      parsed.name,
-      amount ?? parsed.amount,
-      unit ?? parsed.unit ?? "",
-      savedFoods,
-    );
-
-    if (saved) {
-      return { status: "resolved", foods: [saved] };
-    }
-  }
-
   return { status: "unresolved", foods: [unresolvedFood(raw)] };
 }
 
 /**
  * Apply the local Food DB precedence rule to an AI estimate.
  *
- * The AI owns food identity and parsing. For each returned food we may
- * replace only its nutrition with a reliable, unit-compatible catalog
- * value scaled to the stated amount. The user-facing name and unit stay
- * exactly as the AI returned them. Unknown foods retain their AI values;
+ * Saved foods take precedence first, then reliable, unit-compatible
+ * catalog values scaled to the stated amount. The user-facing name and unit
+ * stay exactly as the AI returned them. Unknown foods retain their AI values;
  * they are never replaced with a guessed local food.
  */
 export function applyFoodDbPrecedence(
   estimate: MealEstimate,
+  savedFoods?: SavedFood[] | null,
 ): MealEstimate {
   const foods = estimate.foods.map((food) => {
+    // 1. Exact saved food
+    const saved = matchSavedFood(food.name, savedFoods);
+    if (saved) {
+      const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+      const ratio =
+        food.estimatedAmount && Number.isFinite(food.estimatedAmount) && food.estimatedAmount > 0
+          ? food.estimatedAmount
+          : 1;
+      return {
+        ...food,
+        calories: Math.round(num(saved.calories) * ratio),
+        protein: Math.round(num(saved.protein) * ratio * 10) / 10,
+        carbs: Math.round(num(saved.carbs) * ratio * 10) / 10,
+        fat: Math.round(num(saved.fat) * ratio * 10) / 10,
+        ...pickMicronutrients(saved),
+        nutritionSource: "manual" as const,
+      };
+    }
+
+    // 2. Exact catalog match (minScore 3 = exact normalized match only)
     const entry = matchFoodEntry(food.name, 3);
 
     if (!entry || !isSameUnit(food.unit, entry.unit)) {
@@ -362,7 +428,7 @@ export function applyFoodDbPrecedence(
       };
     }
 
-    const scaled = scalePortionMacros(entry, food.estimatedAmount);
+    const scaled = scalePortionMacros(entry, food.estimatedAmount, food.unit, entry.unit);
 
     return {
       ...food,

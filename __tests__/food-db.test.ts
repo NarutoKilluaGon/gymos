@@ -9,7 +9,7 @@ import {
 describe("FOOD_DATABASE", () => {
   it("ships a V1-sized catalog", () => {
     expect(FOOD_DATABASE.length).toBeGreaterThanOrEqual(70);
-    expect(FOOD_DATABASE.length).toBeLessThanOrEqual(90);
+    expect(FOOD_DATABASE.length).toBeLessThanOrEqual(100);
   });
 
   it("has unique ids", () => {

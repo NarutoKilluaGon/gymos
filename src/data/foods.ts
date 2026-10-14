@@ -1,5 +1,7 @@
 /* Sourced from IFCT (Indian Food Composition Tables, ICMR-NIN 2017) and USDA FoodData Central. */
 
+import { normalizeFoodName } from "@/services/food-db";
+
 export type FoodDefinition = {
   id: string;
   name: string;
@@ -183,7 +185,7 @@ export const FOOD_DEFINITIONS: readonly FoodDefinition[] = [
   {
     id: "chana_cooked",
     name: "Chana (cooked)",
-    aliases: ["chana", "boiled chana", "cooked chickpeas", "chickpeas", "chole"],
+    aliases: ["chana", "boiled chana", "cooked chickpeas", "chickpeas"],
     caloriesPer100g: 164,
     proteinPer100g: 8.9,
     carbsPer100g: 27.4,
@@ -820,6 +822,141 @@ export const FOOD_DEFINITIONS: readonly FoodDefinition[] = [
     cupG: 160,
     plateG: 200,
   },
+  {
+    id: "chole_bhature",
+    name: "Chole bhature",
+    aliases: ["chole bhature", "chhole bhature", "chola bhatura", "chole bhature plate"],
+    caloriesPer100g: 180,
+    proteinPer100g: 4.5,
+    carbsPer100g: 24.0,
+    fatPer100g: 7.5,
+    plateG: 360,
+    pieceG: 180,
+  },
+  {
+    id: "bhatura",
+    name: "Bhatura",
+    aliases: ["bhatura", "bhature", "bhatoora", "bhatoore"],
+    caloriesPer100g: 290,
+    proteinPer100g: 6.5,
+    carbsPer100g: 42.0,
+    fatPer100g: 11.0,
+    pieceG: 75,
+  },
+  {
+    id: "chole_masala",
+    name: "Chole masala",
+    aliases: ["chole", "chana masala", "chole masala", "chhole", "chhole masala"],
+    caloriesPer100g: 147,
+    proteinPer100g: 6.7,
+    carbsPer100g: 20.0,
+    fatPer100g: 4.7,
+    katoriG: 150,
+    cupG: 150,
+    plateG: 250,
+  },
+  {
+    id: "kulcha",
+    name: "Kulcha",
+    aliases: ["kulcha", "kulche", "amritsari kulcha", "plain kulcha"],
+    caloriesPer100g: 225,
+    proteinPer100g: 6.2,
+    carbsPer100g: 42.5,
+    fatPer100g: 3.8,
+    pieceG: 80,
+  },
+  {
+    id: "puri",
+    name: "Puri",
+    aliases: ["puri", "puris", "poori", "pooris"],
+    caloriesPer100g: 330,
+    proteinPer100g: 6.5,
+    carbsPer100g: 43.0,
+    fatPer100g: 16.0,
+    pieceG: 30,
+  },
+  {
+    id: "pav_bhaji",
+    name: "Pav bhaji",
+    aliases: ["pav bhaji", "pao bhaji", "pavbhaji"],
+    caloriesPer100g: 133,
+    proteinPer100g: 3.3,
+    carbsPer100g: 20.0,
+    fatPer100g: 4.7,
+    plateG: 300,
+  },
+  {
+    id: "samosa",
+    name: "Samosa",
+    aliases: ["samosa", "samosas", "samose", "aloo samosa"],
+    caloriesPer100g: 289,
+    proteinPer100g: 5.5,
+    carbsPer100g: 33.3,
+    fatPer100g: 15.5,
+    pieceG: 90,
+  },
+  {
+    id: "jalebi",
+    name: "Jalebi",
+    aliases: ["jalebi", "jalebis", "jilapi"],
+    caloriesPer100g: 380,
+    proteinPer100g: 2.0,
+    carbsPer100g: 80.0,
+    fatPer100g: 8.0,
+    pieceG: 25,
+  },
+  {
+    id: "lassi",
+    name: "Sweet lassi",
+    aliases: ["lassi", "sweet lassi", "punjabi lassi", "plain lassi"],
+    caloriesPer100g: 72,
+    proteinPer100g: 2.8,
+    carbsPer100g: 11.2,
+    fatPer100g: 2.0,
+    glassG: 250,
+  },
+  {
+    id: "jaljeera",
+    name: "Jaljeera",
+    aliases: ["jaljeera", "jal jeera", "jal-jeera"],
+    caloriesPer100g: 12,
+    proteinPer100g: 0.2,
+    carbsPer100g: 2.8,
+    fatPer100g: 0.1,
+    glassG: 250,
+  },
+  {
+    id: "lahori_jeera",
+    name: "Lahori jeera",
+    aliases: ["lahori jeera", "lahori zeera"],
+    caloriesPer100g: 32,
+    proteinPer100g: 0.0,
+    carbsPer100g: 8.0,
+    fatPer100g: 0.0,
+    glassG: 250,
+  },
+  {
+    id: "daliya_cooked",
+    name: "Daliya (cooked)",
+    aliases: ["daliya", "cooked daliya", "daliya cooked", "broken wheat cooked", "dalia", "cooked dalia"],
+    caloriesPer100g: 75,
+    proteinPer100g: 2.5,
+    carbsPer100g: 15.0,
+    fatPer100g: 0.8,
+    katoriG: 200,
+    cupG: 200,
+    plateG: 300,
+  },
+  {
+    id: "daliya_dry",
+    name: "Daliya (dry)",
+    aliases: ["daliya dry", "dry daliya", "raw daliya", "dalia dry", "dry dalia", "broken wheat dry", "broken wheat"],
+    caloriesPer100g: 340,
+    proteinPer100g: 12.0,
+    carbsPer100g: 70.0,
+    fatPer100g: 1.5,
+    cupG: 160,
+  },
 ];
 
 // Pre-sorted alias map for longest-match search
@@ -830,7 +967,10 @@ const ALIAS_ENTRIES = FOOD_DEFINITIONS.flatMap((def) =>
   })),
 ).sort((a, b) => b.alias.length - a.alias.length);
 
-/** Find ingredient definition by longest alias match */
+/**
+ * Find ingredient definition by exact whole-phrase alias match.
+ * Partial overlap never auto-applies so user items are never swapped.
+ */
 export function findFoodDefinition(name: string): FoodDefinition | undefined {
   const clean = name
     .toLowerCase()
@@ -840,9 +980,13 @@ export function findFoodDefinition(name: string): FoodDefinition | undefined {
 
   if (!clean) return undefined;
 
+  const normalizedClean = normalizeFoodName(clean);
+
   for (const entry of ALIAS_ENTRIES) {
-    const pattern = new RegExp(`\\b${entry.alias}\\b`, "i");
-    if (pattern.test(clean)) {
+    if (
+      entry.alias === clean ||
+      normalizeFoodName(entry.alias) === normalizedClean
+    ) {
       return entry.def;
     }
   }

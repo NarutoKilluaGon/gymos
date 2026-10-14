@@ -64,7 +64,17 @@ export const FOOD_DATABASE: FoodEntry[] = [
   { id: "curd-rice", name: "Curd rice", amount: 1, unit: "plate", calories: 300, protein: 10, carbs: 50, fat: 6, fiber: 1, sodium: 350, potassium: 400, calcium: 200, iron: 1, magnesium: 35, zinc: 0.8, vitaminA: 15, vitaminC: 2, vitaminD: 0, vitaminB12: 1, folate: 30 },
   { id: "khichdi", name: "Khichdi", amount: 1, unit: "plate", calories: 320, protein: 12, carbs: 55, fat: 6, fiber: 4, sodium: 450, potassium: 450, calcium: 50, iron: 2.5, magnesium: 55, zinc: 0.8, vitaminA: 40, vitaminC: 4, vitaminD: 0, vitaminB12: 0, folate: 60 },
   { id: "dal-tadka", name: "Dal tadka", amount: 150, unit: "ml", calories: 170, protein: 9, carbs: 24, fat: 5, fiber: 4, sodium: 400, potassium: 400, calcium: 30, iron: 2, magnesium: 40, zinc: 0.6, vitaminA: 10, vitaminC: 2, vitaminD: 0, vitaminB12: 0, folate: 70 },
-  { id: "chole-masala", name: "Chole masala", amount: 150, unit: "g", calories: 220, protein: 10, carbs: 30, fat: 7, fiber: 6, sodium: 450, potassium: 400, calcium: 60, iron: 3, magnesium: 45, zinc: 1, vitaminA: 15, vitaminC: 3, vitaminD: 0, vitaminB12: 0, folate: 90 },
+  { id: "chole-masala", name: "Chole masala", amount: 1, unit: "bowl", calories: 220, protein: 10, carbs: 30, fat: 7, fiber: 6, sodium: 450, potassium: 400, calcium: 60, iron: 3, magnesium: 45, zinc: 1, vitaminA: 15, vitaminC: 3, vitaminD: 0, vitaminB12: 0, folate: 90 },
+  { id: "chole-bhature-plate", name: "Chole bhature (plate)", amount: 1, unit: "plate", calories: 650, protein: 16, carbs: 85, fat: 28, fiber: 8, sodium: 800, potassium: 500, calcium: 100, iron: 4.5, magnesium: 70, zinc: 2, vitaminA: 50, vitaminC: 8, vitaminD: 0, vitaminB12: 0, folate: 120 },
+  { id: "chole-bhature-piece", name: "Chole bhature (piece)", amount: 1, unit: "piece", calories: 325, protein: 8, carbs: 42, fat: 14, fiber: 4, sodium: 400, potassium: 250, calcium: 50, iron: 2.2, magnesium: 35, zinc: 1, vitaminA: 25, vitaminC: 4, vitaminD: 0, vitaminB12: 0, folate: 60 },
+  { id: "bhatura", name: "Bhatura", amount: 1, unit: "piece", calories: 220, protein: 5, carbs: 32, fat: 8, fiber: 1.5, sodium: 220, potassium: 70, calcium: 20, iron: 1.2, magnesium: 15, zinc: 0.4, vitaminA: 0, vitaminC: 0, vitaminD: 0, vitaminB12: 0, folate: 30 },
+  { id: "kulcha", name: "Kulcha", amount: 1, unit: "piece", calories: 180, protein: 5, carbs: 34, fat: 3, fiber: 2, sodium: 250, potassium: 90, calcium: 25, iron: 1.5, magnesium: 20, zinc: 0.5, vitaminA: 0, vitaminC: 0, vitaminD: 0, vitaminB12: 0, folate: 35 },
+  { id: "puri", name: "Puri", amount: 1, unit: "piece", calories: 100, protein: 2, carbs: 13, fat: 5, fiber: 1, sodium: 80, potassium: 50, calcium: 10, iron: 0.6, magnesium: 12, zinc: 0.3, vitaminA: 0, vitaminC: 0, vitaminD: 0, vitaminB12: 0, folate: 15 },
+  { id: "jalebi", name: "Jalebi", amount: 1, unit: "piece", calories: 95, protein: 0.5, carbs: 20, fat: 2, fiber: 0.5, sodium: 50, potassium: 40, calcium: 15, iron: 0.5, magnesium: 10, zinc: 0.2, vitaminA: 0, vitaminC: 0, vitaminD: 0, vitaminB12: 0, folate: 5 },
+  { id: "jaljeera", name: "Jaljeera", amount: 250, unit: "ml", calories: 30, protein: 0.5, carbs: 7, fat: 0.2, fiber: 0.5, sodium: 300, potassium: 80, calcium: 20, iron: 0.8, magnesium: 15, zinc: 0.2, vitaminA: 10, vitaminC: 5, vitaminD: 0, vitaminB12: 0, folate: 8 },
+  { id: "lahori-jeera", name: "Lahori jeera", amount: 250, unit: "ml", calories: 80, protein: 0, carbs: 20, fat: 0, fiber: 0, sodium: 180, potassium: 30, calcium: 10, iron: 0.2, magnesium: 5, zinc: 0.1, vitaminA: 0, vitaminC: 5, vitaminD: 0, vitaminB12: 0, folate: 0 },
+  { id: "daliya-cooked", name: "Daliya (cooked)", amount: 100, unit: "g", calories: 75, protein: 2.5, carbs: 15, fat: 0.8, fiber: 2, sodium: 5, potassium: 60, calcium: 10, iron: 0.9, magnesium: 25, zinc: 0.6, vitaminA: 0, vitaminC: 0, vitaminD: 0, vitaminB12: 0, folate: 12 },
+  { id: "daliya-dry", name: "Daliya (dry)", amount: 100, unit: "g", calories: 340, protein: 12, carbs: 70, fat: 1.5, fiber: 10, sodium: 10, potassium: 350, calcium: 40, iron: 4, magnesium: 120, zinc: 2.5, vitaminA: 0, vitaminC: 0, vitaminD: 0, vitaminB12: 0, folate: 50 },
   { id: "rajma", name: "Rajma", amount: 150, unit: "g", calories: 210, protein: 11, carbs: 32, fat: 4, fiber: 6, sodium: 400, potassium: 550, calcium: 60, iron: 3.5, magnesium: 55, zinc: 1, vitaminA: 5, vitaminC: 2, vitaminD: 0, vitaminB12: 0, folate: 100 },
   { id: "palak-paneer", name: "Palak paneer", amount: 150, unit: "g", calories: 240, protein: 11, carbs: 10, fat: 18, fiber: 3, sodium: 450, potassium: 600, calcium: 350, iron: 3, magnesium: 70, zinc: 1, vitaminA: 400, vitaminC: 15, vitaminD: 0, vitaminB12: 0.3, folate: 60 },
   { id: "paneer-butter-masala", name: "Paneer butter masala", amount: 150, unit: "g", calories: 320, protein: 12, carbs: 12, fat: 26, fiber: 2, sodium: 500, potassium: 350, calcium: 300, iron: 1.5, magnesium: 30, zinc: 1.2, vitaminA: 250, vitaminC: 6, vitaminD: 0.1, vitaminB12: 0.5, folate: 25 },
@@ -192,6 +202,44 @@ const FOOD_NAME_ALIASES: Record<string, string> = {
   omelette: "Omelette (2 eggs)",
   "egg omelette": "Omelette (2 eggs)",
   roti: "Roti (phulka)",
+  bhatura: "Bhatura",
+  bhature: "Bhatura",
+  bhatoora: "Bhatura",
+  bhatoore: "Bhatura",
+  chole: "Chole masala",
+  chhole: "Chole masala",
+  "chana masala": "Chole masala",
+  "chole masala": "Chole masala",
+  "chhole masala": "Chole masala",
+  "chole bhature": "Chole bhature (plate)",
+  "chhole bhature": "Chole bhature (plate)",
+  "chola bhatura": "Chole bhature (plate)",
+  "chole bhature plate": "Chole bhature (plate)",
+  kulcha: "Kulcha",
+  kulche: "Kulcha",
+  puri: "Puri",
+  puris: "Puri",
+  poori: "Puri",
+  pooris: "Puri",
+  "pav bhaji": "Pav bhaji",
+  "pao bhaji": "Pav bhaji",
+  samosa: "Samosa",
+  samose: "Samosa",
+  jalebi: "Jalebi",
+  jalebis: "Jalebi",
+  lassi: "Sweet lassi",
+  "sweet lassi": "Sweet lassi",
+  jaljeera: "Jaljeera",
+  "jal jeera": "Jaljeera",
+  "lahori jeera": "Lahori jeera",
+  "lahori zeera": "Lahori jeera",
+  daliya: "Daliya (cooked)",
+  dalia: "Daliya (cooked)",
+  "cooked daliya": "Daliya (cooked)",
+  "daliya cooked": "Daliya (cooked)",
+  "dry daliya": "Daliya (dry)",
+  "daliya dry": "Daliya (dry)",
+  "raw daliya": "Daliya (dry)",
 };
 
 /** Apply the alias table to an already-normalized name, if present. */
@@ -258,6 +306,31 @@ export function matchFoodEntry(
   );
 
   return scored[0]?.entry;
+}
+
+/**
+ * Suggest partial-match food candidates for "Did you mean...?" hints,
+ * without auto-applying them. Only returns foods with partial overlap.
+ */
+export function suggestFoodMatches(foodName: string): FoodEntry[] {
+  const raw = normalizeFoodName(foodName);
+  if (!raw) return [];
+
+  const candidates: { entry: FoodEntry; score: number }[] = [];
+  FOOD_DATABASE.forEach((entry) => {
+    const name = normalizeFoodName(entry.name);
+    let score = 0;
+    if (name.includes(raw)) score = 2;
+    else if (raw.includes(name)) score = 1;
+    if (score > 0 && name !== raw) {
+      candidates.push({ entry, score });
+    }
+  });
+
+  return candidates
+    .sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
+    .map((c) => c.entry)
+    .slice(0, 5);
 }
 
 /**
@@ -336,21 +409,64 @@ const UNIT_ALIASES: Record<string, string> = {
   pounds: "lb",
 };
 
+function normalizeUnit(value: string): string {
+  const letters = value.toLowerCase().replace(/[^a-z]/g, "");
+  return letters ? (UNIT_ALIASES[letters] ?? letters) : "";
+}
+
 export function isSameUnit(a: string, b: string): boolean {
-  const normalize = (value: string): string => {
-    const letters = value.toLowerCase().replace(/[^a-z]/g, "");
-
-    if (!letters) {
-      return "";
-    }
-
-    return UNIT_ALIASES[letters] ?? letters;
-  };
-
-  const normalizedA = normalize(a);
-  const normalizedB = normalize(b);
+  const normalizedA = normalizeUnit(a);
+  const normalizedB = normalizeUnit(b);
 
   return normalizedA !== "" && normalizedA === normalizedB;
+}
+
+/** Check if two units have a valid culinary conversion between them. */
+export function isConvertibleUnit(statedUnit: string, baseUnit: string): boolean {
+  if (isSameUnit(statedUnit, baseUnit)) return true;
+  const s = normalizeUnit(statedUnit);
+  const b = normalizeUnit(baseUnit);
+
+  if (
+    (s === "piece" && b === "serving") ||
+    (s === "serving" && b === "piece") ||
+    ((s === "bowl" || s === "cup" || s === "plate") && b === "g") ||
+    (s === "g" && (b === "bowl" || b === "cup" || b === "plate")) ||
+    (s === "glass" && b === "ml") ||
+    (s === "ml" && b === "glass")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/** Conversion factor from statedUnit to baseUnit. */
+export function getUnitConversionRatio(
+  statedUnit: string,
+  baseUnit: string,
+): number {
+  const s = normalizeUnit(statedUnit);
+  const b = normalizeUnit(baseUnit);
+
+  if (s === b || !s || !b) return 1;
+
+  // Grams to bowl/cup
+  if (s === "g" && (b === "bowl" || b === "cup")) return 1 / 150;
+  if ((s === "bowl" || s === "cup") && b === "g") return 150;
+
+  // Grams to plate
+  if (s === "g" && b === "plate") return 1 / 300;
+  if (s === "plate" && b === "g") return 300;
+
+  // ML to glass
+  if (s === "ml" && b === "glass") return 1 / 250;
+  if (s === "glass" && b === "ml") return 250;
+
+  // Piece to serving
+  if ((s === "piece" && b === "serving") || (s === "serving" && b === "piece")) return 1;
+
+  return 1;
 }
 
 function round2(value: number): number {
@@ -366,12 +482,20 @@ function round2(value: number): number {
 export function scalePortionMacros(
   base: PortionMacros,
   amount: number,
+  statedUnit?: string,
+  baseUnit?: string,
 ): MacroTotals {
+  let unitFactor = 1;
+  if (statedUnit && baseUnit) {
+    unitFactor = getUnitConversionRatio(statedUnit, baseUnit);
+  }
+
+  const effectiveAmount = amount * unitFactor;
   const ratio =
     base.amount > 0 &&
-    Number.isFinite(amount) &&
-    amount > 0
-      ? amount / base.amount
+    Number.isFinite(effectiveAmount) &&
+    effectiveAmount > 0
+      ? effectiveAmount / base.amount
       : 0;
 
   const scaled: MacroTotals = {

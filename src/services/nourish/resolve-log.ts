@@ -12,7 +12,6 @@ import {
 } from "@/services/meal-description-parsing";
 import {
   checkCountables,
-  localFoodItems,
   reconcileEnergy,
 } from "@/services/nourish/local-food";
 import {
@@ -83,9 +82,13 @@ function fromEstimated(food: EstimatedFood): DraftItem {
         ? "saved"
         : "ai";
 
+  const qty = food.unit
+    ? `${formatAmount(food.estimatedAmount)} ${food.unit}`.trim()
+    : `${formatAmount(food.estimatedAmount)} ${food.estimatedAmount === 1 ? "piece" : "pieces"}`;
+
   return {
     name: food.name,
-    qty: `${formatAmount(food.estimatedAmount)} ${food.unit}`.trim(),
+    qty,
     calories: food.calories,
     protein: food.protein,
     carbs: food.carbs,
@@ -115,20 +118,6 @@ export function savedFoodToDraft(saved: SavedFood): DraftItem {
     multiplier: 1,
     source: "saved",
   };
-}
-
-/** A bare name ("dal") that matches something the user saved is resolved
- *  from THEIR numbers. A typed quantity ("3 eggs") is never matched this
- *  way, because the saved numbers describe one usual portion. */
-function matchUsualFood(
-  segment: string,
-  saved: readonly SavedFood[],
-): SavedFood | undefined {
-  const parsed = parseLeadingQuantity(segment);
-
-  if (parsed.amount !== undefined) return undefined;
-
-  return matchSavedFood(segment, [...saved]);
 }
 
 function finalize(items: DraftItem[], eatingOut: boolean): DraftItem[] {
@@ -246,7 +235,11 @@ async function fetchWithRetry(
 
 /**
  * Stage 1: Resolve all segments locally (≤ 50ms).
- * Returns immediate resolutions and lists items that need proxy enrichment.
+ * Strict resolution order:
+ * 1. Exact saved food
+ * 2. Exact catalog name or exact alias (whole phrase only)
+ * 3. Cached AI estimate
+ * 4. Queued for Stage 2 AI or unresolved manual row
  */
 export async function resolveStage1(
   segments: readonly string[],
@@ -261,31 +254,31 @@ export async function resolveStage1(
 
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i]!;
+    const parsed = parseLeadingQuantity(segment);
+    const candidateName = parsed.name || segment;
 
-    // A. Saved food for bare names
-    const usual = matchUsualFood(segment, saved);
-    if (usual) {
+    // 1. Exact saved food
+    const savedFood = matchSavedFood(candidateName, [...saved]);
+    if (savedFood) {
+      const draft = savedFoodToDraft(savedFood);
+      if (parsed.amount !== undefined && parsed.amount > 0 && parsed.amount !== 1) {
+        draft.calories = Math.round(draft.calories * parsed.amount);
+        draft.protein = Math.round(draft.protein * parsed.amount * 10) / 10;
+        draft.carbs = Math.round(draft.carbs * parsed.amount * 10) / 10;
+        draft.fat = Math.round(draft.fat * parsed.amount * 10) / 10;
+        draft.qty = parsed.unit
+          ? `${formatAmount(parsed.amount)} ${parsed.unit}`
+          : `${formatAmount(parsed.amount)} ${parsed.amount === 1 ? "piece" : "pieces"}`;
+      }
       resolutions.push({
         segment,
         status: "matched",
-        item: savedFoodToDraft(usual),
+        item: draft,
       });
       continue;
     }
 
-    // B. AI Estimate Cache
-    const norm = segment.toLowerCase().trim();
-    const cached = cache.get(norm);
-    if (cached) {
-      resolutions.push({
-        segment,
-        status: "estimated",
-        item: { ...cached },
-      });
-      continue;
-    }
-
-    // C. Exact catalog match from food-db
+    // 2. Exact catalog match from food-db (minScore 3) or data/foods
     const local = resolveSegmentLocally(segment, [...saved]);
     if (!local.unresolved) {
       resolutions.push({
@@ -296,9 +289,7 @@ export async function resolveStage1(
       continue;
     }
 
-    // D. Extended ingredient table match
-    const parsed = parseLeadingQuantity(segment);
-    const def = findFoodDefinition(parsed.name);
+    const def = findFoodDefinition(candidateName);
     if (def) {
       const amount = parsed.amount !== undefined ? parsed.amount : 1;
       const effectiveUnit = parsed.unit || (def.katoriG ? "katori" : undefined);
@@ -316,7 +307,7 @@ export async function resolveStage1(
 
       resolutions.push({
         segment,
-        status: "estimated",
+        status: "matched",
         item: {
           name: def.name,
           qty: formattedQty,
@@ -324,36 +315,42 @@ export async function resolveStage1(
           protein: macros.protein,
           carbs: macros.carbs,
           fat: macros.fat,
-          confidence: 0.8,
+          confidence: 0.85,
           multiplier: 1,
-          source: "local",
+          source: "catalog",
         },
       });
       continue;
     }
 
-    // E. Typical values
-    const typical = localFoodItems(segment);
-    if (typical && typical.length > 0) {
+    // 3. AI Estimate Cache
+    const norm = segment.toLowerCase().trim();
+    const cached = cache.get(norm) ?? (parsed.name ? cache.get(parsed.name.toLowerCase().trim()) : undefined);
+    if (cached) {
       resolutions.push({
         segment,
         status: "estimated",
-        item: typical[0],
+        item: { ...cached },
       });
       continue;
     }
 
-    // F. Unknown segment: skeleton card placeholder
-    const cleanName = parsed.name || segment;
+    // 4. Unknown segment: placeholder for Stage 2 AI or manual entry
+    const cleanName = candidateName;
+    const fallbackUnit = parsed.unit
+      ? parsed.unit
+      : (parsed.amount && parsed.amount > 1 ? "pieces" : "piece");
+    const fallbackQty = parsed.amount
+      ? `${formatAmount(parsed.amount)} ${fallbackUnit}`
+      : "1 serving";
+
     resolutions.push({
       segment,
       status: "needs-input",
       reason: cleanName ? `Don't know '${cleanName}' yet` : "No amount given",
       item: {
         name: cleanName,
-        qty: parsed.unit
-          ? `${formatAmount(parsed.amount ?? 1)} ${parsed.unit}`
-          : "1 serving",
+        qty: fallbackQty,
         calories: 0,
         protein: 0,
         carbs: 0,

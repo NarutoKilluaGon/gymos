@@ -281,7 +281,7 @@ describe("timeline-occasions grouping", () => {
       customTitles,
       dayFeel,
     });
-    expect(transfer).not.null;
+    expect(transfer).not.toBeNull();
     expect(transfer?.newAnchorKey).toBe("occasion-m2");
     customTitles = transfer!.customTitles!;
     dayFeel = transfer!.dayFeel!;
