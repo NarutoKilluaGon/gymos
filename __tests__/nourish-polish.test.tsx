@@ -178,6 +178,38 @@ describe("Part 13 — Nourish Polish", () => {
       const errorTexts = getTexts();
       expect(errorTexts).toContain("Add a food name.");
     });
+
+    it("renders editable 'Eaten at (24h)' field defaulting to snapshotted time and updates slot", () => {
+      const mockLogger = {
+        manual: { name: "Oats", dayKey: "2026-10-09", at: "08:15" },
+        setManual: jest.fn(),
+        busy: false,
+        saveManual: jest.fn(),
+      } as any;
+
+      const { getTexts, renderer } = render(
+        createElement(ManualSheet, { logger: mockLogger }),
+      );
+
+      const texts = getTexts();
+      expect(texts).toContain("Eaten at (24h)");
+
+      const timeInput = renderer.root.findAll(
+        (n: any) => n.props?.value === "08:15",
+      )[0];
+      expect(timeInput).toBeDefined();
+
+      // Change time to 13:30 (Lunch)
+      TestRenderer.act(() => {
+        timeInput.props.onChangeText("13:30");
+      });
+
+      // Verify slot changed to Lunch
+      const lunchPill = renderer.root.findAll(
+        (n: any) => n.props?.label === "Lunch" && n.props?.active === true,
+      )[0];
+      expect(lunchPill).toBeDefined();
+    });
   });
 
   describe("Bar Component 20% Track", () => {

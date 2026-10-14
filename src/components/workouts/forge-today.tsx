@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Calendar, MoreHorizontal, Trophy } from "lucide-react-native";
+import { Trophy } from "lucide-react-native";
 
 import { CardioSheet } from "@/components/nutrition/more-sheets";
+import { CardioSection, DateNavigator } from "@/components/ds";
 import {
   CalendarSheet,
   StaleSessionSheet,
-  TodayMenuSheet,
 } from "@/components/workouts/forge-sheets";
-import { Button, FCard, Label, Pill, tap } from "@/components/workouts/forge-ui";
+import { Button, FCard, Pill, tap } from "@/components/workouts/forge-ui";
 import { Font } from "@/constants/design";
 import { F, FSerif } from "@/constants/forge-theme";
 import type { ForgeData } from "@/hooks/use-forge";
@@ -72,7 +72,6 @@ export function TodayView({
   const [picked, setPicked] = useState<string | null>(null);
   const [cardioOpen, setCardioOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [staleSheetOpen, setStaleSheetOpen] = useState(false);
 
   const dateKey = picked ?? todayKey;
@@ -137,66 +136,14 @@ export function TodayView({
   return (
     <View style={s.root}>
       {/* COMPACT DATE ROW */}
-      <View style={s.dateRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Previous day"
-          hitSlop={8}
-          style={s.stepBtn}
-          onPress={() => stepDay(-1)}
-        >
-          <Text style={s.stepText}>‹</Text>
-        </Pressable>
-
-        <View style={s.dateCenter}>
-          <Text style={s.dateTitle}>{isToday ? "Today" : dayLabel(dateKey)}</Text>
-          {isToday ? (
-            <Text style={s.dateSubtitle}>{dayLabel(dateKey)}</Text>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back to today"
-              style={s.jumpChip}
-              onPress={() => setPicked(null)}
-            >
-              <Text style={s.jumpChipText}>Back to today</Text>
-            </Pressable>
-          )}
-        </View>
-
-        <View style={s.dateActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Next day"
-            disabled={isToday}
-            hitSlop={8}
-            style={[s.stepBtn, isToday && s.stepBtnDisabled]}
-            onPress={() => stepDay(1)}
-          >
-            <Text style={[s.stepText, isToday && s.stepTextDisabled]}>›</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Workout calendar"
-            hitSlop={8}
-            style={s.iconBtn}
-            onPress={() => setCalendarOpen(true)}
-          >
-            <Calendar size={18} color={F.mute} />
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Today options"
-            hitSlop={8}
-            style={s.iconBtn}
-            onPress={() => setMenuOpen(true)}
-          >
-            <MoreHorizontal size={18} color={F.mute} />
-          </Pressable>
-        </View>
-      </View>
+      <DateNavigator
+        dateKey={dateKey}
+        todayKey={todayKey}
+        onStep={stepDay}
+        onOpenCalendar={() => setCalendarOpen(true)}
+        onBackToToday={() => setPicked(null)}
+        accentColor={F.acc}
+      />
 
       {!isToday ? (
         <Text style={s.meta}>
@@ -305,38 +252,20 @@ export function TodayView({
 
       {/* CARDIO SECTION WITH UNDO REMOVAL */}
       {cardio.length > 0 ? (
-        <FCard style={s.card}>
-          <Label>Cardio</Label>
-          {cardio.map((entry, index) => (
-            <View key={entry.id} style={s.cardioRow}>
-              <View style={{ flexShrink: 1 }}>
-                <Text style={s.lineStrong}>{displayName(entry.name)}</Text>
-                <Text style={s.meta}>
-                  {entry.durationMin
-                    ? `${entry.durationMin} min · ${entry.kcal} kcal`
-                    : `${entry.kcal} kcal`}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${entry.name}`}
-                hitSlop={8}
-                style={s.cardioRemoveBtn}
-                onPress={() => {
-                  onRemoveCardio(dateKey, entry.id);
-                  showUndoToast({
-                    message: `Removed ${displayName(entry.name)}`,
-                    onUndo: () => {
-                      onRestoreCardio?.(dateKey, entry, index);
-                    },
-                  });
-                }}
-              >
-                <Text style={s.removeText}>Remove</Text>
-              </Pressable>
-            </View>
-          ))}
-        </FCard>
+        <CardioSection
+          entries={cardio}
+          onAddPress={() => setCardioOpen(true)}
+          onRemovePress={(entry, index) => {
+            const originalLog = cardio.find((c) => c.id === entry.id);
+            onRemoveCardio(dateKey, entry.id);
+            showUndoToast({
+              message: `Removed ${displayName(entry.name)}`,
+              onUndo: () => {
+                if (originalLog) onRestoreCardio?.(dateKey, originalLog, index);
+              },
+            });
+          }}
+        />
       ) : null}
 
       {/* NOT STARTED / REST DAY CARD */}
@@ -456,8 +385,11 @@ export function TodayView({
         </View>
       ) : null}
 
-      {/* SECONDARY CARDIO ACTION */}
+      {/* SECONDARY ACTIONS */}
       <View style={s.pills}>
+        {done.length > 0 ? (
+          <Pill label="Add another workout" onPress={() => start(null)} />
+        ) : null}
         <Pill label="Log cardio" onPress={() => setCardioOpen(true)} />
       </View>
 
@@ -485,17 +417,6 @@ export function TodayView({
           onStartPastWorkout={(key) => {
             start(null, key);
           }}
-        />
-      ) : null}
-
-      {typeof TodayMenuSheet === "function" ? (
-        <TodayMenuSheet
-          visible={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          hasFinishedWorkout={done.length > 0}
-          onAddAnotherWorkout={() => start(null)}
-          onOpenCalendar={() => setCalendarOpen(true)}
-          onLogCardio={() => setCardioOpen(true)}
         />
       ) : null}
 

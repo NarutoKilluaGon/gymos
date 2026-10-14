@@ -31,7 +31,7 @@ export type ManualState = {
 /** The date/time context captured when an entry is started. */
 type DayContext = { dayKey: string; at: string };
 
-function clock(now: Date): string {
+export function clock(now: Date): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
@@ -215,16 +215,17 @@ export function useFoodLogger(input: {
   }, [busy, onLogged, review, save]);
 
   const saveManual = useCallback(
-    async (item: DraftItem, slot: MealSlot) => {
+    async (item: DraftItem, slot: MealSlot, at?: string) => {
       // The sheet's own snapshot; falls back to now only if it was closed.
       const context = manual ?? snapshot();
+      const resolvedAt = at !== undefined ? parseClock(at) : parseClock(context.at);
 
       setBusy(true);
 
       const ok = await save({
         items: [item],
         slot,
-        at: parseClock(context.at),
+        at: resolvedAt,
         dayKey: context.dayKey,
       });
 

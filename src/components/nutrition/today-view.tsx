@@ -1,8 +1,7 @@
 import * as Haptics from "expo-haptics";
 import {
   Bookmark,
-  ChevronLeft,
-  ChevronRight,
+  Pencil,
   Plus,
   RotateCcw,
   Send,
@@ -11,6 +10,9 @@ import {
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
+  Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +20,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   EditEntrySheet,
@@ -26,15 +29,20 @@ import {
 } from "@/components/nutrition/log-sheets";
 import {
   CardioSheet,
+  DayPickerSheet,
   MicrosSheet,
   SavedSheet,
   SuggestionsSheet,
 } from "@/components/nutrition/more-sheets";
+import { CardioSection, DateNavigator } from "@/components/ds";
 import {
   Bar,
+  Button,
+  Field,
   NCard,
   Pill,
   Ring,
+  Sheet,
   fmtInt,
   tap,
 } from "@/components/nutrition/nourish-ui";
@@ -52,27 +60,24 @@ import {
   type Suggestion,
   type SuggestionCandidate,
 } from "@/services/nourish/suggestions";
+import {
+  groupIntoOccasions,
+  type EatingOccasion,
+} from "@/services/nourish/timeline-occasions";
+import {
+  getOccasionTitles,
+  setOccasionTitle,
+  type OccasionTitlesMap,
+} from "@/storage/repositories/occasion-titles";
 import { isSavedMeal, type SavedFood } from "@/storage/repositories/saved-foods";
-import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
+import type { Meal, MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
 import {
   addDaysToKey,
-  dateFromKey,
   dateKeyFromTimestamp,
   getTodayKey,
 } from "@/utils/date";
 import { showToast, showUndoToast } from "@/utils/toast";
-
-const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTH_SHORT = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-function formatShortDate(key: string): string {
-  const date = dateFromKey(key);
-  return `${WEEKDAY_SHORT[date.getDay()]} ${date.getDate()} ${MONTH_SHORT[date.getMonth()]}`;
-}
 
 type Nourish = ReturnType<typeof useNourish>;
 
@@ -82,6 +87,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   // null follows "today" (so it rolls over at midnight); a string is a past
   // day the user deliberately navigated to and stays put.
   const [picked, setPicked] = useState<string | null>(null);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const dayKey = picked ?? todayKey;
   const [input, setInput] = useState("");
   const [cardioText, setCardioText] = useState<string | null>(null);
@@ -90,6 +96,57 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const [savedOpen, setSavedOpen] = useState(false);
   const [editing, setEditing] = useState<Meal | null>(null);
   const [editBusy, setEditBusy] = useState(false);
+  const [occasionTitles, setOccasionTitles] = useState<OccasionTitlesMap>({});
+  const [renamingOccasion, setRenamingOccasion] = useState<EatingOccasion | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    void getOccasionTitles().then((titles) => {
+      if (active && Object.keys(titles).length > 0) {
+        setOccasionTitles(titles);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const insets = useSafeAreaInsets();
+  const keyboardHeight = useRef(new Animated.Value(0)).current;
+
+  const BASE_DOCK_BOTTOM = 12 + (insets.bottom || 0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      const h = e.endCoordinates.height;
+      // When the keyboard appears, it covers the bottom tab bar and bottom insets.
+      // The dock's resting bottom edge is BASE_DOCK_BOTTOM (12 + insets.bottom).
+      // To place the dock's bottom edge exactly at the top of the keyboard (flush with 0 gap),
+      // we shift it upward by (keyboardHeight - BASE_DOCK_BOTTOM).
+      Animated.timing(keyboardHeight, {
+        toValue: Math.max(0, h - BASE_DOCK_BOTTOM),
+        duration: e.duration || 200,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardHeight, {
+        toValue: 0,
+        duration: e?.duration || 200,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [BASE_DOCK_BOTTOM, keyboardHeight]);
 
   const day = model(dayKey);
   const prevKey = addDaysToKey(dayKey, -1);
@@ -120,6 +177,41 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
       ),
     [day],
   );
+
+  const occasions = useMemo(
+    () => groupIntoOccasions(day?.meals ?? [], occasionTitles),
+    [day?.meals, occasionTitles],
+  );
+
+  const handleSaveOccasionTitle = useCallback(
+    async (newTitle: string) => {
+      if (!renamingOccasion) return;
+      const id = renamingOccasion.id;
+      await setOccasionTitle(id, newTitle);
+      setOccasionTitles((prev) => {
+        const next = { ...prev };
+        if (!newTitle.trim()) {
+          delete next[id];
+        } else {
+          next[id] = newTitle.trim();
+        }
+        return next;
+      });
+      setRenamingOccasion(null);
+    },
+    [renamingOccasion],
+  );
+
+  const loggedDayKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (!records) return keys;
+    for (const [k, r] of records.entries()) {
+      if ((r.meals?.length ?? 0) > 0) {
+        keys.add(k);
+      }
+    }
+    return keys;
+  }, [records]);
 
   // Resolved from the clock at tap time, never from render state, so a stale
   // render can't file a new entry under yesterday. A picked past day stays.
@@ -175,7 +267,6 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     );
   }
 
-  const isToday = dayKey === todayKey;
   const { totals, targets } = day;
   const allowance = day.budget - data.settings.kcal;
   const uncertainty = Math.round(totals.uncertainty / 10) * 10;
@@ -231,41 +322,18 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   return (
     <View style={s.fill}>
       <ScrollView
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={[s.scroll, { paddingBottom: BASE_DOCK_BOTTOM + 72 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={s.dayStrip}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Previous day"
-            hitSlop={8}
-            onPress={() => {
-              tap();
-              stepDay(-1);
-            }}
-            style={s.dayNavBtn}
-          >
-            <ChevronLeft size={20} color={N.ink} />
-          </Pressable>
-          <View style={s.dayTitleWrap}>
-            <Text style={s.dayTitle}>{dayTitle(dayKey, todayKey)}</Text>
-            <Text style={s.daySubtitle}> · {formatShortDate(dayKey)}</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Next day"
-            hitSlop={8}
-            disabled={isToday}
-            onPress={() => {
-              tap();
-              stepDay(1);
-            }}
-            style={[s.dayNavBtn, isToday && s.hidden]}
-          >
-            <ChevronRight size={20} color={N.ink} />
-          </Pressable>
-        </View>
+        <DateNavigator
+          dateKey={dayKey}
+          todayKey={todayKey}
+          onStep={stepDay}
+          onOpenCalendar={() => setDayPickerOpen(true)}
+          onBackToToday={() => setPicked(null)}
+          accentColor={N.acc}
+        />
 
         <NCard style={s.hero}>
           <Ring value={totals.calories} max={day.budget} size={132}>
@@ -336,56 +404,33 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           ) : null}
         </ScrollView>
 
-        {MEAL_SLOTS.map((slot) => {
-          const entries = day.bySlot[slot];
-          const kcal = entries.reduce((sum, m) => sum + (m.calories ?? 0), 0);
-          const protein = entries.reduce((sum, m) => sum + (m.protein ?? 0), 0);
-          const isEmpty = entries.length === 0;
-
-          if (isEmpty) {
-            return (
-              <View key={slot} style={s.emptyRow}>
-                <View style={s.emptyRowMain}>
-                  <Text style={s.emptyTitle}>{slot}</Text>
-                  <Text style={s.emptySub}>Nothing logged</Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add food to ${slot}`}
-                  hitSlop={4}
-                  style={s.compactAddBtn}
-                  onPress={() => {
-                    tap();
-                    logger.openManual(slot);
-                  }}
-                >
-                  <Plus size={18} color={N.acc} />
-                </Pressable>
-              </View>
-            );
-          }
+        {occasions.map((occasion) => {
+          const { meals: entries, totals: occasionTotals, slot, title, id } = occasion;
 
           return (
-            <View key={slot} style={s.section}>
+            <View key={id} style={s.section}>
               <View style={s.sectionHead}>
                 <View style={s.sectionTitleRow}>
-                  <Text style={s.sectionTitle}>{slot}</Text>
+                  <View style={s.sectionTitleWrap}>
+                    <Text style={s.sectionTitle}>{title}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Rename ${title}`}
+                      hitSlop={8}
+                      onPress={() => {
+                        tap();
+                        setRenamingOccasion(occasion);
+                        setRenameInput(title);
+                      }}
+                      style={s.renameBtn}
+                    >
+                      <Pencil size={13} color={N.mute} />
+                    </Pressable>
+                  </View>
                   <Text style={s.sectionSub}>
-                    {fmtInt(kcal)} kcal · {Math.round(protein)}g protein
+                    {fmtInt(occasionTotals.calories)} kcal · {Math.round(occasionTotals.protein)}g protein
                   </Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add food to ${slot}`}
-                  hitSlop={8}
-                  style={s.sectionAddBtn}
-                  onPress={() => {
-                    tap();
-                    logger.openManual(slot);
-                  }}
-                >
-                  <Plus size={18} color={N.ink} />
-                </Pressable>
               </View>
               <NCard style={s.rows}>
                 {entries.map((meal, index) => (
@@ -430,67 +475,44 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         })}
 
         <View style={s.section}>
-          <View style={s.sectionHead}>
-            <Text style={s.sectionTitle}>Cardio</Text>
-            <Pill
-              label="Cardio"
-              icon={<Plus size={14} color={N.ink} />}
-              onPress={() => setCardioText("")}
-            />
-          </View>
-          {day.burn.length === 0 ? (
-            <Text style={s.empty}>
-              Log cardio to add part of it back to today’s budget.
-            </Text>
-          ) : (
-            <NCard style={s.rows}>
-              {day.burn.map((entry, index) => (
-                <View
-                  key={entry.id}
-                  style={[s.entry, index < day.burn.length - 1 && s.entryLine]}
-                >
-                  <View style={s.entryMain}>
-                    <Text style={s.entryName}>{entry.name}</Text>
-                    <Text style={s.mute}>
-                      {[entry.detail, entry.source === "workouts" ? "from Workouts" : ""]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </Text>
-                  </View>
-                  <Text style={s.entryKcal}>{fmtInt(entry.kcal)} kcal</Text>
-                  {entry.removable ? (
-                    <Pressable
-                      accessibilityLabel={`Remove ${entry.name}`}
-                      hitSlop={10}
-                      onPress={() => {
-                        tap();
-                        const cardioLogs = data?.cardio[dayKey] ?? [];
-                        const targetLog = cardioLogs.find((b) => b.id === entry.id);
-                        const targetIndex = cardioLogs.findIndex((b) => b.id === entry.id);
-                        if (!targetLog) return;
-                        void actions.removeCardio(dayKey, entry.id).then((ok) => {
-                          if (ok) {
-                            showUndoToast({
-                              message: `${targetLog.name} removed`,
-                              onUndo: () => {
-                                void actions.restoreCardio(dayKey, targetLog, targetIndex);
-                              },
-                            });
-                          }
-                        });
-                      }}
-                    >
-                      <Text style={s.remove}>✕</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ))}
-            </NCard>
-          )}
+          <CardioSection
+            entries={day.burn}
+            cardStyle={false}
+            emptyText="Log cardio to add part of it back to today’s budget."
+            onAddPress={() => {
+              tap();
+              setCardioText("");
+            }}
+            onRemovePress={(entry) => {
+              tap();
+              const cardioLogs = data?.cardio[dayKey] ?? [];
+              const targetLog = cardioLogs.find((b) => b.id === entry.id);
+              const targetIndex = cardioLogs.findIndex((b) => b.id === entry.id);
+              if (!targetLog) return;
+              void actions.removeCardio(dayKey, entry.id).then((ok) => {
+                if (ok) {
+                  showUndoToast({
+                    message: `${targetLog.name} removed`,
+                    onUndo: () => {
+                      void actions.restoreCardio(dayKey, targetLog, targetIndex);
+                    },
+                  });
+                }
+              });
+            }}
+          />
         </View>
       </ScrollView>
 
-      <View style={s.dock}>
+      <Animated.View
+        style={[
+          s.dock,
+          {
+            bottom: BASE_DOCK_BOTTOM,
+            transform: [{ translateY: Animated.multiply(keyboardHeight, -1) }],
+          },
+        ]}
+      >
         <TextInput
           value={input}
           onChangeText={setInput}
@@ -515,8 +537,20 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
         >
           <Send size={18} color={N.accInk} />
         </Pressable>
-      </View>
-      {logger.busy ? <Text style={s.working}>Working it out…</Text> : null}
+      </Animated.View>
+      {logger.busy ? (
+        <Animated.Text
+          style={[
+            s.working,
+            {
+              bottom: BASE_DOCK_BOTTOM + 56,
+              transform: [{ translateY: Animated.multiply(keyboardHeight, -1) }],
+            },
+          ]}
+        >
+          Working it out…
+        </Animated.Text>
+      ) : null}
 
       <ReviewSheet logger={logger} />
       <ManualSheet logger={logger} />
@@ -600,6 +634,36 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           });
         }}
       />
+      <DayPickerSheet
+        visible={dayPickerOpen}
+        onClose={() => setDayPickerOpen(false)}
+        selectedKey={dayKey}
+        todayKey={todayKey}
+        loggedDayKeys={loggedDayKeys}
+        onSelectDay={(key) => setPicked(key === todayKey ? null : key)}
+      />
+      <Sheet
+        visible={renamingOccasion !== null}
+        onClose={() => setRenamingOccasion(null)}
+        title="Rename occasion"
+        footer={
+          <Button
+            label="Save title"
+            kind="primary"
+            onPress={() => void handleSaveOccasionTitle(renameInput)}
+          />
+        }
+      >
+        <View style={{ gap: 12, paddingBottom: 16 }}>
+          <Field
+            label="Occasion title"
+            value={renameInput}
+            onChangeText={setRenameInput}
+            placeholder="e.g. Pre-workout, Post-workout, Late snack"
+            autoFocus
+          />
+        </View>
+      </Sheet>
     </View>
   );
 }
@@ -757,53 +821,21 @@ const s = StyleSheet.create({
     gap: 8,
     flex: 1,
   },
+  sectionTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  renameBtn: {
+    padding: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sectionTitle: { fontFamily: NSerif, fontWeight: "400", fontSize: 20, color: N.ink },
   sectionSub: {
     color: N.mute,
     fontSize: 12,
     fontVariant: ["tabular-nums"],
-  },
-  sectionAddBtn: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: N.card,
-    borderRadius: NRadius.control,
-    borderWidth: 1,
-    borderColor: N.line,
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 4,
-    marginTop: 10,
-    minHeight: 48,
-  },
-  emptyRowMain: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
-  },
-  emptyTitle: {
-    fontFamily: NSerif,
-    fontWeight: "400",
-    fontSize: 17,
-    color: N.ink,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: N.dim,
-  },
-  compactAddBtn: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
   },
   empty: { color: N.dim, fontSize: 14, paddingVertical: 6 },
   rows: { padding: 0, overflow: "hidden" },
@@ -850,19 +882,23 @@ const s = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: N.card,
+    backgroundColor: N.card2,
     borderRadius: NRadius.pill,
     borderWidth: 1,
-    borderColor: N.line,
+    borderColor: `${N.acc}55`,
     paddingLeft: 18,
     paddingRight: 6,
     paddingVertical: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  dockInput: { flex: 1, color: N.ink, fontSize: 15, paddingVertical: 8 },
+  dockInput: { flex: 1, color: N.ink, fontSize: 16, minHeight: 44, paddingVertical: 8 },
   send: {
     width: 44,
     height: 44,
@@ -874,7 +910,6 @@ const s = StyleSheet.create({
   sendOff: { opacity: 0.4 },
   working: {
     position: "absolute",
-    bottom: 68,
     alignSelf: "center",
     color: N.mute,
     fontSize: 12,

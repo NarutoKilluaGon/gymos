@@ -71,10 +71,15 @@ function mountToday() {
 
   const texts = () => JSON.stringify(renderer.toJSON());
 
-  // Pill labels are <Text> children; walk up to the Pressable that owns onPress.
+  // Match a Pressable by accessibilityLabel or by a <Text> label, then walk
+  // up to the node that owns onPress.
   const press = (label: string) => {
-    const text = renderer.root.findAll((n) => n.children?.length === 1 && n.children[0] === label)[0];
-    let node: Instance | null = text ?? null;
+    const hit = renderer.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === label ||
+        (n.children?.length === 1 && n.children[0] === label),
+    )[0];
+    let node: Instance | null = hit ?? null;
 
     while (node && typeof node.props.onPress !== "function") node = node.parent;
 
@@ -219,7 +224,7 @@ describe("Forge TodayView day handling", () => {
   it("keeps a manually selected past day across the rollover", async () => {
     const view = mountToday();
 
-    view.press("‹");
+    view.press("Previous day");
     expect(view.texts()).toContain("Sat 3 Oct");
 
     tick(31_000);
@@ -236,8 +241,8 @@ describe("Forge TodayView day handling", () => {
   it("returning to today follows today again, including after a later rollover", () => {
     const view = mountToday();
 
-    view.press("‹");
-    view.press("›");
+    view.press("Previous day");
+    view.press("Next day");
     expect(view.texts()).toContain("Today");
     view.press("Blank workout");
     expect(onStart).toHaveBeenLastCalledWith({ dayId: null, date: "2026-10-04", backdated: false });

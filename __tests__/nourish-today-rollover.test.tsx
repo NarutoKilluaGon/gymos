@@ -21,14 +21,21 @@ jest.mock("@/utils/toast", () => ({ showToast: jest.fn(), showUndoToast: jest.fn
 // lucide-react-native ships ESM that Jest's transform ignores; the icons are
 // decoration only, so stand in null components for the four TodayView uses.
 jest.mock("lucide-react-native", () => ({
+  Calendar: () => null,
   ChevronLeft: () => null,
   ChevronRight: () => null,
+  Pencil: () => null,
   Plus: () => null,
   Send: () => null,
   RotateCcw: () => null,
   Bookmark: () => null,
   Utensils: () => null,
   Sparkles: () => null,
+}));
+
+jest.mock("@/storage/repositories/occasion-titles", () => ({
+  getOccasionTitles: jest.fn().mockResolvedValue({}),
+  setOccasionTitle: jest.fn().mockResolvedValue(undefined),
 }));
 
 // The ring/bars draw with react-native-svg; they are irrelevant to day binding.
@@ -72,6 +79,7 @@ jest.mock("@/components/nutrition/more-sheets", () => ({
 
     return null;
   },
+  DayPickerSheet: () => null,
   MicrosSheet: () => null,
   SuggestionsSheet: () => null,
   SavedSheet: (props: { onLog: typeof mockUi.savedLog }) => {
@@ -355,10 +363,10 @@ describe("Nourish TodayView day handling", () => {
     const view = mountToday();
 
     view.press("Previous day");
-    expect(view.texts()).toContain('"Yesterday"');
+    expect(view.texts()).toContain("Sat 3 Oct");
 
     tick(31_000);
-    expect(view.texts()).toContain("Sat, 3 Oct");
+    expect(view.texts()).toContain("Sat 3 Oct");
     expect(view.texts()).not.toContain('"Today"');
 
     await run(() => mockUi.logger!.submit("2 rotis"));

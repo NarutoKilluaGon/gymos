@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
 
 import {
   Bar,
@@ -19,7 +27,8 @@ import type { WeeklyRead } from "@/services/nourish/weekly-read";
 import { dayTitle } from "@/services/nourish/format";
 import { isSavedMeal, type SavedFood } from "@/storage/repositories/saved-foods";
 import type { CardioLog, ChangeLogEntry } from "@/types/nourish";
-import { dateKeyFromTimestamp, getTodayKey } from "@/utils/date";
+import { dateFromKey, dateKeyFromTimestamp, getTodayKey } from "@/utils/date";
+import { getMonthGrid, type CalendarDaySummary } from "@/services/forge/calendar";
 
 export function CardioSheet({
   visible,
@@ -583,4 +592,227 @@ const s = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
   },
+  calWeekdaysRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  calWeekdayLabel: {
+    width: "14.2857%",
+    textAlign: "center",
+    color: N.dim,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  calGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calCellWrapper: {
+    width: "14.2857%",
+    padding: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calCell: {
+    width: "100%",
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: N.card,
+  },
+  calCellFaded: { opacity: 0.3 },
+  calCellToday: { borderWidth: 1, borderColor: N.acc },
+  calCellSelected: { backgroundColor: "rgba(100, 160, 130, 0.2)" },
+  calCellNum: { color: N.ink, fontSize: 13, fontWeight: "500" },
+  calCellNumFaded: { color: N.dim },
+  calCellNumToday: { color: N.acc, fontWeight: "700" },
+  calCellNumSelected: { color: N.acc, fontWeight: "700" },
+  calDotsRow: { flexDirection: "row", gap: 3, marginTop: 3, minHeight: 6 },
+  calFoodDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: N.acc,
+  },
+  calNavRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  calNavBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: N.card2,
+  },
+  calMonthTitle: { color: N.ink, fontSize: 16, fontWeight: "600" },
 });
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const CALENDAR_WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
+export function DayPickerSheet({
+  visible,
+  onClose,
+  selectedKey,
+  todayKey,
+  loggedDayKeys,
+  onSelectDay,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  selectedKey: string;
+  todayKey: string;
+  loggedDayKeys: Set<string>;
+  onSelectDay: (key: string) => void;
+}) {
+  const initialDate = dateFromKey(selectedKey || todayKey);
+  const [viewYear, setViewYear] = useState(initialDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initialDate.getMonth());
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const monthDir = useRef<1 | -1>(1);
+
+  const prevMonth = () => {
+    monthDir.current = -1;
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    monthDir.current = 1;
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    slideAnim.setValue(monthDir.current * 30);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [viewYear, viewMonth, slideAnim]);
+
+  // Construct synthetic summaryMap for getMonthGrid
+  const summaryMap = useMemo(() => {
+    const map = new Map<string, CalendarDaySummary>();
+    for (const key of loggedDayKeys) {
+      map.set(key, {
+        sessions: [],
+        cardio: [],
+        hasStrength: true, // will map to hasStrength in grid
+        hasCardio: false,
+      });
+    }
+    return map;
+  }, [loggedDayKeys]);
+
+  const grid = useMemo(
+    () => getMonthGrid(viewYear, viewMonth, summaryMap, todayKey),
+    [viewYear, viewMonth, summaryMap, todayKey],
+  );
+
+  const monthTitle = `${MONTH_NAMES[viewMonth]} ${viewYear}`;
+
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Select Day">
+      {/* Month navigation */}
+      <View style={s.calNavRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Previous month"
+          hitSlop={8}
+          onPress={prevMonth}
+          style={s.calNavBtn}
+        >
+          <ChevronLeft size={20} color={N.ink} />
+        </Pressable>
+        <Text style={s.calMonthTitle}>{monthTitle}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Next month"
+          hitSlop={8}
+          onPress={nextMonth}
+          style={s.calNavBtn}
+        >
+          <ChevronRight size={20} color={N.ink} />
+        </Pressable>
+      </View>
+
+      {/* Monday-first weekday headers */}
+      <View style={s.calWeekdaysRow}>
+        {CALENDAR_WEEKDAYS.map((wd) => (
+          <Text key={wd} style={s.calWeekdayLabel}>
+            {wd}
+          </Text>
+        ))}
+      </View>
+
+      {/* 7-column Month grid */}
+      <Animated.View
+        style={[
+          s.calGrid,
+          { transform: [{ translateX: slideAnim }] },
+        ]}
+      >
+        {grid.map((cell) => {
+          const isSelected = cell.key === selectedKey;
+          const hasFood = loggedDayKeys.has(cell.key);
+          const isFuture = cell.key > todayKey;
+
+          return (
+            <View key={cell.key} style={s.calCellWrapper}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Day ${cell.dayNumber}`}
+                disabled={isFuture}
+                onPress={() => {
+                  onSelectDay(cell.key);
+                  onClose();
+                }}
+                style={[
+                  s.calCell,
+                  (!cell.isCurrentMonth || isFuture) && s.calCellFaded,
+                  cell.isToday && s.calCellToday,
+                  isSelected && s.calCellSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    s.calCellNum,
+                    (!cell.isCurrentMonth || isFuture) && s.calCellNumFaded,
+                    cell.isToday && s.calCellNumToday,
+                    isSelected && s.calCellNumSelected,
+                  ]}
+                >
+                  {cell.dayNumber}
+                </Text>
+                <View style={s.calDotsRow}>
+                  {hasFood ? <View style={s.calFoodDot} /> : null}
+                </View>
+              </Pressable>
+            </View>
+          );
+        })}
+      </Animated.View>
+    </Sheet>
+  );
+}
+
