@@ -273,7 +273,7 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
     setAiLoadingIndex(idx);
 
     try {
-      const est = await aiProvider.estimate(row.segment);
+      const est = await aiProvider.estimate(row.segment, { fresh: true });
       if (est.foods.length > 0 && !est.foods[0]!.unresolved) {
         const aiFood = est.foods[0]!;
         const updatedItem: DraftItem = {

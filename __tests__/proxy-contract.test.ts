@@ -194,6 +194,40 @@ describe("what the app sends", () => {
   it("is disabled (null provider) when no URL is configured", () => {
     expect(createRenderDescriptionAiProvider({ baseUrl: "   " })).toBeNull();
   });
+
+  it("deduplicates concurrent in-flight requests for the exact same text", async () => {
+    let callCount = 0;
+    const { fetcher } = fakeProxy(async () => {
+      callCount++;
+      await new Promise((r) => setTimeout(r, 20));
+      return json(GOLDEN_RESPONSE);
+    });
+
+    const provider = createRenderDescriptionAiProvider({ baseUrl: "https://p.test", fetcher });
+
+    // Fire 2 simultaneous requests for identical text
+    const [res1, res2] = await Promise.all([
+      provider?.estimate("2 rotis and dal"),
+      provider?.estimate("2 rotis and dal"),
+    ]);
+
+    expect(callCount).toBe(1);
+    expect(res1?.foods[0]?.name).toBe("Roti (phulka)");
+    expect(res2?.foods[0]?.name).toBe("Roti (phulka)");
+  });
+
+  it("sends fresh: true when requested, bypassing cache", async () => {
+    const { calls, fetcher } = fakeProxy(() => json(GOLDEN_RESPONSE));
+    const provider = createRenderDescriptionAiProvider({ baseUrl: "https://p.test", fetcher });
+
+    await provider?.estimate("2 rotis", { fresh: true });
+
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      description: "2 rotis",
+      fresh: true,
+    });
+  });
 });
 
 describe("how the app rejects a response", () => {

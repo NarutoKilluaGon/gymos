@@ -28,8 +28,15 @@ export type MealEstimate = {
  * deliberately a single description string: this V1 path has no image,
  * photo, camera, MIME, or base64 input.
  */
+export type DescriptionAiEstimateOptions = {
+  fresh?: boolean;
+};
+
 export interface DescriptionAiProvider {
-  estimate(description: string): Promise<MealEstimate>;
+  estimate(
+    description: string,
+    options?: DescriptionAiEstimateOptions,
+  ): Promise<MealEstimate>;
 }
 
 export type DescriptionAiErrorCode =
@@ -246,68 +253,100 @@ export function createRenderDescriptionAiProvider(
   const timeoutMs = options.timeoutMs ?? 60_000;
   const endpoint = descriptionProxyEndpoint(baseUrl);
 
+  const inFlightRequests = new Map<string, Promise<MealEstimate>>();
+
   return {
-    async estimate(description: string): Promise<MealEstimate> {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+    async estimate(
+      description: string,
+      estimateOptions?: DescriptionAiEstimateOptions,
+    ): Promise<MealEstimate> {
+      const normalizedKey = description.trim().toLowerCase();
 
-      try {
-        const response = await fetcher(endpoint, {
-          method: "POST",
-          headers: {
-            accept: "application/json",
-            "content-type": "application/json",
-          },
-          // Description is the sole request field. In particular, no
-          // image/photo/MIME field is ever constructed or sent.
-          body: JSON.stringify({ description }),
-          signal: controller.signal,
-        });
+      // Deduplicate: do not re-send while a request for the same text is in flight
+      if (!estimateOptions?.fresh && inFlightRequests.has(normalizedKey)) {
+        return inFlightRequests.get(normalizedKey)!;
+      }
 
-        if (!response.ok) {
-          // Consume the response for connection hygiene, but do not expose
-          // upstream/provider text to the UI.
-          await response.text().catch(() => "");
-          throw new DescriptionAiError(
-            "http",
-            `Description AI request failed (${response.status})`,
-            response.status,
-          );
-        }
-
-        let payload: unknown;
+      const execute = async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
 
         try {
-          payload = await response.json();
-        } catch {
-          throw invalidDescriptionAiResponse(
-            "Description AI returned invalid JSON",
-          );
-        }
+          const bodyPayload: { description: string; fresh?: boolean } = {
+            description,
+          };
+          if (estimateOptions?.fresh) {
+            bodyPayload.fresh = true;
+          }
 
-        return parseDescriptionAiEstimate(payload);
-      } catch (error) {
-        if (error instanceof DescriptionAiError) {
-          throw error;
-        }
+          const response = await fetcher(endpoint, {
+            method: "POST",
+            headers: {
+              accept: "application/json",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(bodyPayload),
+            signal: controller.signal,
+          });
 
-        if (controller.signal.aborted) {
+          if (!response.ok) {
+            // Consume the response for connection hygiene, but do not expose
+            // upstream/provider text to the UI.
+            await response.text().catch(() => "");
+            throw new DescriptionAiError(
+              "http",
+              `Description AI request failed (${response.status})`,
+              response.status,
+            );
+          }
+
+          let payload: unknown;
+
+          try {
+            payload = await response.json();
+          } catch {
+            throw invalidDescriptionAiResponse(
+              "Description AI returned invalid JSON",
+            );
+          }
+
+          return parseDescriptionAiEstimate(payload);
+        } catch (error) {
+          if (error instanceof DescriptionAiError) {
+            throw error;
+          }
+
+          if (controller.signal.aborted) {
+            throw new DescriptionAiError(
+              "network",
+              "Description AI request timed out",
+              undefined,
+              error,
+            );
+          }
+
           throw new DescriptionAiError(
             "network",
-            "Description AI request timed out",
+            "Description AI request failed",
             undefined,
             error,
           );
+        } finally {
+          clearTimeout(timer);
         }
+      };
 
-        throw new DescriptionAiError(
-          "network",
-          "Description AI request failed",
-          undefined,
-          error,
-        );
+      const promise = execute();
+      if (!estimateOptions?.fresh) {
+        inFlightRequests.set(normalizedKey, promise);
+      }
+
+      try {
+        return await promise;
       } finally {
-        clearTimeout(timer);
+        if (!estimateOptions?.fresh) {
+          inFlightRequests.delete(normalizedKey);
+        }
       }
     },
   };

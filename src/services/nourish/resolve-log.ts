@@ -206,6 +206,7 @@ export function lenientDraftFromEstimate(food: EstimatedFood): DraftItem {
 async function fetchWithRetry(
   segment: string,
   provider: DescriptionAiProvider,
+  fresh?: boolean,
 ): Promise<EstimatedFood | null> {
   const singleAttempt = async () => {
     return new Promise<EstimatedFood | null>(async (resolve, reject) => {
@@ -214,7 +215,10 @@ async function fetchWithRetry(
       }, 12_000);
 
       try {
-        const est = await provider.estimate(segment);
+        const est = await provider.estimate(
+          segment,
+          fresh ? { fresh: true } : undefined,
+        );
         clearTimeout(timer);
         if (est.foods.length > 0 && !est.foods[0]!.unresolved) {
           resolve(est.foods[0]!);
@@ -390,6 +394,7 @@ export async function resolveSegments(
     eatingOut?: boolean;
     provider?: DescriptionAiProvider | null;
     onUpdate?: (resolutions: SegmentResolution[]) => void;
+    fresh?: boolean;
   },
 ): Promise<SegmentResolution[]> {
   const trimmed = text.trim();
@@ -418,7 +423,7 @@ export async function resolveSegments(
     const chunk = unknownSegments.slice(i, i + CONCURRENCY);
     await Promise.all(
       chunk.map(async ({ segment, index }) => {
-        const est = await fetchWithRetry(segment, provider);
+        const est = await fetchWithRetry(segment, provider, options?.fresh);
         if (est && !est.unresolved) {
           // Check Food DB precedence: catalog values win on exact match
           const entry = matchFoodEntry(est.name, 3);
