@@ -1,4 +1,5 @@
-import { useLocalSearchParams } from "expo-router";
+import { useCallback } from "react";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Utensils } from "lucide-react-native";
 import { StyleSheet, View } from "react-native";
 
@@ -9,6 +10,7 @@ import {
 import { ModuleDisabled } from "@/components/ui/module-disabled";
 import { N } from "@/constants/nourish-theme";
 import { useModules } from "@/contexts/modules-context";
+import { pingProxyHealth } from "@/services/meal-description-ai-provider";
 
 const VIEWS: readonly NourishViewId[] = ["today", "insights", "kitchen", "me"];
 
@@ -16,6 +18,12 @@ export default function NutritionScreen() {
   const { enabled } = useModules();
   const { view } = useLocalSearchParams<{ view?: string }>();
   const requested = VIEWS.find((id) => id === view);
+
+  useFocusEffect(
+    useCallback(() => {
+      pingProxyHealth();
+    }, []),
+  );
 
   if (!enabled.nutrition) {
     return (

@@ -1,5 +1,7 @@
 import {
   getDescriptionAiProvider,
+  isProxyCold,
+  markProxyActive,
   type DescriptionAiProvider,
 } from "@/services/meal-description-ai-provider";
 import {
@@ -202,46 +204,40 @@ export function lenientDraftFromEstimate(food: EstimatedFood): DraftItem {
   return draft;
 }
 
-/** Resolve a single segment with 1 retry and 12s timeout */
+/**
+ * Request estimation for a single segment from the proxy.
+ * Timeout is 45,000ms (45s) for the first request after idle to allow Render proxy cold start,
+ * or 25,000ms (25s) for warm requests (matching proxy's 22s total budget).
+ * The proxy handles internal upstream retry; client avoids duplicate requests.
+ */
 async function fetchWithRetry(
   segment: string,
   provider: DescriptionAiProvider,
   fresh?: boolean,
 ): Promise<EstimatedFood | null> {
-  const singleAttempt = async () => {
-    return new Promise<EstimatedFood | null>(async (resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error("Timeout (12s)"));
-      }, 12_000);
+  const timeoutMs = isProxyCold() ? 45_000 : 25_000;
+  return new Promise<EstimatedFood | null>(async (resolve) => {
+    const timer = setTimeout(() => {
+      resolve(null);
+    }, timeoutMs);
 
-      try {
-        const est = await provider.estimate(
-          segment,
-          fresh ? { fresh: true } : undefined,
-        );
-        clearTimeout(timer);
-        if (est.foods.length > 0 && !est.foods[0]!.unresolved) {
-          resolve(est.foods[0]!);
-        } else {
-          resolve(null);
-        }
-      } catch (err) {
-        clearTimeout(timer);
-        reject(err);
-      }
-    });
-  };
-
-  try {
-    return await singleAttempt();
-  } catch {
-    // Retry once
     try {
-      return await singleAttempt();
+      const est = await provider.estimate(
+        segment,
+        fresh ? { fresh: true } : undefined,
+      );
+      clearTimeout(timer);
+      if (est.foods.length > 0 && !est.foods[0]!.unresolved) {
+        markProxyActive();
+        resolve(est.foods[0]!);
+      } else {
+        resolve(null);
+      }
     } catch {
-      return null;
+      clearTimeout(timer);
+      resolve(null);
     }
-  }
+  });
 }
 
 /**

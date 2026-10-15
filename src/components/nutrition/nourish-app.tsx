@@ -19,6 +19,7 @@ import { NOURISH } from "@/constants/design";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { Screen } from "@/components/ds/screen";
 import { ScreenHeader } from "@/components/ds/screen-header";
+import { pingProxyHealth } from "@/services/meal-estimator";
 import { useNourish } from "@/hooks/use-nourish";
 import {
   daysSinceLastChange,
@@ -62,6 +63,10 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
 
     if (requestedView) setView(requestedView);
   }
+
+  useEffect(() => {
+    pingProxyHealth();
+  }, []);
 
   useEffect(() => {
     if (view === "today") return;

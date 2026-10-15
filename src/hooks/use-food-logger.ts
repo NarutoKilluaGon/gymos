@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 
+import { isProxyCold } from "@/services/meal-description-ai-provider";
 import { looksLikeCardio } from "@/services/nourish/cardio";
 import { resolveStaged } from "@/services/nourish/resolve-log";
 import { pickSlot, slotFromText } from "@/services/nourish/slots";
@@ -75,6 +76,7 @@ export function useFoodLogger(input: {
   const { dayKey, resolveDay, saved, filled, save, onCardioText, onLogged } =
     input;
   const [busy, setBusy] = useState(false);
+  const [busyMessage, setBusyMessage] = useState<string | null>(null);
   const [eatingOut, setEatingOut] = useState(false);
   const [review, setReview] = useState<ReviewState | null>(null);
   const [manual, setManual] = useState<ManualState | null>(null);
@@ -130,6 +132,7 @@ export function useFoodLogger(input: {
       const context = snapshot();
 
       setBusy(true);
+      setBusyMessage(isProxyCold() ? "Waking up the estimator..." : "Working it out…");
 
       try {
         const outcome = await resolveStaged(
@@ -168,6 +171,7 @@ export function useFoodLogger(input: {
         return true;
       } finally {
         setBusy(false);
+        setBusyMessage(null);
       }
     },
     [busy, eatingOut, onCardioText, openReview, saved, snapshot],
@@ -241,6 +245,7 @@ export function useFoodLogger(input: {
 
   return {
     busy,
+    busyMessage,
     eatingOut,
     setEatingOut,
     review,

@@ -20,8 +20,13 @@ export type {
 export {
   DescriptionAiError,
   createRenderDescriptionAiProvider,
+  descriptionProxyHealthEndpoint,
   getDescriptionAiProvider,
+  isProxyCold,
+  markProxyActive,
+  pingProxyHealth,
   resetDescriptionAiProvider,
+  resetProxyActiveForTest,
   setDescriptionAiProvider,
 } from "@/services/meal-description-ai-provider";
 

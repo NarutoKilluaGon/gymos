@@ -724,7 +724,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
             },
           ]}
         >
-          Working it out…
+          {logger.busyMessage ?? "Working it out…"}
         </Animated.Text>
       ) : null}
 

@@ -13,8 +13,13 @@
  */
 import {
   createRenderDescriptionAiProvider,
+  descriptionProxyHealthEndpoint,
   DescriptionAiError,
+  isProxyCold,
+  markProxyActive,
   parseDescriptionAiEstimate,
+  pingProxyHealth,
+  resetProxyActiveForTest,
 } from "@/services/meal-description-ai-provider";
 import { NUTRIENT_KEYS } from "@/types/gymos";
 
@@ -292,6 +297,54 @@ describe("how the app rejects a response", () => {
     await expect(http?.estimate("x")).rejects.toMatchObject({ code: "http", statusCode: 502 });
     await expect(net?.estimate("x")).rejects.toMatchObject({ code: "network" });
     await expect(notJson?.estimate("x")).rejects.toMatchObject({ code: "invalid-response" });
+  });
+});
+
+describe("proxy health ping and cold-start handling (Step 4)", () => {
+  beforeEach(() => {
+    resetProxyActiveForTest();
+  });
+
+  it("resolves /health endpoint correctly from base url or /estimate endpoint", () => {
+    expect(descriptionProxyHealthEndpoint("https://gymos-proxy.onrender.com")).toBe(
+      "https://gymos-proxy.onrender.com/health",
+    );
+    expect(
+      descriptionProxyHealthEndpoint("https://gymos-proxy.onrender.com/estimate"),
+    ).toBe("https://gymos-proxy.onrender.com/health");
+    expect(descriptionProxyHealthEndpoint("https://gymos-proxy.onrender.com/")).toBe(
+      "https://gymos-proxy.onrender.com/health",
+    );
+  });
+
+  it("tracks cold vs warm proxy state and warms up on health ping", async () => {
+    expect(isProxyCold()).toBe(true);
+
+    let pingUrl = "";
+    const fetcher = (async (url: string) => {
+      pingUrl = url;
+      return json({ status: "ok", version: 2, contractVersion: 2 });
+    }) as unknown as typeof fetch;
+
+    pingProxyHealth({ baseUrl: "https://p.test", fetcher });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(pingUrl).toBe("https://p.test/health");
+    expect(isProxyCold()).toBe(false);
+  });
+
+  it("warms up after a successful estimate", async () => {
+    expect(isProxyCold()).toBe(true);
+
+    const { fetcher } = fakeProxy(() => json(GOLDEN_RESPONSE));
+    const provider = createRenderDescriptionAiProvider({
+      baseUrl: "https://p.test",
+      fetcher,
+    });
+    await provider?.estimate("roti");
+
+    expect(isProxyCold()).toBe(false);
   });
 });
 

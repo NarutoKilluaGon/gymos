@@ -94,6 +94,50 @@ function descriptionProxyEndpoint(baseUrl: string): string {
     : `${normalized}/estimate`;
 }
 
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+let lastProxyActiveTimestamp: number | null = null;
+
+export function isProxyCold(): boolean {
+  if (lastProxyActiveTimestamp === null) return true;
+  return Date.now() - lastProxyActiveTimestamp > IDLE_TIMEOUT_MS;
+}
+
+export function markProxyActive(): void {
+  lastProxyActiveTimestamp = Date.now();
+}
+
+export function resetProxyActiveForTest(): void {
+  lastProxyActiveTimestamp = null;
+}
+
+export function descriptionProxyHealthEndpoint(baseUrl?: string): string {
+  const base = (baseUrl ?? configuredDescriptionProxyUrl()).trim().replace(/\/+$/, "");
+  if (!base) return "";
+  const root = base.endsWith("/estimate") ? base.slice(0, -"/estimate".length) : base;
+  return `${root}/health`;
+}
+
+export function pingProxyHealth(options?: {
+  baseUrl?: string;
+  fetcher?: typeof fetch;
+}): void {
+  const endpoint = descriptionProxyHealthEndpoint(options?.baseUrl);
+  if (!endpoint) return;
+  const f = options?.fetcher ?? fetch;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  f(endpoint, { method: "GET", signal: controller.signal })
+    .then((res) => {
+      if (res.ok) markProxyActive();
+    })
+    .catch(() => {
+      // Best-effort health ping; ignore network failures
+    })
+    .finally(() => {
+      clearTimeout(timer);
+    });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -250,7 +294,6 @@ export function createRenderDescriptionAiProvider(
   }
 
   const fetcher = options.fetcher ?? fetch;
-  const timeoutMs = options.timeoutMs ?? 60_000;
   const endpoint = descriptionProxyEndpoint(baseUrl);
 
   const inFlightRequests = new Map<string, Promise<MealEstimate>>();
@@ -268,8 +311,10 @@ export function createRenderDescriptionAiProvider(
       }
 
       const execute = async () => {
+        const effectiveTimeout =
+          options.timeoutMs ?? (isProxyCold() ? 45_000 : 25_000);
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        const timer = setTimeout(() => controller.abort(), effectiveTimeout);
 
         try {
           const bodyPayload: { description: string; fresh?: boolean } = {
@@ -299,6 +344,8 @@ export function createRenderDescriptionAiProvider(
               response.status,
             );
           }
+
+          markProxyActive();
 
           let payload: unknown;
 
