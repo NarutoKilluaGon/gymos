@@ -126,40 +126,79 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   }, []);
 
   const insets = useSafeAreaInsets();
-  const keyboardHeight = useRef(new Animated.Value(0)).current;
-
   const BASE_DOCK_BOTTOM = 12 + (insets.bottom || 0);
+
+  const dockBottomAnim = useRef(new Animated.Value(BASE_DOCK_BOTTOM)).current;
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const keyboardOpenRef = useRef(false);
+  const currentKeyboardHeight = useRef(0);
+  const initialLayoutHeight = useRef(0);
+  const currentLayoutHeight = useRef(0);
+  const [dockHeight, setDockHeight] = useState(56);
+
+  const updateDockPosition = useCallback(
+    (kbHeight: number, duration: number) => {
+      if (kbHeight <= 0) {
+        keyboardOpenRef.current = false;
+        setKeyboardOpen(false);
+        Animated.timing(dockBottomAnim, {
+          toValue: BASE_DOCK_BOTTOM,
+          duration: duration || 200,
+          useNativeDriver: false,
+        }).start();
+        return;
+      }
+
+      keyboardOpenRef.current = true;
+      setKeyboardOpen(true);
+      currentKeyboardHeight.current = kbHeight;
+
+      // How much the container layout already shrank (e.g. adjustResize / window resize)
+      const layoutReserved = Math.max(
+        0,
+        (initialLayoutHeight.current || 0) - (currentLayoutHeight.current || 0),
+      );
+
+      // Remaining distance from container bottom to keyboard top
+      const uncompensated = Math.max(0, kbHeight - layoutReserved);
+
+      // Dock bottom edge sits directly on keyboard top with an 8dp gap max (like WhatsApp).
+      // If layout already resized (uncompensated === 0), sits at 8dp from container bottom.
+      const targetBottom = uncompensated + 8;
+
+      Animated.timing(dockBottomAnim, {
+        toValue: targetBottom,
+        duration: duration || 200,
+        useNativeDriver: false,
+      }).start();
+    },
+    [BASE_DOCK_BOTTOM, dockBottomAnim],
+  );
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const frameEvent = Platform.OS === "ios" ? "keyboardWillChangeFrame" : "keyboardDidChangeFrame";
 
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      const h = e.endCoordinates.height;
-      // When the keyboard appears, it covers the bottom tab bar and bottom insets.
-      // The dock's resting bottom edge is BASE_DOCK_BOTTOM (12 + insets.bottom).
-      // To place the dock's bottom edge exactly at the top of the keyboard (flush with 0 gap),
-      // we shift it upward by (keyboardHeight - BASE_DOCK_BOTTOM).
-      Animated.timing(keyboardHeight, {
-        toValue: Math.max(0, h - BASE_DOCK_BOTTOM),
-        duration: e.duration || 200,
-        useNativeDriver: false,
-      }).start();
-    });
+    const handleShow = (e: any) => {
+      const h = e.endCoordinates?.height || 0;
+      updateDockPosition(h, e.duration || 180);
+    };
 
-    const hideSub = Keyboard.addListener(hideEvent, (e) => {
-      Animated.timing(keyboardHeight, {
-        toValue: 0,
-        duration: e?.duration || 200,
-        useNativeDriver: false,
-      }).start();
-    });
+    const handleHide = (e: any) => {
+      updateDockPosition(0, e?.duration || 180);
+    };
+
+    const showSub = Keyboard.addListener(showEvent, handleShow);
+    const hideSub = Keyboard.addListener(hideEvent, handleHide);
+    const frameSub = Keyboard.addListener(frameEvent, handleShow);
 
     return () => {
       showSub.remove();
       hideSub.remove();
+      frameSub.remove();
     };
-  }, [BASE_DOCK_BOTTOM, keyboardHeight]);
+  }, [updateDockPosition]);
 
   const day = model(dayKey);
   const prevKey = addDaysToKey(dayKey, -1);
@@ -450,9 +489,32 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   }
 
   return (
-    <View style={s.fill}>
+    <View
+      style={s.fill}
+      onLayout={(e) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 0) {
+          if (
+            initialLayoutHeight.current === 0 ||
+            (!keyboardOpenRef.current && h > initialLayoutHeight.current)
+          ) {
+            initialLayoutHeight.current = h;
+          }
+          currentLayoutHeight.current = h;
+          if (keyboardOpenRef.current && currentKeyboardHeight.current > 0) {
+            updateDockPosition(currentKeyboardHeight.current, 150);
+          }
+        }
+      }}
+    >
       <ScrollView
-        contentContainerStyle={[s.scroll, { paddingBottom: BASE_DOCK_BOTTOM + 72 }]}
+        contentContainerStyle={[
+          s.scroll,
+          {
+            paddingBottom:
+              (keyboardOpen ? 8 : BASE_DOCK_BOTTOM) + dockHeight + 16,
+          },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -681,11 +743,16 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
       </ScrollView>
 
       <Animated.View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && Math.abs(h - dockHeight) > 1) {
+            setDockHeight(h);
+          }
+        }}
         style={[
           s.dock,
           {
-            bottom: BASE_DOCK_BOTTOM,
-            transform: [{ translateY: Animated.multiply(keyboardHeight, -1) }],
+            bottom: dockBottomAnim,
           },
         ]}
       >
@@ -696,13 +763,13 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           placeholderTextColor={N.mute}
           selectionColor={N.acc}
           style={s.dockInput}
-          returnKeyType="send"
-          onSubmitEditing={() => void send()}
+          multiline
           editable={!logger.busy}
           accessibilityLabel="Log food or cardio"
         />
         <Pressable
           accessibilityLabel="Log"
+          accessibilityRole="button"
           accessibilityState={{ disabled: logger.busy || input.trim() === "" }}
           disabled={logger.busy || input.trim() === ""}
           onPress={() => {
@@ -719,8 +786,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           style={[
             s.working,
             {
-              bottom: BASE_DOCK_BOTTOM + 56,
-              transform: [{ translateY: Animated.multiply(keyboardHeight, -1) }],
+              bottom: Animated.add(dockBottomAnim, 56),
             },
           ]}
         >
@@ -1230,7 +1296,7 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: 8,
     backgroundColor: N.dockBg,
     borderRadius: NRadius.pill,
@@ -1245,11 +1311,20 @@ const s = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
   },
-  dockInput: { flex: 1, color: N.ink, fontSize: 16, minHeight: 44, paddingVertical: 8 },
+  dockInput: {
+    flex: 1,
+    color: N.ink,
+    fontSize: 16,
+    minHeight: 44,
+    maxHeight: 120,
+    paddingVertical: 8,
+  },
   send: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: 22,
     backgroundColor: N.acc,
     alignItems: "center",
     justifyContent: "center",
