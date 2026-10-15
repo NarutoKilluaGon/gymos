@@ -15,7 +15,6 @@ import { HubSavedFoodsSheet } from "@/components/hub/saved-foods-sheet";
 import { SupplementsSheet } from "@/components/hub/supplements-sheet";
 import { InsightsSheet } from "@/components/insights/insights-sheet";
 import { JournalTimeline } from "@/components/journal/journal-timeline";
-import { GymCard } from "@/components/ui/gym-card";
 import { Q } from "@/constants/quiet";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { applyReminders } from "@/services/notifications";
@@ -53,7 +52,8 @@ export default function HubScreen() {
       <Screen>
         <ScreenHeader module="Hub" accentColor={Q.accent.brass} />
 
-        <GymCard style={styles.card}>
+        <View style={styles.list}>
+          <Text style={styles.sectionHeader}>Settings</Text>
           <HubSectionRow
             icon={SlidersHorizontal}
             title="Modules"
@@ -84,7 +84,7 @@ export default function HubScreen() {
             onPress={() => setRemindersOpen(true)}
           />
 
-          <View style={styles.divider} />
+          <Text style={styles.sectionHeader}>Activity & history</Text>
 
           <HubSectionRow
             icon={BookOpen}
@@ -105,28 +105,10 @@ export default function HubScreen() {
           <View style={styles.divider} />
 
           <HubSectionRow
-            icon={Utensils}
-            title="Saved Foods"
-            subtitle="Foods you log often"
-            onPress={() => setSavedFoodsOpen(true)}
-          />
-
-          <View style={styles.divider} />
-
-          <HubSectionRow
-            icon={Dumbbell}
-            title="Exercise Library"
-            subtitle="Browse by muscle group"
-            onPress={() => setLibraryOpen(true)}
-          />
-
-          <View style={styles.divider} />
-
-          <HubSectionRow
-            icon={Pill}
-            title="Supplements"
-            subtitle="What you take daily"
-            onPress={() => setSupplementsOpen(true)}
+            icon={History}
+            title="Workout history"
+            subtitle="Review your past sessions"
+            onPress={() => setHistoryOpen(true)}
           />
 
           <View style={styles.divider} />
@@ -138,16 +120,34 @@ export default function HubScreen() {
             onPress={() => setPrsOpen(true)}
           />
 
-          <View style={styles.divider} />
+          <Text style={styles.sectionHeader}>Library</Text>
 
           <HubSectionRow
-            icon={History}
-            title="Workout history"
-            subtitle="Review your past sessions"
-            onPress={() => setHistoryOpen(true)}
+            icon={Dumbbell}
+            title="Exercise Library"
+            subtitle="Browse by muscle group"
+            onPress={() => setLibraryOpen(true)}
           />
 
           <View style={styles.divider} />
+
+          <HubSectionRow
+            icon={Utensils}
+            title="Saved Foods"
+            subtitle="Foods you log often"
+            onPress={() => setSavedFoodsOpen(true)}
+          />
+
+          <View style={styles.divider} />
+
+          <HubSectionRow
+            icon={Pill}
+            title="Supplements"
+            subtitle="What you take daily"
+            onPress={() => setSupplementsOpen(true)}
+          />
+
+          <Text style={styles.sectionHeader}>Data & export</Text>
 
           <HubSectionRow
             icon={FileDown}
@@ -165,7 +165,7 @@ export default function HubScreen() {
             onPress={() => setImportOpen(true)}
           />
 
-          <View style={styles.divider} />
+          <Text style={styles.sectionHeader}>About</Text>
 
           <HubSectionRow
             icon={Info}
@@ -173,7 +173,7 @@ export default function HubScreen() {
             subtitle="Version and philosophy"
             onPress={() => setAboutOpen(true)}
           />
-        </GymCard>
+        </View>
       </Screen>
 
       <Modal
@@ -353,12 +353,17 @@ export default function HubScreen() {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: 0,
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    borderRadius: 0,
-    padding: 0,
+  list: {
+    paddingHorizontal: 0,
+    paddingBottom: 40,
+  },
+
+  sectionHeader: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
+    marginTop: 24,
+    marginBottom: 6,
   },
 
   divider: {

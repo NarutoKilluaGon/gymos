@@ -9,7 +9,7 @@ import {
 import Svg, { Circle } from "react-native-svg";
 
 import { Card } from "@/components/ds/card";
-import { Button as DSButton } from "@/components/ds/button";
+import { Button as DSButton, type ButtonVariant } from "@/components/ds/button";
 import { Chip } from "@/components/ds/chip";
 import { Seg as DSSeg } from "@/components/ds/seg";
 import { Field as DSField } from "@/components/ds/field";
@@ -66,6 +66,7 @@ export const Seg = DSSeg;
 export function Button({
   label,
   onPress,
+  variant,
   kind = "primary",
   disabled,
   busy,
@@ -73,7 +74,8 @@ export function Button({
 }: {
   label: string;
   onPress: () => void;
-  kind?: "primary" | "ghost" | "danger";
+  variant?: ButtonVariant;
+  kind?: ButtonVariant;
   disabled?: boolean;
   busy?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -82,6 +84,7 @@ export function Button({
     <DSButton
       label={label}
       onPress={onPress}
+      variant={variant}
       kind={kind}
       disabled={disabled}
       busy={busy}

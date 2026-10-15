@@ -518,7 +518,7 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
           }}
           options={[
             { value: "meals", label: `Meals (${meals.length})` },
-            { value: "foods", label: `Foods (${foods.length})` },
+            { value: "foods", label: `Saved (${foods.length})` },
             { value: "recipes", label: `Recipes (${recipes.length})` },
           ]}
         />
@@ -569,9 +569,10 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
           {shown.map((item) => {
             const isMeal = isSavedMeal(item);
             const isRec = item.recipe;
+            const count = item.foods?.length ?? 0;
 
             const subText = isMeal
-              ? `${Math.round(item.calories ?? 0)} kcal · P ${Math.round(item.protein ?? 0)} · ${item.foods?.length ?? 0} items`
+              ? `${Math.round(item.calories ?? 0)} kcal · P ${Math.round(item.protein ?? 0)} · ${count} ${count === 1 ? "item" : "items"}`
               : isRec
                 ? `${Math.round(item.calories ?? 0)} kcal / serving · P ${Math.round(item.protein ?? 0)}${item.servings ? ` · ${item.servings} servings` : ""}`
                 : `${Math.round(item.calories ?? 0)} kcal · P ${Math.round(item.protein ?? 0)}${item.qty ? ` · ${item.qty}` : ""}`;
@@ -592,7 +593,7 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
                 <View style={s.rowActions}>
                   <Button
                     label="Log"
-                    kind="primary"
+                    variant="secondary"
                     onPress={() => openLogModal(item)}
                     style={s.logBtn}
                   />
