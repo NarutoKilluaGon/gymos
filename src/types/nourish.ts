@@ -68,4 +68,5 @@ export type DraftItem = {
   category?: "dish" | "drink" | "ingredient" | "spice" | "packaged";
   assumption?: string;
   aiSource?: "model" | "web";
+  zeroCalorieOk?: boolean;
 } & Micronutrients;

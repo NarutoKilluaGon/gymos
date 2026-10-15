@@ -250,9 +250,12 @@ export function parseDescriptionAiEstimate(
         ? raw.gramsOrMl
         : undefined;
 
-    // Zero-calorie protection: Never save 0 kcal food silently!
+    const zeroCalorieOk = raw.zeroCalorieOk === true;
+
+    // Zero-calorie protection: Never save 0 kcal food silently unless zeroCalorieOk (or water)!
     const isWater = name.toLowerCase().includes("water") || name.toLowerCase().includes("paani");
-    const isZeroKcal = (values.calories === 0 && !isWater);
+    const isZeroCaloriePermitted = zeroCalorieOk || isWater;
+    const isZeroKcal = (values.calories === 0 && !isZeroCaloriePermitted);
     const unresolved = isZeroKcal || raw.unresolved === true;
 
     return {
@@ -266,6 +269,7 @@ export function parseDescriptionAiEstimate(
       source,
       assumption,
       gramsOrMl,
+      zeroCalorieOk,
       unresolved,
     } as EstimatedFood;
   });

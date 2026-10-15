@@ -156,6 +156,46 @@ describe("golden /estimate response", () => {
 
     expect(estimate.foods[0].unresolved).toBe(false);
   });
+
+  it("allows 0 kcal for black coffee, green tea, and diet soda when zeroCalorieOk is true (Step 5)", () => {
+    for (const name of ["Black Coffee", "Green Tea", "Diet Coke"]) {
+      const zeroFood = {
+        ...GOLDEN_FOOD,
+        name,
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        zeroCalorieOk: true,
+      };
+
+      const estimate = parseDescriptionAiEstimate({
+        foods: [zeroFood],
+      });
+
+      expect(estimate.foods[0].unresolved).toBe(false);
+      expect(estimate.foods[0].zeroCalorieOk).toBe(true);
+      expect(estimate.foods[0].calories).toBe(0);
+    }
+  });
+
+  it("marks 0 kcal food as unresolved when zeroCalorieOk is false or missing (unless water)", () => {
+    const paneer = {
+      ...GOLDEN_FOOD,
+      name: "Paneer",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      zeroCalorieOk: false,
+    };
+
+    const estimate = parseDescriptionAiEstimate({
+      foods: [paneer],
+    });
+
+    expect(estimate.foods[0].unresolved).toBe(true);
+  });
 });
 
 describe("what the app sends", () => {

@@ -107,6 +107,7 @@ function fromEstimated(food: EstimatedFood): DraftItem {
     ...(food.category ? { category: food.category } : {}),
     ...(food.assumption ? { assumption: food.assumption } : {}),
     ...(food.source ? { aiSource: food.source } : {}),
+    ...(food.zeroCalorieOk !== undefined ? { zeroCalorieOk: food.zeroCalorieOk } : {}),
   };
 }
 
@@ -196,9 +197,9 @@ export function lenientDraftFromEstimate(food: EstimatedFood): DraftItem {
     fat: num(food.fat),
   });
 
-  // Recompute calories if macros disagree wildly (reconcile)
+  // Recompute calories if macros disagree wildly (reconcile) unless zero-calorie ok
   const calcCal = Math.round(4 * draft.protein + 4 * draft.carbs + 9 * draft.fat);
-  if (draft.calories === 0 && calcCal > 0) {
+  if (draft.calories === 0 && calcCal > 0 && !food.zeroCalorieOk) {
     draft.calories = calcCal;
   }
   return draft;
@@ -443,7 +444,11 @@ export async function resolveSegments(
           const isWater =
             item.name.toLowerCase().includes("water") ||
             item.name.toLowerCase().includes("paani");
-          const hasCalories = item.calories > 0 || isWater;
+          const isZeroAllowed =
+            est.zeroCalorieOk === true ||
+            item.zeroCalorieOk === true ||
+            isWater;
+          const hasCalories = item.calories > 0 || isZeroAllowed;
 
           if (isPlausibleItem(item) && hasCalories) {
             resolutions[index] = {

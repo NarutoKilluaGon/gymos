@@ -353,8 +353,19 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
   async function saveMealAction() {
     if (mealName.trim() === "" || mealItems.length === 0) return;
 
-    // Root cause #7 fix: Check if any food item has 0 calories or lacks numbers
-    const zeroCalItems = mealItems.filter((i) => i.calories === 0 && i.protein === 0 && i.carbs === 0 && i.fat === 0);
+    // Check if any food item has 0 calories or lacks numbers (unless zeroCalorieOk or water)
+    const isZeroAllowed = (i: DraftItem) =>
+      Boolean(i.zeroCalorieOk) ||
+      i.name.toLowerCase().includes("water") ||
+      i.name.toLowerCase().includes("paani");
+    const zeroCalItems = mealItems.filter(
+      (i) =>
+        i.calories === 0 &&
+        i.protein === 0 &&
+        i.carbs === 0 &&
+        i.fat === 0 &&
+        !isZeroAllowed(i),
+    );
     if (zeroCalItems.length > 0) {
       showToast(
         `'${zeroCalItems[0]!.name}' needs numbers before saving. Tap Edit on its card.`,

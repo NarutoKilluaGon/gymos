@@ -227,12 +227,13 @@ export type EstimatedFood = {
   unresolved?: boolean;
   /** Transient provenance; not written to the persisted record. */
   nutritionSource?: NutritionSource;
-  /** Phase C contract fields */
+  /** Phase C & D contract fields */
   category?: FoodCategory;
   confidence?: number;
   source?: EstimateSource;
   assumption?: string;
   gramsOrMl?: number;
+  zeroCalorieOk?: boolean;
 } & Micronutrients;
 
 /** Canonical nutrient key list, macros first: the single enumerator every
