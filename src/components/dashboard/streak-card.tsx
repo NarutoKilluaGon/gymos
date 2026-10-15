@@ -21,31 +21,12 @@ export function StreakCard({
   const isActive = streak > 0 && todayActive;
 
   if (compact) {
-    const flameColor = isNone
-      ? HOME.dim
-      : isAtRisk
-        ? "#e0803f"
-        : "#d4a24c";
-
-    const countColor = isNone
-      ? HOME.dim
-      : isAtRisk
-        ? "#e0803f"
-        : "#d4a24c";
-
     return (
       <View
         accessibilityLabel={`Streak: ${streak} days${isNone ? ", none" : isActive ? ", active" : ", at risk"}`}
-        style={[
-          styles.compactPill,
-          isActive && styles.compactPillActive,
-          isAtRisk && styles.compactPillAtRisk,
-          isNone && styles.compactPillNone,
-        ]}
       >
-        <Flame size={15} color={flameColor} />
-        <Text style={[styles.compactCount, { color: countColor }]}>
-          {streak}
+        <Text style={styles.quietStreakText}>
+          {streak} day streak
         </Text>
       </View>
     );
@@ -180,5 +161,11 @@ const styles = StyleSheet.create({
     color: HOME.dim,
     fontSize: Typography.caption,
     marginTop: 2,
+  },
+  quietStreakText: {
+    color: "#C9A25A",
+    fontFamily: "FunnelSans-Medium",
+    fontSize: 13,
+    fontWeight: "500",
   },
 });

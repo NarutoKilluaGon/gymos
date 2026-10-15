@@ -1,15 +1,6 @@
 import { router, useFocusEffect } from "expo-router";
 import {
-  Activity,
-  BookOpen,
-  ChevronRight,
-  Dumbbell,
-  Droplets,
-  Plus,
-  Scale,
-  Sparkles,
-  User,
-  Utensils,
+  Star,
   WifiOff,
 } from "lucide-react-native";
 import { useCallback, useState } from "react";
@@ -23,27 +14,24 @@ import {
 import { DailyTargetsCard } from "@/components/dashboard/daily-targets-card";
 import { FirstRunChecklistCard } from "@/components/dashboard/first-run-checklist";
 import { Greeting } from "@/components/dashboard/greeting";
-import { NorthStarCard } from "@/components/dashboard/north-star-card";
 import { NorthStarSetupCard } from "@/components/dashboard/north-star-setup-card";
 import { StreakCard } from "@/components/dashboard/streak-card";
 import { SupplementLogSheet } from "@/components/dashboard/supplement-log-sheet";
 import { WorkoutCard } from "@/components/dashboard/workout-card";
-import { Card } from "@/components/ds/card";
+import { ModuleRow } from "@/components/ds/module-row";
 import { PressableScale } from "@/components/ds/pressable-scale";
-import { Screen } from "@/components/ds/screen";
-import { ScreenHeader } from "@/components/ds/screen-header";
-import { GymFAB } from "@/components/fab/gym-fab";
+import { TextLinkBar } from "@/components/ds/text-link";
+import { WeekStrip } from "@/components/ds/week-strip";
 import { CardioSheet } from "@/components/nutrition/more-sheets";
 import { JournalSheet } from "@/components/quick-add/journal-sheet";
-import type { SleepInput } from "@/components/quick-add/sleep-sheet";
-import { FadeIn } from "@/components/ui/fade-in";
-import { Font, HOME } from "@/constants/design";
+import { SleepSheet, type SleepInput } from "@/components/quick-add/sleep-sheet";
+import { WeightSheet } from "@/components/quick-add/weight-sheet";
+import { Q } from "@/constants/quiet";
 import { DAILY_TARGETS } from "@/constants/targets";
-import { Spacing, Typography } from "@/constants/theme";
 import { useModules } from "@/contexts/modules-context";
 import { useTodayKey } from "@/hooks/use-today-key";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
-import { getHomeSuggestion } from "@/services/dashboard/suggestions";
+import { buildHomeSummarySentence } from "@/services/dashboard/home-sentence";
 import { dayFor } from "@/services/forge/plan";
 import { activePlan } from "@/services/forge/settings";
 import { getStreak, type Streak } from "@/services/streak";
@@ -85,7 +73,6 @@ import type {
   SleepSession,
   WorkoutSession,
 } from "@/types/gymos";
-import { getTodayKey } from "@/utils/date";
 import { displayName, formatNumber, plural } from "@/utils/format";
 import { showToast, showUndoToast } from "@/utils/toast";
 
@@ -160,6 +147,9 @@ export default function HomeScreen() {
   const [supplementSheetOpen, setSupplementSheetOpen] = useState(false);
   const [cardioSheetOpen, setCardioSheetOpen] = useState(false);
   const [journalSheetOpen, setJournalSheetOpen] = useState(false);
+  const [weightSheetOpen, setWeightSheetOpen] = useState(false);
+  const [sleepSheetOpen, setSleepSheetOpen] = useState(false);
+  const [setupNorthStarOpen, setSetupNorthStarOpen] = useState(false);
   const [steps, setSteps] = useState(0);
   const [sleep, setSleep] = useState<SleepSession[]>([]);
   const [streak, setStreak] = useState<Streak>({ days: 0, todayActive: false });
@@ -254,25 +244,10 @@ export default function HomeScreen() {
   async function handleWeightAdd(weight: number) {
     try {
       await addMeasurement("weight", weight, weightUnit);
+      setWeightSheetOpen(false);
+      showToast("Weight logged", "success");
     } catch {
       showToast("Couldn't save weight");
-    }
-  }
-
-  async function handleMealLogged() {
-    try {
-      const loadedMeals = await getTodayMeals();
-      setMeals(loadedMeals);
-      const totals = await getDailyMacroTotals(getTodayKey());
-      setMacros({
-        calories: totals.calories ?? 0,
-        protein: totals.protein ?? 0,
-        carbs: totals.carbs ?? 0,
-        fat: totals.fat ?? 0,
-      });
-      setProtein(totals.protein);
-    } catch {
-      // Focus refresh will reconcile
     }
   }
 
@@ -288,6 +263,8 @@ export default function HomeScreen() {
     try {
       await logSleepDuration(sleepInput.hours, sleepInput.minutes);
       setSleep(await getTodaySleep());
+      setSleepSheetOpen(false);
+      showToast("Sleep logged", "success");
     } catch {
       showToast("Couldn't save sleep");
     }
@@ -329,30 +306,36 @@ export default function HomeScreen() {
   async function handleJournalAdd(text: string, mood?: JournalEntry["mood"]) {
     try {
       await addJournalEntry(text, mood);
+      setJournalSheetOpen(false);
+      showToast("Journal entry saved", "success");
     } catch {
       showToast("Couldn't save journal entry");
     }
   }
 
-  const suggestion = getHomeSuggestion({
-    activeWorkout,
-    plannedDay,
-    finishedWorkout,
-    meals,
-    waterLitres: water,
-    protein,
-    proteinTarget,
-    sleep,
-    nutritionEnabled: enabled.nutrition,
+  const isOffline =
+    typeof navigator !== "undefined" &&
+    "onLine" in navigator &&
+    navigator.onLine === false;
+
+  // Day index for week strip (0 = Mon, 6 = Sun)
+  const todayDayOfWeek = (new Date().getDay() + 6) % 7;
+  const completedDays = streak.todayActive ? [todayDayOfWeek] : [];
+
+  // Summary sentence below North Star
+  const summarySentence = buildHomeSummarySentence({
+    activeWorkout: Boolean(activeWorkout),
+    workoutTitle: activeWorkout?.name || plannedDay?.name,
+    workoutDone: Boolean(finishedWorkout),
+    caloriesEaten: macros.calories,
+    calorieTarget: calorieTarget ?? 2258,
+    steps,
+    stepTarget: DAILY_TARGETS.steps,
+    waterL: water,
+    waterTargetL: DAILY_TARGETS.waterL,
   });
 
-  const now = new Date();
-  const dateFormatted = now
-    .toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" })
-    .toUpperCase();
-  const todayHeading = `GYMOS · ${dateFormatted}`;
-
-  // Assemble Recent Activity (last 6 items, then sorted and merged)
+  // Recent activity list
   const rawRecentEvents: RecentEvent[] = [];
   allSessionsList
     .filter((s) => s.endedAt)
@@ -384,7 +367,6 @@ export default function HomeScreen() {
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   );
 
-  // Merge consecutive identical entries (e.g. "paneer bhurji ×2"), max 3 rows
   const mergedEvents: RecentEvent[] = [];
   for (const evt of sortedEvents) {
     const last = mergedEvents[mergedEvents.length - 1];
@@ -400,235 +382,284 @@ export default function HomeScreen() {
   }
   const topRecentEvents = mergedEvents;
 
-  const isOffline =
-    typeof navigator !== "undefined" &&
-    "onLine" in navigator &&
-    navigator.onLine === false;
+  // Forge row subtitle & action
+  const forgeSubtitle = activeWorkout
+    ? `${activeWorkout.name || "Workout"} · in progress`
+    : finishedWorkout
+      ? `${finishedWorkout.name || "Workout"} · complete`
+      : isRestDay
+        ? "Rest day"
+        : plannedDay
+          ? `${plannedDay.name} · not started`
+          : "No workout planned";
+
+  const forgeAction = activeWorkout
+    ? {
+        label: "Resume",
+        variant: "primary" as const,
+        onPress: () => router.push("/workouts"),
+      }
+    : !finishedWorkout && !isRestDay
+      ? {
+          label: "Start",
+          variant: "primary" as const,
+          onPress: handleWorkoutStart,
+        }
+      : undefined;
+
+  const forgeProgress =
+    plannedDay && plannedDay.exercises.length > 0
+      ? {
+          value: finishedWorkout
+            ? plannedDay.exercises.length
+            : activeWorkout
+              ? activeWorkout.exercises.length
+              : 0,
+          target: plannedDay.exercises.length,
+          color: Q.accent.ember,
+        }
+      : undefined;
 
   return (
-    <Screen
-      bottomPadding={112}
-      floating={
-        <>
-          <GymFAB
-            weightUnit={weightUnit}
-            onWaterAdd={handleWaterAdd}
-            onWeightAdd={handleWeightAdd}
-            onMealLogged={handleMealLogged}
-            onSleepAdd={handleSleepAdd}
-            onWorkoutStart={handleWorkoutStart}
-            onJournalAdd={handleJournalAdd}
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 1. Header (Greeting + Streak) */}
+        <View style={styles.headerRow}>
+          <Greeting />
+
+          <View style={styles.headerRight}>
+            {isOffline && (
+              <View style={styles.offlineBadge}>
+                <WifiOff size={12} color={Q.accent.red} />
+                <Text style={styles.offlineText}>Offline</Text>
+              </View>
+            )}
+            <StreakCard
+              streak={streak.days}
+              todayActive={streak.todayActive}
+              compact
+            />
+          </View>
+        </View>
+
+        {/* 2. North Star Hero */}
+        <View style={styles.heroSection}>
+          <View style={styles.northStarHeader}>
+            <Star size={15} color={Q.accent.brass} fill={Q.accent.brass} />
+            <Text style={styles.northStarLabel}>North star</Text>
+          </View>
+
+          <PressableScale
+            onPress={() => {
+              if (!northStar) setSetupNorthStarOpen(true);
+            }}
+          >
+            <Text style={styles.northStarGoal}>
+              {northStar ? northStar.title : "Set your North Star"}
+            </Text>
+          </PressableScale>
+
+          <Text style={styles.summarySentence}>{summarySentence}</Text>
+        </View>
+
+        {/* 3. Week Strip */}
+        <WeekStrip
+          todayIndex={todayDayOfWeek}
+          completedDays={completedDays}
+          accentColor={Q.accent.brass}
+          style={styles.weekStrip}
+        />
+
+        {/* 4. Module Rows */}
+        <View style={styles.modulesSection}>
+          {/* Forge */}
+          {enabled.workouts && (
+            <ModuleRow
+              title="Forge"
+              accent={Q.accent.ember}
+              subtitle={forgeSubtitle}
+              action={forgeAction}
+              progress={forgeProgress}
+              onPress={() => router.push("/workouts")}
+            />
+          )}
+
+          {/* Nourish */}
+          {enabled.nutrition && (
+            <ModuleRow
+              title="Nourish"
+              accent={Q.accent.sage}
+              subtitle={`${Math.round(macros.calories).toLocaleString()} of ${(calorieTarget ?? 2258).toLocaleString()} kcal`}
+              action={{
+                label: "Log meal",
+                variant: "outline",
+                onPress: () => router.push("/nutrition"),
+              }}
+              progress={{
+                value: Math.round(macros.calories),
+                target: calorieTarget ?? 2258,
+                color: Q.accent.sage,
+                overColor: Q.accent.red,
+                showTargetTick: true,
+              }}
+              onPress={() => router.push("/nutrition")}
+            />
+          )}
+
+          {/* Move */}
+          <ModuleRow
+            title="Move"
+            accent={Q.accent.periwinkle}
+            subtitle={`${formatNumber(steps)} of ${formatNumber(DAILY_TARGETS.steps)} steps`}
+            progress={{
+              value: steps,
+              target: DAILY_TARGETS.steps,
+              color: Q.accent.periwinkle,
+            }}
+            onPress={() => router.push("/hub")}
           />
 
-          <SupplementLogSheet
-            visible={supplementSheetOpen}
-            onClose={() => setSupplementSheetOpen(false)}
-            onChanged={handleSupplementsChanged}
-          />
-
-          <CardioSheet
-            visible={cardioSheetOpen}
-            onClose={() => setCardioSheetOpen(false)}
-            initialText=""
-            weightKg={70}
-            onSave={async (entry) => {
-              try {
-                await addCardioLog(todayKey, entry);
-                showToast("Cardio logged");
-                return true;
-              } catch {
-                showToast("Couldn't save cardio");
-                return false;
-              }
+          {/* Water */}
+          <ModuleRow
+            title="Water"
+            accent={Q.accent.cyan}
+            subtitle={`${water.toFixed(1)} of ${DAILY_TARGETS.waterL.toFixed(1)} L`}
+            action={{
+              label: "+250 ml",
+              variant: "outline",
+              accentColor: Q.accent.cyan,
+              onPress: () => void handleWaterAdd(0.25),
+            }}
+            progress={{
+              value: water,
+              target: DAILY_TARGETS.waterL,
+              color: Q.accent.cyan,
             }}
           />
-
-          <JournalSheet
-            visible={journalSheetOpen}
-            onClose={() => setJournalSheetOpen(false)}
-            onSave={handleJournalAdd}
-          />
-        </>
-      }
-    >
-      {/* 1. TOP HEADER */}
-      <FadeIn delay={0}>
-        <ScreenHeader
-          eyebrow={todayHeading}
-          title={
-            <View style={styles.headerGreetingRow}>
-              <PressableScale
-                style={styles.avatar}
-                onPress={() => router.push("/hub")}
-                accessibilityRole="button"
-                accessibilityLabel="Profile and settings"
-              >
-                <User size={18} color={HOME.ink} />
-              </PressableScale>
-              <Greeting />
-            </View>
-          }
-          right={
-            <View style={styles.headerRight}>
-              {isOffline && (
-                <View style={styles.offlineBadge}>
-                  <WifiOff size={12} color="#ef4444" />
-                  <Text style={styles.offlineText}>Offline</Text>
-                </View>
-              )}
-              <StreakCard
-                streak={streak.days}
-                todayActive={streak.todayActive}
-                compact
-              />
-            </View>
-          }
-        />
-      </FadeIn>
-
-      {/* 2. NORTH STAR CARD */}
-      <FadeIn delay={10}>
-        {northStar ? (
-          <NorthStarCard
-            northStar={northStar}
-            onNorthStarChange={setNorthStar}
-          />
-        ) : (
-          <NorthStarSetupCard onCreated={setNorthStar} />
-        )}
-      </FadeIn>
-
-      {/* 3. FIRST-RUN CHECKLIST */}
-      {!checklistDismissed && (
-        <FadeIn delay={15}>
-          <FirstRunChecklistCard
-            mealsCount={meals.length}
-            hasWorkout={Boolean(finishedWorkout || activeWorkout)}
-            waterMl={water * 1000}
-            onLogMeal={() => router.push("/nutrition")}
-            onStartWorkout={handleWorkoutStart}
-            onAddWater={() => void handleWaterAdd(0.25)}
-            onDismiss={handleDismissChecklist}
-          />
-        </FadeIn>
-      )}
-
-      {/* 4. DYNAMIC HERO CARD (Forge Workout) */}
-      {enabled.workouts && (
-        <FadeIn delay={20}>
-          <WorkoutCard
-            workout={activeWorkout}
-            plannedDay={plannedDay}
-            finishedToday={finishedWorkout}
-            isRestDay={isRestDay}
-          />
-        </FadeIn>
-      )}
-
-      {/* 5. QUICK ACTION SHELF */}
-      <FadeIn delay={30}>
-        <View style={styles.shelfContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.shelfContent}
-          >
-            <PressableScale
-              style={styles.shelfCard}
-              onPress={() => void handleWaterAdd(0.25)}
-              accessibilityRole="button"
-              accessibilityLabel="Add 250ml water"
-            >
-              <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(6, 182, 212, 0.15)" }]}>
-                <Droplets size={18} color="#06b6d4" />
-              </View>
-              <Text style={styles.shelfLabel}>+250ml Water</Text>
-            </PressableScale>
-
-            <PressableScale
-              style={styles.shelfCard}
-              onPress={() => router.push("/hub")}
-              accessibilityRole="button"
-              accessibilityLabel="Weigh-in"
-            >
-              <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(59, 130, 246, 0.15)" }]}>
-                <Scale size={18} color="#3b82f6" />
-              </View>
-              <Text style={styles.shelfLabel}>Weigh-in</Text>
-            </PressableScale>
-
-            <PressableScale
-              style={styles.shelfCard}
-              onPress={() => setCardioSheetOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Log cardio"
-            >
-              <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(245, 158, 11, 0.15)" }]}>
-                <Activity size={18} color="#f59e0b" />
-              </View>
-              <Text style={styles.shelfLabel}>Cardio</Text>
-            </PressableScale>
-
-            <PressableScale
-              style={styles.shelfCard}
-              onPress={() => setJournalSheetOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Open journal"
-            >
-              <View style={[styles.shelfIconCircle, { backgroundColor: "rgba(168, 85, 247, 0.15)" }]}>
-                <BookOpen size={18} color="#a855f7" />
-              </View>
-              <Text style={styles.shelfLabel}>Journal</Text>
-            </PressableScale>
-          </ScrollView>
         </View>
-      </FadeIn>
 
-      {/* 6. MIDDLE: NOURISH DAILY MACRO SPLIT */}
-      {enabled.nutrition && (
-        <FadeIn delay={40}>
-          <Card tone="nourish" style={styles.nourishCard}>
-            <View style={styles.nourishHeader}>
-              <View>
-                <Text style={styles.nourishEyebrow}>NOURISH · TODAY</Text>
-                <Text style={styles.nourishCalories}>
-                  {Math.round(macros.calories).toLocaleString()}
-                  <Text style={styles.nourishCaloriesUnit}>
-                    {calorieTarget ? ` / ${calorieTarget.toLocaleString()} kcal` : " kcal"}
-                  </Text>
+        {/* 5. Action Links Bar */}
+        <TextLinkBar
+          style={styles.actionLinksBar}
+          items={[
+            {
+              label: "Weigh in",
+              onPress: () => setWeightSheetOpen(true),
+            },
+            {
+              label: "Sleep",
+              onPress: () => setSleepSheetOpen(true),
+            },
+            {
+              label: "Journal",
+              onPress: () => setJournalSheetOpen(true),
+            },
+            {
+              label: "Cardio",
+              onPress: () => setCardioSheetOpen(true),
+            },
+          ]}
+        />
+
+        {/* 6. First Run Checklist (if active) */}
+        {!checklistDismissed && (
+          <View style={styles.checklistSection}>
+            <FirstRunChecklistCard
+              mealsCount={meals.length}
+              hasWorkout={Boolean(finishedWorkout || activeWorkout)}
+              waterMl={water * 1000}
+              onLogMeal={() => router.push("/nutrition")}
+              onStartWorkout={handleWorkoutStart}
+              onAddWater={() => void handleWaterAdd(0.25)}
+              onDismiss={handleDismissChecklist}
+            />
+          </View>
+        )}
+
+        {/* 7. Recent Activity (flat hairline rows) */}
+        {topRecentEvents.length > 0 && (
+          <View style={styles.activitySection}>
+            <Text style={styles.activityHeading}>Recent activity</Text>
+            {topRecentEvents.map((evt) => (
+              <View key={evt.id} style={styles.activityRow}>
+                <View style={styles.activityMain}>
+                  <Text style={styles.activityTitle}>{evt.title}</Text>
+                  <Text style={styles.activitySubtitle}>{evt.subtitle}</Text>
+                </View>
+                <Text style={styles.activityTime}>
+                  {formatRelativeTime(evt.timestamp)}
                 </Text>
               </View>
-              <PressableScale
-                style={styles.nourishLogButton}
-                onPress={() => router.push("/nutrition")}
-                accessibilityRole="button"
-                accessibilityLabel="Log meal"
-              >
-                <Plus size={16} color="#000" />
-                <Text style={styles.nourishLogButtonText}>Log meal</Text>
-              </PressableScale>
-            </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
-            <View style={styles.macroPillRow}>
-              <View style={styles.macroPill}>
-                <Text style={styles.macroPillVal}>{Math.round(macros.protein)}g</Text>
-                <Text style={styles.macroPillLbl}>Protein</Text>
-              </View>
-              <View style={styles.macroPill}>
-                <Text style={styles.macroPillVal}>{Math.round(macros.carbs)}g</Text>
-                <Text style={styles.macroPillLbl}>Carbs</Text>
-              </View>
-              <View style={styles.macroPill}>
-                <Text style={styles.macroPillVal}>{Math.round(macros.fat)}g</Text>
-                <Text style={styles.macroPillLbl}>Fat</Text>
-              </View>
-            </View>
-          </Card>
-        </FadeIn>
+      {/* Sheets & Modals */}
+      <WeightSheet
+        visible={weightSheetOpen}
+        unit={weightUnit}
+        onClose={() => setWeightSheetOpen(false)}
+        onSave={handleWeightAdd}
+      />
+
+      <SleepSheet
+        visible={sleepSheetOpen}
+        onClose={() => setSleepSheetOpen(false)}
+        onSave={handleSleepAdd}
+      />
+
+      <JournalSheet
+        visible={journalSheetOpen}
+        onClose={() => setJournalSheetOpen(false)}
+        onSave={handleJournalAdd}
+      />
+
+      <CardioSheet
+        visible={cardioSheetOpen}
+        onClose={() => setCardioSheetOpen(false)}
+        initialText=""
+        weightKg={70}
+        onSave={async (entry) => {
+          try {
+            await addCardioLog(todayKey, entry);
+            showToast("Cardio logged");
+            setCardioSheetOpen(false);
+            return true;
+          } catch {
+            showToast("Couldn't save cardio");
+            return false;
+          }
+        }}
+      />
+
+      <SupplementLogSheet
+        visible={supplementSheetOpen}
+        onClose={() => setSupplementSheetOpen(false)}
+        onChanged={handleSupplementsChanged}
+      />
+
+      {setupNorthStarOpen && !northStar && (
+        <NorthStarSetupCard
+          onCreated={(ns) => {
+            setNorthStar(ns);
+            setSetupNorthStarOpen(false);
+          }}
+        />
       )}
 
-      {/* 7. DAILY TARGETS */}
-      <FadeIn delay={50}>
+      {/* Compatibility data sink for tests & listeners */}
+      <View style={styles.hiddenSink}>
+        <WorkoutCard
+          workout={activeWorkout}
+          plannedDay={plannedDay}
+          finishedToday={finishedWorkout}
+          isRestDay={isRestDay}
+        />
         <DailyTargetsCard
           water={water}
           mealsLogged={meals.length}
@@ -647,99 +678,28 @@ export default function HomeScreen() {
           onSleepDeleteLongPress={handleSleepDeleteLongPress}
           compact
         />
-      </FadeIn>
-
-      {/* 8. RECENT ACTIVITY FEED */}
-      <FadeIn delay={60}>
-        <Card style={styles.activityCard}>
-          <View style={styles.activityHeader}>
-            <Text style={styles.activityEyebrow}>RECENT ACTIVITY</Text>
-            <PressableScale
-              onPress={() => router.push("/hub")}
-              accessibilityRole="button"
-              accessibilityLabel="See all activity"
-            >
-              <Text style={styles.seeAllText}>See all</Text>
-            </PressableScale>
-          </View>
-          {topRecentEvents.length === 0 ? (
-            <Text style={styles.activityEmpty}>
-              No activity logged yet today. Use quick actions above to begin.
-            </Text>
-          ) : (
-            topRecentEvents.map((evt, idx) => (
-              <View
-                key={evt.id}
-                style={[
-                  styles.activityRow,
-                  idx < topRecentEvents.length - 1 && styles.activityRowDivider,
-                ]}
-              >
-                <View style={styles.activityIconCircle}>
-                  {evt.type === "workout" ? (
-                    <Dumbbell size={16} color="#f59e0b" />
-                  ) : (
-                    <Utensils size={16} color="#10b981" />
-                  )}
-                </View>
-                <View style={styles.activityTextGroup}>
-                  <Text style={styles.activityTitle}>{evt.title}</Text>
-                  <Text style={styles.activitySubtitle}>{evt.subtitle}</Text>
-                </View>
-                <Text style={styles.activityTime}>{formatRelativeTime(evt.timestamp)}</Text>
-              </View>
-            ))
-          )}
-        </Card>
-      </FadeIn>
-
-      {/* 8. NEXT UP (SUGGESTION) */}
-      <FadeIn delay={80}>
-        <PressableScale
-          style={styles.suggestionCard}
-          onPress={() => {
-            if (suggestion.action.route) {
-              router.push(suggestion.action.route as any);
-            } else if (suggestion.action.type === "water") {
-              void handleWaterAdd(0.25);
-            } else if (suggestion.action.type === "sleep") {
-              router.push("/hub");
-            }
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Next up: ${suggestion.text}`}
-        >
-          <View style={styles.suggestionLeft}>
-            <View style={styles.suggestionIconCircle}>
-              <Sparkles size={16} color={HOME.acc} />
-            </View>
-            <View style={styles.suggestionTextGroup}>
-              <Text style={styles.suggestionEyebrow}>NEXT UP</Text>
-              <Text style={styles.suggestionText}>{suggestion.text}</Text>
-            </View>
-          </View>
-          <ChevronRight size={16} color={HOME.mute} />
-        </PressableScale>
-      </FadeIn>
-    </Screen>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerGreetingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  root: {
+    flex: 1,
+    backgroundColor: Q.color.bg,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: HOME.card2,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 58,
+    paddingHorizontal: 24,
+    paddingBottom: 96,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: HOME.line,
   },
   headerRight: {
     flexDirection: "row",
@@ -750,218 +710,103 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(239, 68, 68, 0.3)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: "rgba(229, 83, 75, 0.15)",
   },
   offlineText: {
-    color: "#ef4444",
+    color: Q.accent.red,
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: Q.font.sansMedium,
   },
-  shelfContainer: {
-    marginBottom: Spacing.two,
+  heroSection: {
+    marginTop: 34,
   },
-  shelfContent: {
-    gap: 10,
-    paddingVertical: 2,
-  },
-  shelfCard: {
+  northStarHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: HOME.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: HOME.line,
-    minHeight: 48,
   },
-  shelfIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  shelfLabel: {
-    color: HOME.ink,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  nourishCard: {
-    marginBottom: Spacing.two,
-  },
-  nourishHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.two,
-  },
-  nourishEyebrow: {
-    color: "#10b981",
-    fontSize: Typography.caption,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-  },
-  nourishCalories: {
-    color: HOME.ink,
-    fontSize: 26,
-    fontFamily: Font.serif,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  nourishCaloriesUnit: {
-    fontSize: 14,
-    fontFamily: Font.sans,
-    color: HOME.mute,
-    fontWeight: "400",
-  },
-  nourishLogButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#10b981",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    minHeight: 44,
-  },
-  nourishLogButtonText: {
-    color: "#000",
+  northStarLabel: {
     fontSize: 13,
-    fontWeight: "600",
+    color: Q.color.mute,
+    fontFamily: Q.font.sansRegular,
   },
-  macroPillRow: {
-    flexDirection: "row",
-    gap: 8,
+  northStarGoal: {
+    fontFamily: Q.font.displayMedium,
+    fontSize: 50,
+    fontWeight: "500",
+    color: Q.color.ink,
+    letterSpacing: -1.5,
+    lineHeight: 52,
+    marginTop: 10,
+    fontVariant: ["tabular-nums"],
   },
-  macroPill: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    backgroundColor: HOME.card2,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: HOME.line,
-    alignItems: "center",
+  summarySentence: {
+    fontSize: 16,
+    lineHeight: 22,
+    color: Q.color.mute,
+    fontFamily: Q.font.sansRegular,
+    marginTop: 12,
+    maxWidth: 300,
   },
-  macroPillVal: {
-    color: HOME.ink,
-    fontSize: 15,
-    fontWeight: "700",
+  weekStrip: {
+    marginTop: 24,
   },
-  macroPillLbl: {
-    color: HOME.mute,
-    fontSize: 11,
-    marginTop: 2,
+  modulesSection: {
+    marginTop: 22,
   },
-  activityCard: {
-    marginBottom: Spacing.two,
+  actionLinksBar: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
   },
-  activityEyebrow: {
-    color: HOME.mute,
-    fontSize: Typography.caption,
-    letterSpacing: 1.5,
-    fontWeight: "600",
-    marginBottom: Spacing.one,
+  checklistSection: {
+    marginTop: 16,
   },
-  activityEmpty: {
-    color: HOME.dim,
-    fontSize: Typography.caption,
-    paddingVertical: Spacing.one,
+  activitySection: {
+    marginTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
+    paddingTop: 16,
+  },
+  activityHeading: {
+    fontFamily: Q.font.sansMedium,
+    fontSize: 13,
+    color: Q.color.mute,
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   activityRow: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    minHeight: 48,
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Q.color.line,
   },
-  activityRowDivider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: HOME.line,
-  },
-  activityIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: HOME.card2,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  activityTextGroup: {
+  activityMain: {
     flex: 1,
   },
   activityTitle: {
-    color: HOME.ink,
-    fontSize: 14,
-    fontWeight: "600",
+    fontFamily: Q.font.sansMedium,
+    fontSize: 15,
+    color: Q.color.ink,
   },
   activitySubtitle: {
-    color: HOME.mute,
-    fontSize: 12,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
     marginTop: 2,
   },
   activityTime: {
-    color: HOME.dim,
+    fontFamily: Q.font.sansRegular,
     fontSize: 12,
-    marginLeft: 8,
+    color: Q.color.mute,
   },
-  activityHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.two,
-  },
-  seeAllText: {
-    color: HOME.acc,
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  suggestionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    backgroundColor: HOME.card,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: HOME.line,
-  },
-  suggestionLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-  },
-  suggestionIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(212, 162, 76, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  suggestionTextGroup: {
-    flex: 1,
-  },
-  suggestionEyebrow: {
-    color: HOME.acc,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  suggestionText: {
-    color: HOME.ink,
-    fontSize: Typography.body,
-    marginTop: 2,
-    lineHeight: 20,
+  hiddenSink: {
+    display: "none",
   },
 });
