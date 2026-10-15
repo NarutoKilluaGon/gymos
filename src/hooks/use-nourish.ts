@@ -55,6 +55,7 @@ import {
   rememberFoods,
   restoreSavedFood,
   saveMealWithItems,
+  updateSavedFood,
   type RememberedFood,
   type SavedFood,
   type SavedFoodExtras,
@@ -285,6 +286,11 @@ export function useNourish() {
         act(
           () => addSavedFood(name, macros, foods, extras),
           "Couldn't save food",
+        ),
+      updateSavedFood: (id: string, patch: Partial<SavedFood>) =>
+        act(
+          () => updateSavedFood(id, patch),
+          "Couldn't update saved food",
         ),
       removeSaved: (id: string) =>
         act(() => deleteSavedFood(id), "Couldn't delete"),

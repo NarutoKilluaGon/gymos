@@ -255,6 +255,25 @@ export async function restoreSavedFood(
   });
 }
 
+export async function updateSavedFood(
+  id: ID,
+  patch: Partial<SavedFood>,
+): Promise<SavedFood | null> {
+  return savedFoodsMutex.runExclusive(async () => {
+    const foods = await readSavedFoodsUnlocked();
+    const idx = foods.findIndex((f) => f.id === id);
+    if (idx === -1) return null;
+    const updated: SavedFood = {
+      ...foods[idx],
+      ...patch,
+      id: foods[idx].id,
+    };
+    foods[idx] = updated;
+    await setStorage(SAVED_FOODS_KEY, foods);
+    return updated;
+  });
+}
+
 /**
  * Extract normalized unit from a portion quantity string ("100 g" → "g", "1 bowl" → "bowl").
  */
@@ -312,7 +331,8 @@ export async function saveMealWithItems(
   if (meals.length === 0) return null;
 
   return savedFoodsMutex.runExclusive(async () => {
-    const existing = await readSavedFoodsUnlocked();
+    const snapshot = await readSavedFoodsUnlocked();
+    const existing = [...snapshot];
     const now = new Date().toISOString();
 
     const foods: MealFood[] = meals.map(mealFoodOf);
@@ -371,8 +391,14 @@ export async function saveMealWithItems(
       existing.push(itemFood);
     }
 
-    await setStorage(SAVED_FOODS_KEY, existing);
-    return savedMeal;
+    try {
+      await setStorage(SAVED_FOODS_KEY, existing);
+      return savedMeal;
+    } catch (err) {
+      // All-or-nothing: roll back to snapshot on storage write failure
+      await setStorage(SAVED_FOODS_KEY, snapshot).catch(() => {});
+      throw err;
+    }
   });
 }
 

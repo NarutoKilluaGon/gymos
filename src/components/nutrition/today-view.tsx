@@ -11,6 +11,7 @@ import {
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Keyboard,
   Platform,
@@ -344,13 +345,55 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     );
 
     if (existingSaved) {
-      await actions.removeSaved(existingSaved.id);
-      showUndoToast({
-        message: `Removed ${meal.name} from Saved foods`,
-        onUndo: async () => {
-          await actions.restoreSaved(existingSaved);
-        },
-      });
+      const macrosDiffer =
+        Math.round(existingSaved.calories ?? 0) !== Math.round(meal.calories ?? 0) ||
+        Math.round(existingSaved.protein ?? 0) !== Math.round(meal.protein ?? 0) ||
+        Math.round(existingSaved.carbs ?? 0) !== Math.round(meal.carbs ?? 0) ||
+        Math.round(existingSaved.fat ?? 0) !== Math.round(meal.fat ?? 0);
+
+      const doRemove = async () => {
+        await actions.removeSaved(existingSaved.id);
+        showUndoToast({
+          message: `Removed ${meal.name} from Saved foods`,
+          onUndo: async () => {
+            await actions.restoreSaved(existingSaved);
+          },
+        });
+      };
+
+      if (macrosDiffer) {
+        Alert.alert(
+          "Update saved food?",
+          `Logged macros (${Math.round(meal.calories ?? 0)} kcal, ${Math.round(meal.protein ?? 0)}g protein) differ from your saved food (${Math.round(existingSaved.calories ?? 0)} kcal, ${Math.round(existingSaved.protein ?? 0)}g protein).`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Remove from Saved",
+              style: "destructive",
+              onPress: () => void doRemove(),
+            },
+            {
+              text: "Update Saved Food",
+              onPress: async () => {
+                const updated = await actions.updateSavedFood(existingSaved.id, {
+                  calories: meal.calories ?? 0,
+                  protein: meal.protein ?? 0,
+                  carbs: meal.carbs ?? 0,
+                  fat: meal.fat ?? 0,
+                  ...pickMicronutrients(meal),
+                  qty: meal.qty,
+                });
+                if (updated) {
+                  showToast(`Updated ${meal.name} in Saved foods`, "success");
+                }
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      await doRemove();
       return;
     }
 
@@ -521,7 +564,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`Save ${title} as meal`}
-                      hitSlop={8}
+                      hitSlop={10}
                       onPress={() => {
                         tap();
                         setSavingMealOccasion(occasion);
@@ -529,7 +572,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                       }}
                       style={s.saveMealHeaderBtn}
                     >
-                      <BookmarkPlus size={15} color={N.acc} />
+                      <BookmarkPlus size={16} color={N.acc} />
                     </Pressable>
                   </View>
                 </View>
@@ -933,7 +976,7 @@ function EntryRow({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={isSaved ? `${meal.name} is saved` : `Save ${meal.name}`}
-        hitSlop={8}
+        hitSlop={12}
         onPress={() => {
           tap();
           onBookmark();
@@ -1035,8 +1078,10 @@ const s = StyleSheet.create({
     gap: 8,
   },
   saveMealHeaderBtn: {
-    padding: 5,
-    borderRadius: 6,
+    minWidth: 44,
+    minHeight: 44,
+    padding: 8,
+    borderRadius: 8,
     backgroundColor: N.card2,
     borderWidth: 1,
     borderColor: N.line,
@@ -1070,8 +1115,9 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   bookmarkBtn: {
-    paddingLeft: 12,
-    paddingVertical: 4,
+    minWidth: 44,
+    minHeight: 44,
+    paddingHorizontal: 8,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1186,7 +1232,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#2a332e",
+    backgroundColor: N.dockBg,
     borderRadius: NRadius.pill,
     borderWidth: 1.5,
     borderColor: N.acc,

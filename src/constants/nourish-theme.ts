@@ -22,6 +22,7 @@ export const N = {
   ok: "#4c9a6a",
   warn: "#d9a441",
   bad: "#c8634b",
+  dockBg: "#2a332e",
   scrim: "rgba(0,0,0,0.55)",
 } as const;
 

@@ -119,6 +119,8 @@ function renderTodayView({
   const createSavedFoodMock = jest.fn().mockResolvedValue(true);
   const saveMealWithItemsMock = jest.fn().mockResolvedValue(true);
   const saveSectionMock = jest.fn().mockResolvedValue(true);
+  const removeSavedMock = jest.fn().mockResolvedValue(true);
+  const updateSavedFoodMock = jest.fn().mockResolvedValue(true);
 
   const nourish = {
     data: {
@@ -136,7 +138,8 @@ function renderTodayView({
       createSavedFood: createSavedFoodMock,
       saveMealWithItems: saveMealWithItemsMock,
       saveSection: saveSectionMock,
-      removeSaved: jest.fn().mockResolvedValue(true),
+      removeSaved: removeSavedMock,
+      updateSavedFood: updateSavedFoodMock,
       restoreSaved: jest.fn().mockResolvedValue(true),
       saveMeal: jest.fn().mockResolvedValue(true),
       editMeal: jest.fn().mockResolvedValue(true),
@@ -192,6 +195,8 @@ function renderTodayView({
     setFeelMock,
     createSavedFoodMock,
     saveMealWithItemsMock,
+    removeSavedMock,
+    updateSavedFoodMock,
   };
 }
 
@@ -251,5 +256,43 @@ describe("TodayView Phase B UI Integration", () => {
       undefined,
       expect.objectContaining({ qty: "1 bowl" }),
     );
+  });
+
+  it("tapping a filled bookmark with identical macros removes it from saved foods", () => {
+    const { press, removeSavedMock } = renderTodayView();
+
+    // Roti in mock has 160 kcal, and saved Roti has 160 kcal
+    press("Roti is saved");
+    expect(removeSavedMock).toHaveBeenCalledWith("s1");
+  });
+
+  it("tapping a filled bookmark with differing macros prompts to update saved food", () => {
+    const { Alert } = require("react-native");
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    // Roti saved has 160 kcal, but meal has 200 kcal
+    const mealsWithDiffMacros: Meal[] = [
+      {
+        ...SAMPLE_MEALS[0],
+        calories: 200,
+        protein: 8,
+      },
+    ];
+
+    const { press, removeSavedMock } = renderTodayView({
+      meals: mealsWithDiffMacros,
+    });
+
+    press("Roti is saved");
+
+    // Must NOT remove directly; must show alert
+    expect(removeSavedMock).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Update saved food?",
+      expect.stringContaining("differ from your saved food"),
+      expect.any(Array),
+    );
+
+    alertSpy.mockRestore();
   });
 });

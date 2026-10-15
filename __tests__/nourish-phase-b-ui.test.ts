@@ -4,6 +4,7 @@ import {
   saveMealWithItems,
   getSavedFoods,
   addSavedFood,
+  updateSavedFood,
   type SavedFood,
 } from "@/storage/repositories/saved-foods";
 import { setStorage } from "@/storage/storage";
@@ -214,6 +215,76 @@ describe("Phase B: Nourish UI, Bookmarking & Saved Meal Upsert", () => {
       );
       // Only 1 individual saved food added, not 2
       expect(eggItems.length).toBe(1);
+    });
+
+    it("rolls back on failure so meal and item upserts are all-or-nothing", async () => {
+      // Pre-populate with one existing saved food
+      const initial = await addSavedFood("Toast", { calories: 80, protein: 3, carbs: 15, fat: 1 });
+      const beforeFoods = await getSavedFoods();
+      expect(beforeFoods.length).toBe(1);
+
+      const meals: Meal[] = [
+        {
+          id: "m1",
+          name: "Oatmeal",
+          qty: "1 bowl",
+          calories: 150,
+          protein: 5,
+          carbs: 27,
+          fat: 3,
+          timestamp: "2026-10-14T08:00:00.000Z",
+          slot: "Breakfast",
+        },
+      ];
+
+      // Simulate a storage failure during setStorage
+      const storageModule = require("@/storage/storage");
+      const originalSetStorage = storageModule.setStorage;
+      const setStorageSpy = jest.spyOn(storageModule, "setStorage").mockImplementationOnce(() => {
+        return Promise.reject(new Error("Disk full or quota exceeded"));
+      });
+
+      await expect(saveMealWithItems("Oatmeal breakfast", meals, "Breakfast")).rejects.toThrow(
+        "Disk full or quota exceeded",
+      );
+
+      // Verify that all-or-nothing rollback left existing saved foods intact
+      const afterFoods = await getSavedFoods();
+      expect(afterFoods.length).toBe(1);
+      expect(afterFoods[0].id).toBe(initial.id);
+      expect(afterFoods[0].name).toBe("Toast");
+
+      setStorageSpy.mockRestore();
+    });
+  });
+
+  describe("3. updateSavedFood", () => {
+    it("updates macros and fields of an existing saved food while preserving its id", async () => {
+      const initial = await addSavedFood("Roti", {
+        calories: 80,
+        protein: 3,
+        carbs: 15,
+        fat: 1,
+      }, undefined, { qty: "1 piece" });
+
+      const updated = await updateSavedFood(
+        initial.id,
+        {
+          calories: 100,
+          protein: 4,
+          qty: "1 large piece",
+        },
+      );
+
+      expect(updated).toBeDefined();
+      expect(updated?.id).toBe(initial.id);
+      expect(updated?.calories).toBe(100);
+      expect(updated?.protein).toBe(4);
+      expect(updated?.qty).toBe("1 large piece");
+
+      const all = await getSavedFoods();
+      expect(all.length).toBe(1);
+      expect(all[0].calories).toBe(100);
     });
   });
 });
