@@ -60,6 +60,7 @@ export function DailyTargetsCard({
   items.push(
     <ProgressBar
       key="water"
+      label="Water"
       current={water}
       target={DAILY_TARGETS.waterL}
       unit="L"
@@ -73,6 +74,7 @@ export function DailyTargetsCard({
       items.push(
         <ProgressBar
           key="protein"
+          label="Protein"
           current={protein ?? 0}
           target={proteinTarget}
           unit="g"
@@ -123,6 +125,7 @@ export function DailyTargetsCard({
       items.push(
         <ProgressBar
           key="steps"
+          label="Steps"
           current={steps}
           target={stepsTarget}
           unit="steps"
@@ -172,6 +175,7 @@ export function DailyTargetsCard({
           />
         ) : (
           <ProgressBar
+            label="Supplements"
             current={supplementsTaken ?? 0}
             target={supplementsTotal}
             unit="taken"

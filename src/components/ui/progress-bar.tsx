@@ -11,6 +11,7 @@ import { formatNumber } from '@/utils/format';
 import { TimingConfig } from '@/utils/motion';
 
 type ProgressBarProps = {
+  label?: string;
   current: number;
   target: number;
   unit: string;
@@ -24,6 +25,7 @@ type ProgressBarProps = {
 };
 
 export function ProgressBar({
+  label,
   current,
   target,
   unit,
@@ -57,17 +59,21 @@ export function ProgressBar({
       <View style={styles.containerCompact}>
         {!hideHeader && (
           <View style={styles.headerCompact}>
-            <Text style={styles.valueCompact}>
-              {formatNumber(current)} / {formatNumber(target)} {unit}
-            </Text>
+            {label ? <Text style={styles.labelCompact}>{label}</Text> : null}
 
-            <Text
-              style={[
-                styles.statusCompact,
-                current >= target && styles.completedCompact,
-              ]}>
-              {current >= target ? '✓' : ''}
-            </Text>
+            <View style={styles.valueRowCompact}>
+              <Text style={styles.valueCompact}>
+                {formatNumber(current)} / {formatNumber(target)} {unit}
+              </Text>
+
+              <Text
+                style={[
+                  styles.statusCompact,
+                  current >= target && styles.completedCompact,
+                ]}>
+                {current >= target ? '✓' : ''}
+              </Text>
+            </View>
           </View>
         )}
 
@@ -88,18 +94,22 @@ export function ProgressBar({
     <View style={styles.container}>
       {!hideHeader && (
         <View style={styles.header}>
-          <Text style={styles.value}>
-            {formatNumber(current)} / {formatNumber(target)} {unit}
-          </Text>
+          {label ? <Text style={styles.label}>{label}</Text> : null}
 
-          <Text
-            style={[
-              styles.status,
-              current >= target && styles.completed,
-            ]}>
-            {current >= target ? '✓ ' : ''}
-            {status}
-          </Text>
+          <View style={styles.valueRow}>
+            <Text style={styles.value}>
+              {formatNumber(current)} / {formatNumber(target)} {unit}
+            </Text>
+
+            <Text
+              style={[
+                styles.status,
+                current >= target && styles.completed,
+              ]}>
+              {current >= target ? '✓ ' : ''}
+              {status}
+            </Text>
+          </View>
         </View>
       )}
 
@@ -125,6 +135,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+
+  label: {
+    color: GymColors.text.primary,
+    fontSize: Typography.body,
+  },
+
+  valueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
   },
 
   value: {
@@ -163,13 +184,24 @@ const styles = StyleSheet.create({
   // Compact styles
   containerCompact: {
     gap: Spacing.half,
-    width: "48%",
+    width: "100%",
   },
 
   headerCompact: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+
+  labelCompact: {
+    fontSize: Typography.caption,
+    color: GymColors.text.tertiary,
+  },
+
+  valueRowCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.half,
   },
 
   valueCompact: {
