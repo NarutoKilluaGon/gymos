@@ -1,8 +1,9 @@
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { Bar, NCard, Ring } from "@/components/nutrition/nourish-ui";
-import { N, NRadius, NSerif } from "@/constants/nourish-theme";
+import { ProgressLine } from "@/components/ds/progress-line";
+import { Q } from "@/constants/quiet";
+import { fmtInt } from "@/components/nutrition/summary-card-view-model";
 import type { SummaryCardViewModel } from "@/components/nutrition/summary-card-view-model";
 
 export const SummaryCard = memo(function SummaryCard({
@@ -12,57 +13,62 @@ export const SummaryCard = memo(function SummaryCard({
   vm: SummaryCardViewModel;
   onOpenMicros: () => void;
 }) {
-  return (
-    <NCard style={styles.card}>
-      <View style={styles.mainRow}>
-        {/* Left side: 96dp ring with visible track */}
-        <View style={styles.ringWrapper}>
-          <Ring
-            value={vm.footer.eaten}
-            max={vm.footer.budget}
-            size={96}
-            strokeWidth={8}
-          >
-            <Text
-              style={[
-                styles.kcalNumber,
-                { fontSize: vm.calories.fontSize },
-                vm.calories.isOver && { color: N.bad },
-              ]}
-              numberOfLines={1}
-            >
-              {vm.calories.displayNumber}
-            </Text>
-            <Text
-              style={[
-                styles.kcalLabel,
-                vm.calories.isOver && { color: N.bad },
-              ]}
-            >
-              {vm.calories.displayLabel}
-            </Text>
-          </Ring>
-        </View>
+  const isOver = vm.calories.isOver;
+  const displayNumber = isOver
+    ? `+${vm.calories.displayNumber}`
+    : vm.calories.displayNumber;
 
-        {/* Right side: 3 macro rows (Protein, Carbs, Fat) */}
-        <View style={styles.macroCol}>
-          {vm.macros.map((m) => (
-            <View key={m.name} style={styles.macroRow}>
-              <View style={styles.macroHead}>
-                <Text style={styles.macroName}>{m.name}</Text>
-                <Text style={[styles.macroRemaining, m.isOver && { color: N.bad }]}>
-                  {m.displayRemaining}
-                </Text>
-              </View>
-              <Bar value={m.eaten} max={m.target} color={m.color} height={6} />
-            </View>
-          ))}
-        </View>
+  const subtitle = vm.isEmpty
+    ? `kcal budget for today. You haven't logged yet.`
+    : isOver
+      ? `kcal over your ${fmtInt(vm.footer.budget)} budget. You've eaten ${fmtInt(vm.footer.eaten)}.`
+      : `kcal remaining of ${fmtInt(vm.footer.budget)} budget. You've eaten ${fmtInt(vm.footer.eaten)}.`;
+
+  return (
+    <View style={styles.container}>
+      {/* 1. Large Calorie Number */}
+      <Text
+        style={[
+          styles.kcalNumber,
+          isOver && styles.kcalNumberOver,
+        ]}
+        numberOfLines={1}
+      >
+        {displayNumber}
+      </Text>
+
+      {/* 2. Subtitle */}
+      <Text style={styles.subtitle} numberOfLines={2}>
+        {subtitle}
+      </Text>
+
+      {/* 3. Progress Line with target tick and overage split */}
+      <View style={styles.progressLineWrap}>
+        <ProgressLine
+          value={vm.footer.eaten}
+          target={vm.footer.budget}
+          color={Q.accent.sage}
+          overColor={Q.accent.red}
+          trackColor={Q.color.line}
+          showTargetTick={true}
+          height={2}
+        />
       </View>
 
-      <View style={styles.divider} />
+      {/* 4. Macro 3 Columns (Protein, Carbs, Fat) */}
+      <View style={styles.macroRow}>
+        {vm.macros.map((m) => (
+          <View key={m.name} style={styles.macroCol}>
+            <Text style={styles.macroValue}>
+              {Math.round(m.eaten)}
+              <Text style={styles.macroUnit}> g</Text>
+            </Text>
+            <Text style={styles.macroLabel}>{m.name}</Text>
+          </View>
+        ))}
+      </View>
 
-      {/* Footer: Eaten X (±uncertainty if present) · Budget Y · Burned Z and Micros › */}
+      {/* 5. Footer: Eaten · Budget · Burned & Micros link */}
       <View style={styles.footerRow}>
         <Text style={styles.footerText} numberOfLines={1}>
           {vm.footer.line}
@@ -77,88 +83,93 @@ export const SummaryCard = memo(function SummaryCard({
           <Text style={styles.microsText}>Micros ›</Text>
         </Pressable>
       </View>
-    </NCard>
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
-  card: {
-    padding: 14,
-    borderRadius: NRadius.card,
-    marginBottom: 12,
-  },
-  mainRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  ringWrapper: {
-    width: 96,
-    height: 96,
-    alignItems: "center",
-    justifyContent: "center",
+  container: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   kcalNumber: {
-    fontFamily: NSerif,
-    fontWeight: "300",
-    color: N.ink,
-    textAlign: "center",
+    fontFamily: Q.font.displayMedium,
+    fontSize: 84,
+    fontWeight: "500",
+    letterSpacing: -0.04 * 84,
+    lineHeight: 88,
+    color: Q.color.ink,
+    fontVariant: ["tabular-nums"] as unknown as ("tabular-nums")[],
   },
-  kcalLabel: {
-    color: N.mute,
-    fontSize: 11,
-    marginTop: 1,
-    textAlign: "center",
+  kcalNumberOver: {
+    color: Q.accent.red,
+  },
+  subtitle: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 16,
+    color: Q.color.mute,
+    marginTop: 10,
+    lineHeight: 22,
+  },
+  progressLineWrap: {
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  macroRow: {
+    flexDirection: "row",
+    gap: 12,
+    paddingTop: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Q.color.line,
   },
   macroCol: {
     flex: 1,
-    gap: 8,
-    justifyContent: "center",
   },
-  macroRow: {
-    gap: 3,
-  },
-  macroHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  macroName: {
-    color: N.ink,
-    fontSize: 12,
+  macroValue: {
+    fontFamily: Q.font.displayMedium,
+    fontSize: 26,
     fontWeight: "500",
+    color: Q.color.ink,
+    fontVariant: ["tabular-nums"] as unknown as ("tabular-nums")[],
   },
-  macroRemaining: {
-    color: N.mute,
-    fontSize: 12,
+  macroUnit: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    fontWeight: "400",
+    color: Q.color.mute,
   },
-  divider: {
-    height: 1,
-    backgroundColor: N.line,
-    marginTop: 12,
-    marginBottom: 4,
+  macroLabel: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
+    marginTop: 2,
   },
   footerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    minHeight: 44,
+    minHeight: 40,
+    paddingTop: 4,
   },
   footerText: {
-    color: N.mute,
-    fontSize: 11,
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.mute,
+    fontSize: 12,
     flex: 1,
     paddingRight: 8,
   },
   microsBtn: {
-    minHeight: 44,
+    minHeight: 40,
     minWidth: 44,
     justifyContent: "center",
     alignItems: "flex-end",
   },
   microsText: {
-    color: N.acc,
-    fontSize: 12,
+    fontFamily: Q.font.sansSemiBold,
+    color: Q.accent.sage,
+    fontSize: 13,
     fontWeight: "600",
   },
 });
