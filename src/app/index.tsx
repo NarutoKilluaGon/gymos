@@ -1,7 +1,6 @@
 import { router, useFocusEffect } from "expo-router";
 import {
   Star,
-  WifiOff,
 } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import {
@@ -464,10 +463,7 @@ export default function HomeScreen() {
 
           <View style={styles.headerRight}>
             {isOffline && (
-              <View style={styles.offlineBadge}>
-                <WifiOff size={12} color={Q.accent.red} />
-                <Text style={styles.offlineText}>Offline</Text>
-              </View>
+              <Text style={styles.offlineText}>Offline</Text>
             )}
             <StreakCard
               streak={streak.days}
@@ -571,6 +567,26 @@ export default function HomeScreen() {
               color: Q.accent.cyan,
             }}
           />
+
+          {/* Supplements (if configured) */}
+          {supplementProgress.total > 0 && (
+            <ModuleRow
+              title="Supplements"
+              accent={Q.accent.brass}
+              subtitle={`${supplementProgress.taken} of ${supplementProgress.total} taken`}
+              action={{
+                label: "Log",
+                variant: "outline",
+                accentColor: Q.accent.brass,
+                onPress: () => setSupplementSheetOpen(true),
+              }}
+              progress={{
+                value: supplementProgress.taken,
+                target: supplementProgress.total,
+                color: Q.accent.brass,
+              }}
+            />
+          )}
         </View>
 
         {/* 5. Action Links Bar */}
@@ -738,19 +754,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  offlineBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: "rgba(229, 83, 75, 0.15)",
-  },
   offlineText: {
-    color: Q.accent.red,
-    fontSize: 11,
-    fontFamily: Q.font.sansMedium,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
   },
   heroSection: {
     marginTop: 34,
@@ -797,32 +804,29 @@ const styles = StyleSheet.create({
   },
   activitySection: {
     marginTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: Q.color.line,
-    paddingTop: 16,
   },
   activityHeading: {
-    fontFamily: Q.font.sansMedium,
+    fontFamily: Q.font.sansRegular,
     fontSize: 13,
     color: Q.color.mute,
     marginBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 1,
   },
   activityRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "baseline",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Q.color.line,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
   },
   activityMain: {
     flex: 1,
+    marginRight: 12,
   },
   activityTitle: {
     fontFamily: Q.font.sansMedium,
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: "500",
     color: Q.color.ink,
   },
   activitySubtitle: {
@@ -833,7 +837,7 @@ const styles = StyleSheet.create({
   },
   activityTime: {
     fontFamily: Q.font.sansRegular,
-    fontSize: 12,
+    fontSize: 13,
     color: Q.color.mute,
   },
   hiddenSink: {

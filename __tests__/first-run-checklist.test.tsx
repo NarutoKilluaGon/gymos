@@ -66,7 +66,7 @@ describe("FirstRunChecklistCard", () => {
     );
 
     expect(toJSON()).not.toBeNull();
-    expect(texts).toContain("0/3 completed");
+    expect(texts).toContain("Get started · 0 of 3 done");
     expect(texts).toContain("Log your first meal");
     expect(texts).toContain("Start your first workout");
     expect(texts).toContain("Add water");
@@ -85,7 +85,7 @@ describe("FirstRunChecklistCard", () => {
       />
     );
 
-    expect(texts).toContain("2/3 completed");
+    expect(texts).toContain("Get started · 2 of 3 done");
   });
 
   it("auto-hides when all 3 items are completed", () => {

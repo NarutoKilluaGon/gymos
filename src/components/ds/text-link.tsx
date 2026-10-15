@@ -34,6 +34,7 @@ export function TextLink({
         testID={testID}
         accessibilityRole="button"
         accessibilityLabel={label}
+        hitSlop={8}
         style={styles.pressable}
       >
         <Text style={[styles.text, textStyle]}>{label}</Text>
@@ -50,10 +51,11 @@ export type TextLinkBarProps = {
     onPress: () => void;
     testID?: string;
   }[];
+  showBullets?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
-export function TextLinkBar({ items, style }: TextLinkBarProps) {
+export function TextLinkBar({ items, showBullets = false, style }: TextLinkBarProps) {
   return (
     <View style={[styles.bar, style]}>
       {items.map((item, index) => (
@@ -61,7 +63,7 @@ export function TextLinkBar({ items, style }: TextLinkBarProps) {
           key={item.label}
           label={item.label}
           onPress={item.onPress}
-          showBullet={index < items.length - 1}
+          showBullet={showBullets && index < items.length - 1}
           testID={item.testID}
         />
       ))}
@@ -73,9 +75,10 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    gap: 18,
     flexWrap: "wrap",
-    paddingVertical: 12,
+    paddingVertical: 0,
   },
   wrapper: {
     flexDirection: "row",
@@ -83,14 +86,15 @@ const styles = StyleSheet.create({
   },
   pressable: {
     paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
     minHeight: 44,
     justifyContent: "center",
   },
   text: {
-    fontFamily: Q.font.sansRegular,
+    fontFamily: Q.font.sansSemiBold,
     fontSize: 14,
-    color: Q.color.mute,
+    fontWeight: "600",
+    color: Q.color.ink,
   },
   bullet: {
     fontFamily: Q.font.sansRegular,
