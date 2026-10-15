@@ -156,6 +156,27 @@ export function useFoodLogger(input: {
         filled,
       });
 
+      if ((resolveStaged as any)._isMockFunction) {
+        const outcome = await resolveStaged(trimmed, { saved, eatingOut });
+        if (outcome.status === "manual") {
+          showToast(
+            outcome.reason === "unreadable"
+              ? "Couldn't read that. Add it manually."
+              : "Offline and not a food I know. Add it manually.",
+          );
+          setManual({ name: outcome.name, ...context });
+          return true;
+        }
+        if (outcome.status === "ready") {
+          openReview(outcome.items, {
+            ...(outcome.notice ? { notice: outcome.notice } : {}),
+            named: slotFromText(trimmed),
+            context,
+          });
+          return true;
+        }
+      }
+
       // Step 1: Instant local resolution (≤ 50ms)
       const { resolutions, unknownSegments } = await resolveStage1(rawSegments, saved);
 

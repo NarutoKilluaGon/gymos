@@ -37,6 +37,8 @@ import {
   SuggestionsSheet,
 } from "@/components/nutrition/more-sheets";
 import { CardioSection, DateNavigator } from "@/components/ds";
+import { SummaryCard } from "@/components/nutrition/summary-card";
+import { computeSummaryCardViewModel } from "@/components/nutrition/summary-card-view-model";
 import {
   Bar,
   Button,
@@ -324,6 +326,23 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const uncertainty = Math.round(totals.uncertainty / 10) * 10;
   const over = day.remaining < 0;
 
+  const summaryVm = computeSummaryCardViewModel({
+    eatenKcal: totals.calories,
+    budgetKcal: day.budget,
+    burnedKcal: day.burnKcal,
+    uncertainty: uncertainty > 0 ? uncertainty : undefined,
+    macrosEaten: {
+      protein: totals.protein,
+      carbs: totals.carbs,
+      fat: totals.fat,
+    },
+    macroTargets: {
+      protein: targets.protein,
+      carbs: targets.carbs,
+      fat: targets.fat,
+    },
+  });
+
   function stepDay(delta: number) {
     const next = addDaysToKey(dayKey, delta);
 
@@ -527,36 +546,10 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           accentColor={N.acc}
         />
 
-        <NCard style={s.hero}>
-          <Ring value={totals.calories} max={day.budget} size={132}>
-            <Text style={[s.ringNumber, over && { color: N.bad }]}>
-              {fmtInt(Math.abs(day.remaining))}
-            </Text>
-            <Text style={s.ringSub}>{over ? "kcal over" : "kcal left"}</Text>
-          </Ring>
-          <View style={s.stats}>
-            <Stat
-              label="Eaten"
-              value={fmtInt(totals.calories)}
-              note={uncertainty > 40 ? `±${uncertainty}` : undefined}
-            />
-            <Stat
-              label="Budget"
-              value={fmtInt(day.budget)}
-              note={allowance > 0 ? `+${fmtInt(allowance)} cardio` : undefined}
-            />
-            <Stat label="Burned" value={fmtInt(day.burnKcal)} />
-          </View>
-        </NCard>
-
-        <Pressable onPress={() => setMicrosOpen(true)} accessibilityRole="button">
-          <NCard style={s.macros}>
-            <MacroRow label="Protein" color={N.protein} value={totals.protein} target={targets.protein} />
-            <MacroRow label="Carbs" color={N.carbs} value={totals.carbs} target={targets.carbs} />
-            <MacroRow label="Fat" color={N.fat} value={totals.fat} target={targets.fat} />
-            <Text style={s.microLink}>Micronutrients ›</Text>
-          </NCard>
-        </Pressable>
+        <SummaryCard
+          vm={summaryVm}
+          onOpenMicros={() => setMicrosOpen(true)}
+        />
 
         <ScrollView
           horizontal
@@ -946,49 +939,6 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   );
 }
 
-function Stat({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-}) {
-  return (
-    <View style={s.stat}>
-      <Text style={s.statLabel}>{label}</Text>
-      <Text style={s.statValue}>
-        {value}
-        {note ? <Text style={s.statNote}> {note}</Text> : null}
-      </Text>
-    </View>
-  );
-}
-
-function MacroRow({
-  label,
-  color,
-  value,
-  target,
-}: {
-  label: string;
-  color: string;
-  value: number;
-  target: number;
-}) {
-  return (
-    <View style={s.macro}>
-      <View style={s.macroHead}>
-        <Text style={s.macroLabel}>{label}</Text>
-        <Text style={s.macroValue}>
-          {Math.round(value)} / {target}g
-        </Text>
-      </View>
-      <Bar value={value} max={target} color={color} />
-    </View>
-  );
-}
 
 function EntryRow({
   meal,

@@ -576,15 +576,13 @@ export async function resolveLogText(
     provider: options.provider,
   });
 
-  const finalItems = resolutions.map((s) => s.item!).filter(Boolean);
-  if (finalItems.length === 0) {
-    return { status: "empty" };
-  }
-
   // If any segment couldn't be resolved (source is manual or status is needs-input with 0 kcal),
   // return legacy manual status so whole-entry manual fallback behaves as expected in older tests/callers.
   const hasUnresolved = resolutions.some(
-    (r) => r.status === "needs-input" || (r.item && r.item.source === "manual" && r.item.calories === 0),
+    (r) =>
+      r.status === "needs-input" ||
+      !r.item ||
+      (r.item && r.item.source === "manual" && r.item.calories === 0),
   );
 
   if (hasUnresolved) {
@@ -597,6 +595,11 @@ export async function resolveLogText(
       name: trimmed,
       reason: provider ? "unreadable" : "unavailable",
     };
+  }
+
+  const finalItems = resolutions.map((s) => s.item!).filter(Boolean);
+  if (finalItems.length === 0) {
+    return { status: "empty" };
   }
 
   return {

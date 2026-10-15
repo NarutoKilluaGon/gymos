@@ -99,14 +99,16 @@ export function Ring({
   value,
   max,
   size = 132,
+  strokeWidth,
   children,
 }: {
   value: number;
   max: number;
   size?: number;
+  strokeWidth?: number;
   children?: ReactNode;
 }) {
-  const stroke = 11;
+  const stroke = strokeWidth ?? (size >= 120 ? 11 : 8);
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const raw = max > 0 ? value / max : 0;
