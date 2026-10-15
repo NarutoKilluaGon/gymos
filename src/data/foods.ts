@@ -1,4 +1,5 @@
-/* Sourced from IFCT (Indian Food Composition Tables, ICMR-NIN 2017) and USDA FoodData Central. */
+/* Sourced from IFCT (Indian Food Composition Tables, ICMR-NIN 2017) and USDA FoodData Central.
+ * Note: all catalog nutritional values are approximate estimates. */
 
 import { normalizeFoodName } from "@/services/food-db";
 
