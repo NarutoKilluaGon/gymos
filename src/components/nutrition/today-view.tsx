@@ -1,6 +1,7 @@
 import * as Haptics from "expo-haptics";
 import {
   Bookmark,
+  BookmarkPlus,
   Pencil,
   Plus,
   RotateCcw,
@@ -54,6 +55,7 @@ import { dayTitle, FEEL_OPTIONS } from "@/services/nourish/format";
 import { confidenceLabel, confidenceOf } from "@/services/nourish/nutrition";
 import { slotOfMeal, timeOfDay } from "@/services/nourish/slots";
 import { savedFoodToDraft } from "@/services/nourish/resolve-log";
+import { normalizeFoodName } from "@/services/food-db";
 import {
   catalogCandidates,
   suggestProteinOptions,
@@ -69,8 +71,14 @@ import {
   setOccasionTitle,
   type OccasionTitlesMap,
 } from "@/storage/repositories/occasion-titles";
-import { isSavedMeal, type SavedFood } from "@/storage/repositories/saved-foods";
+import {
+  extractFoodUnit,
+  isItemSaved,
+  isSavedMeal,
+  type SavedFood,
+} from "@/storage/repositories/saved-foods";
 import type { Meal, MealSlot } from "@/types/gymos";
+import { pickMicronutrients } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
 import {
   addDaysToKey,
@@ -99,6 +107,10 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const [occasionTitles, setOccasionTitles] = useState<OccasionTitlesMap>({});
   const [renamingOccasion, setRenamingOccasion] = useState<EatingOccasion | null>(null);
   const [renameInput, setRenameInput] = useState("");
+  const [savingMealOccasion, setSavingMealOccasion] = useState<EatingOccasion | null>(null);
+  const [saveMealName, setSaveMealName] = useState("");
+  const [saveMealBusy, setSaveMealBusy] = useState(false);
+  const [expandedFeelKeys, setExpandedFeelKeys] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let active = true;
@@ -319,6 +331,81 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
     }
   }
 
+  async function handleBookmarkMeal(meal: Meal) {
+    tap();
+    const targetName = normalizeFoodName(meal.name);
+    const targetUnit = extractFoodUnit(meal.qty);
+    const existingSaved = data?.saved?.find(
+      (saved) =>
+        !isSavedMeal(saved) &&
+        !saved.recipe &&
+        normalizeFoodName(saved.name) === targetName &&
+        extractFoodUnit(saved.qty) === targetUnit,
+    );
+
+    if (existingSaved) {
+      await actions.removeSaved(existingSaved.id);
+      showUndoToast({
+        message: `Removed ${meal.name} from Saved foods`,
+        onUndo: async () => {
+          await actions.restoreSaved(existingSaved);
+        },
+      });
+      return;
+    }
+
+    const ok = await actions.createSavedFood(
+      meal.name,
+      {
+        calories: meal.calories ?? 0,
+        protein: meal.protein ?? 0,
+        carbs: meal.carbs ?? 0,
+        fat: meal.fat ?? 0,
+        ...pickMicronutrients(meal),
+      },
+      undefined,
+      { qty: meal.qty },
+    );
+    if (ok) {
+      showUndoToast({
+        message: `Saved ${meal.name} to Saved foods`,
+        onUndo: async () => {
+          const currentSaved = data?.saved ?? [];
+          const added = currentSaved.find(
+            (s) =>
+              !isSavedMeal(s) &&
+              !s.recipe &&
+              normalizeFoodName(s.name) === targetName &&
+              extractFoodUnit(s.qty) === targetUnit,
+          );
+          if (added) {
+            await actions.removeSaved(added.id);
+          }
+        },
+      });
+    }
+  }
+
+  async function handleSaveMeal() {
+    if (!savingMealOccasion || !saveMealName.trim() || saveMealBusy) return;
+    setSaveMealBusy(true);
+    try {
+      const saved = await actions.saveMealWithItems(
+        saveMealName.trim(),
+        savingMealOccasion.meals,
+        savingMealOccasion.slot,
+      );
+      if (saved) {
+        showToast("Saved to Kitchen › Meals", "success");
+        setSavingMealOccasion(null);
+      }
+    } catch {
+      showToast("Couldn't save meal");
+    } finally {
+      setSaveMealBusy(false);
+    }
+  }
+
   return (
     <View style={s.fill}>
       <ScrollView
@@ -427,9 +514,24 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                       <Pencil size={13} color={N.mute} />
                     </Pressable>
                   </View>
-                  <Text style={s.sectionSub}>
-                    {fmtInt(occasionTotals.calories)} kcal · {Math.round(occasionTotals.protein)}g protein
-                  </Text>
+                  <View style={s.sectionRightWrap}>
+                    <Text style={s.sectionSub}>
+                      {fmtInt(occasionTotals.calories)} kcal · {Math.round(occasionTotals.protein)}g protein
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Save ${title} as meal`}
+                      hitSlop={8}
+                      onPress={() => {
+                        tap();
+                        setSavingMealOccasion(occasion);
+                        setSaveMealName(title);
+                      }}
+                      style={s.saveMealHeaderBtn}
+                    >
+                      <BookmarkPlus size={15} color={N.acc} />
+                    </Pressable>
+                  </View>
                 </View>
               </View>
               <NCard style={s.rows}>
@@ -438,37 +540,68 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                     key={meal.id}
                     meal={meal}
                     last={index === entries.length - 1}
+                    isSaved={isItemSaved(meal, data?.saved)}
                     onPress={() => setEditing(meal)}
+                    onBookmark={() => void handleBookmarkMeal(meal)}
                   />
                 ))}
-                <View style={s.sectionSaveRow}>
-                  <Pill
-                    label="Save as meal"
-                    onPress={() =>
-                      void actions
-                        .saveSection(entries, slot)
-                        .then((ok) => {
-                          if (ok)
-                            showToast("Saved to Kitchen › Meals", "success");
-                        })
-                    }
-                  />
-                </View>
-                <View style={s.feelContainer}>
-                  <Text style={s.feelLabel}>How did it feel?</Text>
-                  <View style={s.feelRow}>
-                    {FEEL_OPTIONS.map((option) => (
-                      <Pill
-                        key={option.value}
-                        label={option.label}
-                        active={(occasion.feel ?? day.feel[id] ?? day.feel[slot]) === option.value}
-                        onPress={() =>
-                          void actions.setFeel(dayKey, id, option.value)
-                        }
-                      />
-                    ))}
-                  </View>
-                </View>
+                {(() => {
+                  const currentFeel = occasion.feel ?? day.feel[id] ?? day.feel[slot];
+                  const isExpanded = expandedFeelKeys[id] ?? false;
+                  const chosenOption = currentFeel
+                    ? FEEL_OPTIONS.find((o) => o.value === currentFeel)
+                    : undefined;
+
+                  if (chosenOption && !isExpanded) {
+                    return (
+                      <View style={s.feelBar}>
+                        <Text style={s.feelPrompt}>How did it feel?</Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`${chosenOption.label}. Tap to change.`}
+                          hitSlop={4}
+                          onPress={() => {
+                            tap();
+                            setExpandedFeelKeys((prev) => ({ ...prev, [id]: true }));
+                          }}
+                          style={s.feelCollapsedChip}
+                        >
+                          <Text style={s.feelCollapsedChipText}>{chosenOption.label}</Text>
+                          <Pencil size={11} color={N.acc} />
+                        </Pressable>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View style={s.feelBar}>
+                      <Text style={s.feelPrompt}>How did it feel?</Text>
+                      <View style={s.feelPills}>
+                        {FEEL_OPTIONS.map((option) => {
+                          const active = currentFeel === option.value;
+                          return (
+                            <Pressable
+                              key={option.value}
+                              accessibilityRole="button"
+                              accessibilityLabel={option.label}
+                              hitSlop={4}
+                              onPress={() => {
+                                tap();
+                                setExpandedFeelKeys((prev) => ({ ...prev, [id]: false }));
+                                void actions.setFeel(dayKey, id, option.value);
+                              }}
+                              style={[s.feelPill, active && s.feelPillActive]}
+                            >
+                              <Text style={[s.feelPillText, active && s.feelPillTextActive]}>
+                                {option.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })()}
               </NCard>
             </View>
           );
@@ -517,7 +650,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           value={input}
           onChangeText={setInput}
           placeholder="Log anything: 2 rotis, dal, paneer bhurji"
-          placeholderTextColor={N.dim}
+          placeholderTextColor={N.mute}
           selectionColor={N.acc}
           style={s.dockInput}
           returnKeyType="send"
@@ -535,7 +668,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           }}
           style={[s.send, (logger.busy || input.trim() === "") && s.sendOff]}
         >
-          <Send size={18} color={N.accInk} />
+          <Send size={20} color={N.accInk} />
         </Pressable>
       </Animated.View>
       {logger.busy ? (
@@ -664,6 +797,54 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           />
         </View>
       </Sheet>
+      <Sheet
+        visible={savingMealOccasion !== null}
+        onClose={() => setSavingMealOccasion(null)}
+        title="Save meal"
+        footer={
+          <Button
+            label="Save meal"
+            kind="primary"
+            onPress={() => void handleSaveMeal()}
+            disabled={saveMealBusy || !saveMealName.trim()}
+          />
+        }
+      >
+        <View style={{ gap: 14, paddingBottom: 16 }}>
+          <Field
+            label="Meal name"
+            value={saveMealName}
+            onChangeText={setSaveMealName}
+            placeholder="e.g. My Breakfast"
+            autoFocus
+          />
+          {savingMealOccasion && (
+            <View style={s.saveMealItemsContainer}>
+              <Text style={s.saveMealItemsHeader}>
+                Included items ({savingMealOccasion.meals.length})
+              </Text>
+              <View style={s.saveMealItemsList}>
+                {savingMealOccasion.meals.map((item, idx) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      s.saveMealItemRow,
+                      idx < savingMealOccasion.meals.length - 1 && s.saveMealItemBorder,
+                    ]}
+                  >
+                    <Text style={s.saveMealItemName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={s.saveMealItemMeta}>
+                      {item.qty ?? "1 serving"} · {fmtInt(item.calories ?? 0)} kcal
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+      </Sheet>
     </View>
   );
 }
@@ -715,35 +896,57 @@ function MacroRow({
 function EntryRow({
   meal,
   last,
+  isSaved,
   onPress,
+  onBookmark,
 }: {
   meal: Meal;
   last: boolean;
+  isSaved: boolean;
   onPress: () => void;
+  onBookmark: () => void;
 }) {
   const conf = confidenceLabel(confidenceOf(meal));
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Edit ${meal.name}`}
-      onPress={() => {
-        tap();
-        onPress();
-      }}
-      style={[s.entry, !last && s.entryLine]}
-    >
-      <View style={s.entryMain}>
-        <Text style={s.entryName}>{meal.name}</Text>
-        <View style={s.entrySub}>
-          <View style={[s.dot, { backgroundColor: conf.color }]} />
-          <Text style={s.mute}>
-            {meal.qty ?? "1 serving"} · {Math.round(meal.protein ?? 0)}g protein
-          </Text>
+    <View style={[s.entry, !last && s.entryLine]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${meal.name}`}
+        onPress={() => {
+          tap();
+          onPress();
+        }}
+        style={s.entryMainPressable}
+      >
+        <View style={s.entryMain}>
+          <Text style={s.entryName}>{meal.name}</Text>
+          <View style={s.entrySub}>
+            <View style={[s.dot, { backgroundColor: conf.color }]} />
+            <Text style={s.mute}>
+              {meal.qty ?? "1 serving"} · {Math.round(meal.protein ?? 0)}g protein
+            </Text>
+          </View>
         </View>
-      </View>
-      <Text style={s.entryKcal}>{fmtInt(meal.calories ?? 0)} kcal</Text>
-    </Pressable>
+        <Text style={s.entryKcal}>{fmtInt(meal.calories ?? 0)} kcal</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={isSaved ? `${meal.name} is saved` : `Save ${meal.name}`}
+        hitSlop={8}
+        onPress={() => {
+          tap();
+          onBookmark();
+        }}
+        style={s.bookmarkBtn}
+      >
+        <Bookmark
+          size={16}
+          color={isSaved ? N.acc : N.mute}
+          fill={isSaved ? N.acc : "none"}
+        />
+      </Pressable>
+    </View>
   );
 }
 
@@ -817,14 +1020,28 @@ const s = StyleSheet.create({
   },
   sectionTitleRow: {
     flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
+    alignItems: "center",
+    justifyContent: "space-between",
     flex: 1,
   },
   sectionTitleWrap: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  sectionRightWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  saveMealHeaderBtn: {
+    padding: 5,
+    borderRadius: 6,
+    backgroundColor: N.card2,
+    borderWidth: 1,
+    borderColor: N.line,
+    alignItems: "center",
+    justifyContent: "center",
   },
   renameBtn: {
     padding: 2,
@@ -842,9 +1059,21 @@ const s = StyleSheet.create({
   entry: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 13,
+  },
+  entryMainPressable: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  bookmarkBtn: {
+    paddingLeft: 12,
+    paddingVertical: 4,
+    justifyContent: "center",
+    alignItems: "center",
   },
   entryLine: { borderBottomWidth: 1, borderBottomColor: N.line },
   entryMain: { flex: 1 },
@@ -857,26 +1086,98 @@ const s = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   remove: { color: N.dim, fontSize: 16, paddingHorizontal: 4 },
-  sectionSaveRow: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 4,
+  feelBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: N.line,
   },
-  feelContainer: {
-    padding: 12,
-    paddingTop: 8,
-  },
-  feelLabel: {
+  feelPrompt: {
     color: N.mute,
     fontSize: 12,
-    marginBottom: 6,
   },
-  feelRow: {
+  feelPills: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+  },
+  feelPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: N.card2,
+    borderWidth: 1,
+    borderColor: N.line,
+  },
+  feelPillActive: {
+    backgroundColor: `${N.acc}25`,
+    borderColor: N.acc,
+  },
+  feelPillText: {
+    color: N.mute,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  feelPillTextActive: {
+    color: N.acc,
+    fontWeight: "600",
+  },
+  saveMealItemsContainer: {
+    marginTop: 4,
     gap: 8,
+  },
+  saveMealItemsHeader: {
+    color: N.mute,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  saveMealItemsList: {
+    backgroundColor: N.card2,
+    borderRadius: NRadius.control,
+    borderWidth: 1,
+    borderColor: N.line,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  saveMealItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+  saveMealItemBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: N.line,
+  },
+  saveMealItemName: {
+    color: N.ink,
+    fontSize: 14,
+    fontWeight: "500",
+    flex: 1,
+    marginRight: 8,
+  },
+  saveMealItemMeta: {
+    color: N.mute,
+    fontSize: 12,
+  },
+  feelCollapsedChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: `${N.acc}22`,
+    borderWidth: 1,
+    borderColor: `${N.acc}66`,
+  },
+  feelCollapsedChipText: {
+    color: N.acc,
+    fontSize: 12,
+    fontWeight: "600",
   },
   dock: {
     position: "absolute",
@@ -885,24 +1186,24 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: N.card2,
+    backgroundColor: "#2a332e",
     borderRadius: NRadius.pill,
-    borderWidth: 1,
-    borderColor: `${N.acc}55`,
+    borderWidth: 1.5,
+    borderColor: N.acc,
     paddingLeft: 18,
     paddingRight: 6,
     paddingVertical: 6,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
   },
   dockInput: { flex: 1, color: N.ink, fontSize: 16, minHeight: 44, paddingVertical: 8 },
   send: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: N.acc,
     alignItems: "center",
     justifyContent: "center",

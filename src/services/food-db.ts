@@ -435,7 +435,7 @@ const UNIT_ALIASES: Record<string, string> = {
   pounds: "lb",
 };
 
-function normalizeUnit(value: string): string {
+export function normalizeUnit(value: string): string {
   const letters = value.toLowerCase().replace(/[^a-z]/g, "");
   return letters ? (UNIT_ALIASES[letters] ?? letters) : "";
 }

@@ -3,15 +3,18 @@ import {
   setStorage,
 } from "@/storage/storage";
 import { createMutex } from "@/storage/mutex";
-import { normalizeFoodName } from "@/services/food-db";
+import { normalizeFoodName, normalizeUnit } from "@/services/food-db";
+import { parseLeadingQuantity } from "@/services/meal-description-parsing";
+import { computeMealTotals } from "@/services/meal-nutrition-math";
 import type {
   ID,
+  Meal,
   MealFood,
   MealSlot,
   Micronutrients,
   Timestamp,
 } from "@/types/gymos";
-import { NUTRIENT_KEYS } from "@/types/gymos";
+import { NUTRIENT_KEYS, pickMicronutrients } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
 import { createId } from "@/utils/id";
 
@@ -251,3 +254,125 @@ export async function restoreSavedFood(
     }
   });
 }
+
+/**
+ * Extract normalized unit from a portion quantity string ("100 g" → "g", "1 bowl" → "bowl").
+ */
+export function extractFoodUnit(qty?: string): string {
+  if (!qty) return "";
+  const parsed = parseLeadingQuantity(qty);
+  if (parsed.unit) return normalizeUnit(parsed.unit);
+  return normalizeUnit(qty);
+}
+
+/**
+ * Check if an identical individual food item exists in Saved foods,
+ * matching by normalized name and normalized unit.
+ */
+export function isItemSaved(
+  item: { name: string; qty?: string },
+  savedFoods?: readonly SavedFood[] | null,
+): boolean {
+  if (!savedFoods || savedFoods.length === 0) return false;
+  const targetName = normalizeFoodName(item.name);
+  if (!targetName) return false;
+  const targetUnit = extractFoodUnit(item.qty);
+
+  return savedFoods.some((saved) => {
+    if (isSavedMeal(saved) || saved.recipe) return false;
+    const savedName = normalizeFoodName(saved.name);
+    if (savedName !== targetName) return false;
+    const savedUnit = extractFoodUnit(saved.qty);
+    return targetUnit === savedUnit;
+  });
+}
+
+function mealFoodOf(meal: Meal): MealFood {
+  return {
+    name: meal.name,
+    qty: meal.qty,
+    calories: meal.calories ?? 0,
+    protein: meal.protein ?? 0,
+    carbs: meal.carbs ?? 0,
+    fat: meal.fat ?? 0,
+    ...pickMicronutrients(meal),
+  };
+}
+
+/**
+ * Save a meal with its breakdown of items, and also upsert each individual
+ * item into Saved foods, deduped by normalised name+unit, never overwriting
+ * user-edited saved foods.
+ */
+export async function saveMealWithItems(
+  mealName: string,
+  meals: readonly Meal[],
+  slot?: MealSlot,
+): Promise<SavedFood | null> {
+  if (meals.length === 0) return null;
+
+  return savedFoodsMutex.runExclusive(async () => {
+    const existing = await readSavedFoodsUnlocked();
+    const now = new Date().toISOString();
+
+    const foods: MealFood[] = meals.map(mealFoodOf);
+    const mealTotals = computeMealTotals(foods);
+
+    // 1. Create the saved meal entry
+    const savedMeal: SavedFood = {
+      id: createId(),
+      name: mealName.trim(),
+      ...mealTotals,
+      foods,
+      slot,
+      createdAt: now,
+    };
+    existing.push(savedMeal);
+
+    // 2. Upsert each individual item into Saved foods:
+    // Deduped by normalised name+unit, NEVER overwriting user-edited saved foods.
+    const seenBatchKeys = new Set<string>();
+
+    for (const meal of meals) {
+      const normName = normalizeFoodName(meal.name);
+      if (!normName) continue;
+
+      const normUnit = extractFoodUnit(meal.qty);
+      const batchKey = `${normName}|${normUnit}`;
+      if (seenBatchKeys.has(batchKey)) continue;
+      seenBatchKeys.add(batchKey);
+
+      // Check if an individual saved food already exists matching normalized name + unit
+      const alreadyExists = existing.some(
+        (entry) =>
+          !isSavedMeal(entry) &&
+          !entry.recipe &&
+          normalizeFoodName(entry.name) === normName &&
+          extractFoodUnit(entry.qty) === normUnit,
+      );
+
+      // If it already exists, NEVER overwrite user-edited saved foods!
+      if (alreadyExists) {
+        continue;
+      }
+
+      // If not, add it as a new individual saved food
+      const itemFood: SavedFood = {
+        id: createId(),
+        name: meal.name,
+        qty: meal.qty ?? "1 serving",
+        calories: meal.calories ?? 0,
+        protein: meal.protein ?? 0,
+        carbs: meal.carbs ?? 0,
+        fat: meal.fat ?? 0,
+        ...pickMicronutrients(meal),
+        createdAt: now,
+      };
+      existing.push(itemFood);
+    }
+
+    await setStorage(SAVED_FOODS_KEY, existing);
+    return savedMeal;
+  });
+}
+

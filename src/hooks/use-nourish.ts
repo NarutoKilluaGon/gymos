@@ -54,6 +54,7 @@ import {
   getSavedFoods,
   rememberFoods,
   restoreSavedFood,
+  saveMealWithItems,
   type RememberedFood,
   type SavedFood,
   type SavedFoodExtras,
@@ -251,6 +252,16 @@ export function useNourish() {
         actOnce(
           "saveSection",
           () => saveSlotAsMeal(meals, slot),
+          "Couldn't save meal",
+        ),
+      saveMealWithItems: (
+        name: string,
+        meals: readonly Meal[],
+        slot?: MealSlot,
+      ) =>
+        actOnce(
+          "saveMealWithItems",
+          () => saveMealWithItems(name, meals, slot),
           "Couldn't save meal",
         ),
       logSaved: (
