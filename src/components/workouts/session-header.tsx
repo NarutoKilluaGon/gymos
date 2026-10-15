@@ -3,6 +3,7 @@ import { ChevronLeft, MoreHorizontal } from "lucide-react-native";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { F, FSerif } from "@/constants/forge-theme";
+import { Q } from "@/constants/quiet";
 
 type SessionHeaderProps = {
   name: string;
@@ -28,7 +29,7 @@ export function SessionHeader({
         }}
         style={styles.iconButton}
       >
-        <ChevronLeft size={22} color={F.ink} />
+        <ChevronLeft size={20} strokeWidth={1.5} color={Q.color.mute} />
       </Pressable>
 
       <View style={styles.titleContainer}>

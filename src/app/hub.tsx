@@ -51,7 +51,7 @@ export default function HubScreen() {
   return (
     <>
       <Screen>
-        <ScreenHeader eyebrow="HUB" title="Hub" />
+        <ScreenHeader module="Hub" accentColor={Q.accent.brass} />
 
         <GymCard style={styles.card}>
           <HubSectionRow
