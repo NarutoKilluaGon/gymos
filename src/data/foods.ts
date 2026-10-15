@@ -1,5 +1,7 @@
-/* Sourced from IFCT (Indian Food Composition Tables, ICMR-NIN 2017) and USDA FoodData Central.
- * Note: all catalog nutritional values are approximate estimates. */
+/* Some base entries were historically referenced from IFCT (Indian Food Composition Tables, ICMR-NIN 2017)
+ * and USDA FoodData Central, but individual provenance is not tracked per entry. Dishes and beverages
+ * added in Phase A (lahori jeera, chole bhature, bhatura, jaljeera, kulcha, puri, pav bhaji, samosa,
+ * jalebi, sweet lassi, daliya) and other composite items are approximate estimates. */
 
 import { normalizeFoodName } from "@/services/food-db";
 
