@@ -1,6 +1,8 @@
 import { X } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -10,19 +12,75 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
-import { GymCard } from "@/components/ui/gym-card";
 import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { saveNorthStar } from "@/storage/repositories/north-star";
 import { convertWeight } from "@/storage/repositories/preferences";
 import { showToast } from "@/utils/toast";
+import { useReducedMotion } from "@/utils/motion";
 import type {
   GoalType,
   MeasurementType,
   MeasurementUnit,
   NorthStar,
 } from "@/types/gymos";
+
+function ShootingStar() {
+  const reducedMotion = useReducedMotion();
+  const slideAnim = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [reducedMotion, slideAnim]);
+
+  const animatedStyle = {
+    opacity: slideAnim,
+    transform: [
+      {
+        translateX: slideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [30, 0],
+        }),
+      },
+      {
+        translateY: slideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-13, 0],
+        }),
+      },
+    ],
+  };
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.shootingStarContainer, animatedStyle]}
+    >
+      {/* Tail: ~130dp long, 2dp thick, rotated about -24 degrees running down-left from head */}
+      <View style={styles.tailWrapper}>
+        <LinearGradient
+          colors={["rgba(255, 255, 255, 0)", "#FFFFFF"]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.tail}
+        />
+      </View>
+
+      {/* Head: ~8dp white dot with soft gold/lavender glow placed 30dp from right, 52dp from top */}
+      <View style={styles.headGlowOuter} />
+      <View style={styles.headGlowInner} />
+      <View style={styles.headDot} />
+    </Animated.View>
+  );
+}
 
 const GOAL_TYPES: { value: GoalType; label: string }[] = [
   { value: "gainMuscle", label: "Gain muscle" },
@@ -194,17 +252,39 @@ export function NorthStarCard({
         accessibilityRole="button"
         accessibilityLabel="Open North Star"
       >
-        <GymCard style={styles.card}>
-          <Text style={styles.eyebrow}>NORTH STAR</Text>
+        <View style={styles.cardContainer}>
+          <LinearGradient
+            colors={["#171a4a", "#241552", "#3a1b5e"]}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={styles.card}
+          >
+            <ShootingStar />
 
-          <Text style={styles.title}>{northStar.title}</Text>
+            <View style={styles.content}>
+              <View style={styles.headerRow}>
+                <Text style={styles.eyebrow}>NORTH STAR</Text>
+                <Pressable
+                  onPress={openEditor}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit North Star"
+                  style={styles.editButtonSmall}
+                >
+                  <Text style={styles.editButtonSmallText}>Edit</Text>
+                </Pressable>
+              </View>
 
-          <View style={styles.whySection}>
-            <Text style={styles.whyLabel}>WHY</Text>
+              <Text style={styles.title}>{northStar.title}</Text>
 
-            <Text style={styles.why}>{northStar.why}</Text>
-          </View>
-        </GymCard>
+              <View style={styles.whySection}>
+                <Text style={styles.whyLabel}>WHY</Text>
+
+                <Text style={styles.why}>{northStar.why}</Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
       </Pressable>
 
       {/* North Star details */}
@@ -476,20 +556,54 @@ export function NorthStarCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
+  cardContainer: {
+    borderRadius: Radius.large,
+    overflow: "hidden",
     marginBottom: Spacing.two,
   },
 
-  eyebrow: {
-    color: GymColors.text.tertiary,
-    fontSize: Typography.caption,
+  card: {
+    borderRadius: Radius.large,
+    padding: Spacing.three,
+    overflow: "hidden",
+    position: "relative",
+  },
+
+  content: {
+    position: "relative",
+    zIndex: 1,
+  },
+
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.one,
   },
 
+  editButtonSmall: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+
+  editButtonSmallText: {
+    color: "rgba(255, 255, 255, 0.75)",
+    fontSize: Typography.caption,
+    fontWeight: "600",
+  },
+
+  eyebrow: {
+    color: "rgba(242, 196, 109, 0.85)",
+    fontSize: Typography.caption,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+
   title: {
-    color: GymColors.text.primary,
+    color: "#FFFFFF",
     fontSize: Typography.h2,
     fontWeight: "600",
+    paddingRight: 60,
   },
 
   whySection: {
@@ -497,15 +611,73 @@ const styles = StyleSheet.create({
   },
 
   whyLabel: {
-    color: GymColors.text.tertiary,
+    color: "rgba(255, 255, 255, 0.5)",
     fontSize: Typography.caption,
     marginBottom: Spacing.one,
   },
 
   why: {
-    color: GymColors.text.secondary,
+    color: "rgba(255, 255, 255, 0.85)",
     fontSize: Typography.body,
     lineHeight: 22,
+  },
+
+  shootingStarContainer: {
+    ...StyleSheet.absoluteFill,
+    overflow: "hidden",
+    zIndex: 0,
+  },
+
+  tailWrapper: {
+    position: "absolute",
+    top: 55,
+    right: 34,
+    width: 130,
+    height: 2,
+    transformOrigin: "right center",
+    transform: [{ rotate: "-24deg" }],
+  },
+
+  tail: {
+    width: 130,
+    height: 2,
+    borderRadius: 1,
+  },
+
+  headGlowOuter: {
+    position: "absolute",
+    top: 45,
+    right: 23,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#b9a3ff",
+    opacity: 0.4,
+  },
+
+  headGlowInner: {
+    position: "absolute",
+    top: 49,
+    right: 27,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#f2c46d",
+    opacity: 0.6,
+  },
+
+  headDot: {
+    position: "absolute",
+    top: 52,
+    right: 30,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#f2c46d",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
   },
 
   modal: {
