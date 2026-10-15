@@ -126,4 +126,59 @@ describe("FoodItemCard (Forge-style review card)", () => {
 
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
+
+  it("shows 'Check this' chip when estimated confidence is low (< 0.6)", () => {
+    const lowConfItem: DraftItem = {
+      ...baseItem,
+      name: "Street chaat",
+      confidence: 0.45,
+      source: "ai",
+    };
+
+    let tree: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(
+        <FoodItemCard item={lowConfItem} status="estimated" />,
+      );
+    });
+
+    const root = tree!.root;
+    expect(root.findByProps({ children: "Check this" })).toBeDefined();
+  });
+
+  it("shows 'Estimated' chip when estimated confidence is good (>= 0.6)", () => {
+    const highConfItem: DraftItem = {
+      ...baseItem,
+      name: "Paneer butter masala",
+      confidence: 0.85,
+      source: "ai",
+    };
+
+    let tree: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(
+        <FoodItemCard item={highConfItem} status="estimated" />,
+      );
+    });
+
+    const root = tree!.root;
+    expect(root.findByProps({ children: "Estimated" })).toBeDefined();
+  });
+
+  it("renders assumption text when item.assumption is provided", () => {
+    const itemWithAssumption: DraftItem = {
+      ...baseItem,
+      assumption: "Assuming 1 medium bowl cooked with 1 tsp oil",
+    };
+
+    let tree: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(
+        <FoodItemCard item={itemWithAssumption} />,
+      );
+    });
+
+    const root = tree!.root;
+    expect(root.findByProps({ children: "Assuming 1 medium bowl cooked with 1 tsp oil" })).toBeDefined();
+  });
 });

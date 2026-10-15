@@ -91,6 +91,7 @@ export const FoodItemCard = memo(function FoodItemCard({
   const isMatched = status === "matched";
   const isEstimated = status === "estimated";
   const isLoading = status === "loading";
+  const isLowConfidence = isEstimated && item.confidence > 0 && item.confidence < 0.6;
 
   return (
     <View style={[styles.card, !approved && styles.cardUnapproved]}>
@@ -134,7 +135,7 @@ export const FoodItemCard = memo(function FoodItemCard({
             style={[
               styles.chip,
               isMatched && styles.chipMatched,
-              isEstimated && styles.chipEstimated,
+              isEstimated && (isLowConfidence ? styles.chipCheckThis : styles.chipEstimated),
               isNeedsInput && styles.chipNeedsInput,
               isLoading && styles.chipLoading,
             ]}
@@ -143,7 +144,7 @@ export const FoodItemCard = memo(function FoodItemCard({
               style={[
                 styles.chipText,
                 isMatched && styles.chipTextMatched,
-                isEstimated && styles.chipTextEstimated,
+                isEstimated && (isLowConfidence ? styles.chipTextCheckThis : styles.chipTextEstimated),
                 isNeedsInput && styles.chipTextNeedsInput,
                 isLoading && styles.chipTextLoading,
               ]}
@@ -153,7 +154,7 @@ export const FoodItemCard = memo(function FoodItemCard({
                 : isMatched
                   ? "Matched"
                   : isEstimated
-                    ? "Estimated"
+                    ? (isLowConfidence ? "Check this" : "Estimated")
                     : "Needs numbers"}
             </Text>
           </View>
@@ -174,6 +175,14 @@ export const FoodItemCard = memo(function FoodItemCard({
           ) : null}
         </View>
       </View>
+
+      {item.assumption ? (
+        <View style={styles.assumptionRow}>
+          <Text style={styles.assumptionText} numberOfLines={2}>
+            {item.assumption}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Macros Section or Edit Inputs */}
       {isEditing ? (
@@ -390,6 +399,9 @@ const styles = StyleSheet.create({
   chipEstimated: {
     backgroundColor: "rgba(217, 164, 65, 0.15)",
   },
+  chipCheckThis: {
+    backgroundColor: "rgba(217, 164, 65, 0.25)",
+  },
   chipNeedsInput: {
     backgroundColor: "rgba(200, 99, 75, 0.15)",
   },
@@ -407,11 +419,23 @@ const styles = StyleSheet.create({
   chipTextEstimated: {
     color: N.warn,
   },
+  chipTextCheckThis: {
+    color: N.warn,
+  },
   chipTextNeedsInput: {
     color: N.bad,
   },
   chipTextLoading: {
     color: N.acc,
+  },
+  assumptionRow: {
+    marginTop: 4,
+  },
+  assumptionText: {
+    fontSize: 12,
+    color: N.mute,
+    fontStyle: "italic",
+    lineHeight: 16,
   },
   iconBtn: {
     padding: 4,

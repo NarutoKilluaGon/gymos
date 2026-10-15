@@ -201,6 +201,15 @@ export const MEAL_SLOTS = [
 ] as const;
 export type MealSlot = (typeof MEAL_SLOTS)[number];
 
+export type FoodCategory =
+  | "dish"
+  | "drink"
+  | "ingredient"
+  | "spice"
+  | "packaged";
+
+export type EstimateSource = "model" | "web";
+
 /** One food as it appears in a review list before it is saved. Totals are
  *  for the WHOLE stated amount, never per 100 g. */
 export type EstimatedFood = {
@@ -218,6 +227,12 @@ export type EstimatedFood = {
   unresolved?: boolean;
   /** Transient provenance; not written to the persisted record. */
   nutritionSource?: NutritionSource;
+  /** Phase C contract fields */
+  category?: FoodCategory;
+  confidence?: number;
+  source?: EstimateSource;
+  assumption?: string;
+  gramsOrMl?: number;
 } & Micronutrients;
 
 /** Canonical nutrient key list, macros first: the single enumerator every

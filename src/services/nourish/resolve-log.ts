@@ -21,10 +21,14 @@ import {
 import {
   isSameUnit,
   matchFoodEntry,
+  normalizeFoodName,
   scalePortionMacros,
 } from "@/services/food-db";
 import { getStorage, setStorage } from "@/storage/storage";
-import type { SavedFood } from "@/storage/repositories/saved-foods";
+import {
+  extractFoodUnit,
+  type SavedFood,
+} from "@/storage/repositories/saved-foods";
 import { pickMicronutrients, type EstimatedFood } from "@/types/gymos";
 import type { DraftItem, DraftSource } from "@/types/nourish";
 
@@ -94,10 +98,13 @@ function fromEstimated(food: EstimatedFood): DraftItem {
     carbs: food.carbs,
     fat: food.fat,
     ...pickMicronutrients(food),
-    confidence: CONFIDENCE[source],
+    confidence: food.confidence !== undefined ? food.confidence : CONFIDENCE[source],
     multiplier: 1,
     source,
     ...(food.entryId ? { entryId: food.entryId } : {}),
+    ...(food.category ? { category: food.category } : {}),
+    ...(food.assumption ? { assumption: food.assumption } : {}),
+    ...(food.source ? { aiSource: food.source } : {}),
   };
 }
 
@@ -325,7 +332,13 @@ export async function resolveStage1(
 
     // 3. AI Estimate Cache
     const norm = segment.toLowerCase().trim();
-    const cached = cache.get(norm) ?? (parsed.name ? cache.get(parsed.name.toLowerCase().trim()) : undefined);
+    const normName = normalizeFoodName(candidateName);
+    const normUnit = extractFoodUnit(parsed.unit || segment);
+    const batchKey = `${normName}|${normUnit}`;
+    const cached =
+      cache.get(norm) ??
+      (batchKey ? cache.get(batchKey) : undefined) ??
+      (parsed.name ? cache.get(parsed.name.toLowerCase().trim()) : undefined);
     if (cached) {
       resolutions.push({
         segment,
@@ -406,7 +419,7 @@ export async function resolveSegments(
     await Promise.all(
       chunk.map(async ({ segment, index }) => {
         const est = await fetchWithRetry(segment, provider);
-        if (est) {
+        if (est && !est.unresolved) {
           // Check Food DB precedence: catalog values win on exact match
           const entry = matchFoodEntry(est.name, 3);
           let item: DraftItem;
@@ -426,14 +439,21 @@ export async function resolveSegments(
             item = lenientDraftFromEstimate(est);
           }
 
-          if (isPlausibleItem(item)) {
+          const isWater =
+            item.name.toLowerCase().includes("water") ||
+            item.name.toLowerCase().includes("paani");
+          const hasCalories = item.calories > 0 || isWater;
+
+          if (isPlausibleItem(item) && hasCalories) {
             resolutions[index] = {
               segment,
               status: "estimated",
               item,
             };
-            // Cache successful AI estimate
+            // Cache successful AI estimate by raw segment and normalised name+unit
             await setAiCache(segment.toLowerCase().trim(), item);
+            const normKey = `${normalizeFoodName(item.name)}|${extractFoodUnit(item.qty)}`;
+            await setAiCache(normKey, item);
             options?.onUpdate?.([...resolutions]);
           }
         }

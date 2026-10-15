@@ -65,4 +65,7 @@ export type DraftItem = {
   source: DraftSource;
   note?: string;
   entryId?: string;
+  category?: "dish" | "drink" | "ingredient" | "spice" | "packaged";
+  assumption?: string;
+  aiSource?: "model" | "web";
 } & Micronutrients;

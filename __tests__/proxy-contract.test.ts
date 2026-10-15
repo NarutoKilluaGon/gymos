@@ -89,6 +89,68 @@ describe("golden /estimate response", () => {
 
     expect(estimate.foods).toHaveLength(1);
   });
+
+  it("parses Phase C contract fields correctly", () => {
+    const phaseCFood = {
+      ...GOLDEN_FOOD,
+      category: "dish",
+      confidence: 0.85,
+      source: "model",
+      assumption: "2 medium phulkas made without ghee",
+      gramsOrMl: 70,
+    };
+
+    const estimate = parseDescriptionAiEstimate({
+      foods: [phaseCFood],
+      contractVersion: 2,
+    });
+
+    expect(estimate.foods[0]).toMatchObject({
+      name: "Roti (phulka)",
+      category: "dish",
+      confidence: 0.85,
+      source: "model",
+      assumption: "2 medium phulkas made without ghee",
+      gramsOrMl: 70,
+      unresolved: false,
+    });
+  });
+
+  it("enforces zero-calorie protection by marking 0 kcal food as unresolved", () => {
+    const zeroCalFood = {
+      ...GOLDEN_FOOD,
+      name: "Bhatura",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+    };
+
+    const estimate = parseDescriptionAiEstimate({
+      foods: [zeroCalFood],
+    });
+
+    // Zero-calorie food must be marked unresolved so it is never saved silently
+    expect(estimate.foods[0].unresolved).toBe(true);
+  });
+
+  it("allows 0 kcal for water without marking unresolved", () => {
+    const waterFood = {
+      ...GOLDEN_FOOD,
+      name: "Water",
+      unit: "glass",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+    };
+
+    const estimate = parseDescriptionAiEstimate({
+      foods: [waterFood],
+    });
+
+    expect(estimate.foods[0].unresolved).toBe(false);
+  });
 });
 
 describe("what the app sends", () => {

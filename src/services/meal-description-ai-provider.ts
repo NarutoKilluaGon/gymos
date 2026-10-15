@@ -175,12 +175,47 @@ export function parseDescriptionAiEstimate(
       values[key] = value;
     }
 
+    // Phase C Contract fields (tolerating legacy responses)
+    const validCategories = new Set(["dish", "drink", "ingredient", "spice", "packaged"]);
+    const rawCat = typeof raw.category === "string" ? raw.category.toLowerCase().trim() : "";
+    const category = validCategories.has(rawCat)
+      ? (rawCat as "dish" | "drink" | "ingredient" | "spice" | "packaged")
+      : undefined;
+
+    const confidence =
+      typeof raw.confidence === "number" && Number.isFinite(raw.confidence)
+        ? Math.max(0, Math.min(1, raw.confidence))
+        : 0.75;
+
+    const source = raw.source === "web" ? "web" : "model";
+
+    const assumption =
+      typeof raw.assumption === "string" && raw.assumption.trim()
+        ? raw.assumption.trim()
+        : undefined;
+
+    const gramsOrMl =
+      typeof raw.gramsOrMl === "number" && Number.isFinite(raw.gramsOrMl) && raw.gramsOrMl > 0
+        ? raw.gramsOrMl
+        : undefined;
+
+    // Zero-calorie protection: Never save 0 kcal food silently!
+    const isWater = name.toLowerCase().includes("water") || name.toLowerCase().includes("paani");
+    const isZeroKcal = (values.calories === 0 && !isWater);
+    const unresolved = isZeroKcal || raw.unresolved === true;
+
     return {
       name,
       estimatedAmount,
       unit,
       ...values,
       nutritionSource: "ai",
+      category,
+      confidence,
+      source,
+      assumption,
+      gramsOrMl,
+      unresolved,
     } as EstimatedFood;
   });
 
