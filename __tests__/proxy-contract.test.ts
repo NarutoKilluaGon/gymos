@@ -227,6 +227,21 @@ describe("what the app sends", () => {
     expect(headers).not.toContain("x-goog");
   });
 
+  it("attaches x-gymos-secret header when sharedSecret is configured (Step 6)", async () => {
+    const { calls, fetcher } = fakeProxy(() => json(GOLDEN_RESPONSE));
+
+    await createRenderDescriptionAiProvider({
+      baseUrl: "https://p.test",
+      fetcher,
+      sharedSecret: "my-app-secret-456",
+    })?.estimate("1 roti");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.init.headers).toMatchObject({
+      "x-gymos-secret": "my-app-secret-456",
+    });
+  });
+
   it("accepts a base URL with a trailing slash or the /estimate suffix", async () => {
     for (const base of ["https://p.test/", "https://p.test/estimate", "https://p.test//"]) {
       const { calls, fetcher } = fakeProxy(() => json(GOLDEN_RESPONSE));

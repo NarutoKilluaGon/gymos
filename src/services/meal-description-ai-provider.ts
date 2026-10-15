@@ -73,6 +73,8 @@ export type RenderDescriptionAiProviderOptions = {
   fetcher?: typeof fetch;
   /** Real request timeout; not a loading delay. */
   timeoutMs?: number;
+  /** Shared secret for authenticating with the proxy. Defaults to EXPO_PUBLIC_GYMOS_SHARED_SECRET. */
+  sharedSecret?: string;
 };
 
 let descriptionAiProviderOverride:
@@ -83,6 +85,12 @@ let descriptionAiProviderOverride:
 /** Read the public Render proxy URL. Expo statically inlines this property. */
 function configuredDescriptionProxyUrl(): string {
   const value = process.env.EXPO_PUBLIC_VISION_API_URL;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** Read the shared secret from environment. */
+function configuredSharedSecret(): string {
+  const value = process.env.EXPO_PUBLIC_GYMOS_SHARED_SECRET;
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -299,6 +307,7 @@ export function createRenderDescriptionAiProvider(
 
   const fetcher = options.fetcher ?? fetch;
   const endpoint = descriptionProxyEndpoint(baseUrl);
+  const sharedSecret = (options.sharedSecret ?? configuredSharedSecret()).trim();
 
   const inFlightRequests = new Map<string, Promise<MealEstimate>>();
 
@@ -328,12 +337,17 @@ export function createRenderDescriptionAiProvider(
             bodyPayload.fresh = true;
           }
 
+          const headers: Record<string, string> = {
+            accept: "application/json",
+            "content-type": "application/json",
+          };
+          if (sharedSecret) {
+            headers["x-gymos-secret"] = sharedSecret;
+          }
+
           const response = await fetcher(endpoint, {
             method: "POST",
-            headers: {
-              accept: "application/json",
-              "content-type": "application/json",
-            },
+            headers,
             body: JSON.stringify(bodyPayload),
             signal: controller.signal,
           });
