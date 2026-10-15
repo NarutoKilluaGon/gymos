@@ -781,18 +781,6 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           <Send size={20} color={N.accInk} />
         </Pressable>
       </Animated.View>
-      {logger.busy ? (
-        <Animated.Text
-          style={[
-            s.working,
-            {
-              bottom: Animated.add(dockBottomAnim, 56),
-            },
-          ]}
-        >
-          {logger.busyMessage ?? "Working it out…"}
-        </Animated.Text>
-      ) : null}
 
       <ReviewSheet logger={logger} />
       <ManualSheet logger={logger} />
@@ -1330,10 +1318,4 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   sendOff: { opacity: 0.4 },
-  working: {
-    position: "absolute",
-    alignSelf: "center",
-    color: N.mute,
-    fontSize: 12,
-  },
 });

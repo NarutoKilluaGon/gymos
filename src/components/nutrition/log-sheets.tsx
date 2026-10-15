@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { RotateCcw, X } from "lucide-react-native";
 
 import { Button, Field, Label, Pill, Sheet } from "@/components/nutrition/nourish-ui";
 import { N, NRadius } from "@/constants/nourish-theme";
@@ -8,6 +9,7 @@ import { FoodItemCard } from "@/components/nutrition/food-item-card";
 import { slotForTime } from "@/services/nourish/slots";
 import { MEAL_SLOTS, type Meal, type MealSlot } from "@/types/gymos";
 import type { DraftItem } from "@/types/nourish";
+import { useReducedMotion } from "@/utils/motion";
 
 function SlotPicker({
   value,
@@ -30,26 +32,127 @@ function SlotPicker({
   );
 }
 
+function EstimatingRow({
+  segment,
+  reducedMotion,
+}: {
+  segment: string;
+  reducedMotion: boolean;
+}) {
+  return (
+    <View style={s.estimatingCard}>
+      <View style={s.itemMain}>
+        <Text style={s.itemName} numberOfLines={1}>
+          {segment}
+        </Text>
+        <Text style={s.estimatingHint}>Estimating…</Text>
+      </View>
+      {reducedMotion ? (
+        <View style={s.staticSpinner} />
+      ) : (
+        <ActivityIndicator size="small" color={N.acc} />
+      )}
+    </View>
+  );
+}
+
+function FailedRow({
+  segment,
+  error,
+  onRetry,
+  onManual,
+  onRemove,
+}: {
+  segment: string;
+  error?: string;
+  onRetry: () => void;
+  onManual: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <View style={s.failedCard}>
+      <View style={s.failedTop}>
+        <View style={s.itemMain}>
+          <Text style={s.itemName} numberOfLines={1}>
+            {segment}
+          </Text>
+          <Text style={s.failedErrorText}>{error ?? "Couldn't estimate. Retry"}</Text>
+        </View>
+        <Pressable
+          accessibilityLabel={`Remove ${segment}`}
+          onPress={onRemove}
+          hitSlop={8}
+          style={s.failedRemoveBtn}
+        >
+          <X size={16} color={N.dim} />
+        </Pressable>
+      </View>
+      <View style={s.failedActionsRow}>
+        <Pressable
+          accessibilityLabel={`Retry estimating ${segment}`}
+          onPress={onRetry}
+          style={s.retryBtn}
+        >
+          <RotateCcw size={14} color={N.acc} />
+          <Text style={s.retryBtnText}>Retry</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel={`Enter macros manually for ${segment}`}
+          onPress={onManual}
+          style={s.manualBtn}
+        >
+          <Text style={s.manualBtnText}>Enter manually</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 /** "Check before saving": nothing is written until the user confirms. */
 export function ReviewSheet({ logger }: { logger: FoodLogger }) {
+  const reducedMotion = useReducedMotion();
   const { review, setReview, busy } = logger;
+  const stagedSegments = review?.stagedSegments;
   const items = review?.items ?? [];
   const calories = items.reduce((sum, i) => sum + i.calories * i.multiplier, 0);
   const protein = items.reduce((sum, i) => sum + i.protein * i.multiplier, 0);
   const timeOk = !review?.at || parseClock(review.at) !== null;
 
+  const hasEstimating = stagedSegments
+    ? stagedSegments.some((s) => s.status === "estimating")
+    : (review?.estimating ?? false);
+
+  const hasFailed = stagedSegments
+    ? stagedSegments.some((s) => s.status === "failed")
+    : false;
+
+  const isSaveDisabled = hasEstimating || hasFailed || items.length === 0 || !timeOk;
+
+  let title = "Check before saving";
+  if (review?.isColdStart) {
+    title = "Waking up the estimator... (first one can take up to 45s)";
+  } else if (hasEstimating) {
+    const current = review?.estimatingProgress?.current ?? 1;
+    const total = review?.estimatingProgress?.total ?? 1;
+    title = `Estimating ${current} of ${total}...`;
+  }
+
+  const saveLabel = hasEstimating
+    ? "Estimating..."
+    : `Save ${items.length} ${items.length === 1 ? "item" : "items"}`;
+
   return (
     <Sheet
       visible={review !== null}
       onClose={() => setReview(null)}
-      title="Check before saving"
+      title={title}
       footer={
         <>
           <Button
-            label={`Save ${items.length} ${items.length === 1 ? "item" : "items"}`}
+            label={saveLabel}
             onPress={() => void logger.confirm()}
             busy={busy}
-            disabled={items.length === 0 || !timeOk}
+            disabled={isSaveDisabled}
           />
           <Button label="Cancel" kind="ghost" onPress={() => setReview(null)} />
         </>
@@ -62,29 +165,70 @@ export function ReviewSheet({ logger }: { logger: FoodLogger }) {
           portion if you know better.
         </Text>
       ) : null}
-      {items.map((item, index) => (
-        <FoodItemCard
-          key={`${item.name}-${index}`}
-          item={item}
-          status={
-            item.calories === 0 && item.protein === 0 && item.carbs === 0 && item.fat === 0
-              ? "needs-input"
-              : item.source === "saved" || item.source === "catalog"
-                ? "matched"
-                : "estimated"
+      {stagedSegments ? (
+        stagedSegments.map((seg) => {
+          if (seg.status === "estimating") {
+            return (
+              <EstimatingRow
+                key={seg.id}
+                segment={seg.segment}
+                reducedMotion={reducedMotion}
+              />
+            );
           }
-          onChange={(next) =>
-            setReview((r) =>
-              r ? { ...r, items: r.items.map((x, i) => (i === index ? next : x)) } : r,
-            )
+          if (seg.status === "failed") {
+            return (
+              <FailedRow
+                key={seg.id}
+                segment={seg.segment}
+                error={seg.error}
+                onRetry={() => void logger.retrySegment(seg.id)}
+                onManual={() => {
+                  logger.removeStagedSegment(seg.id);
+                  logger.openManual(seg.segment, review?.slot);
+                }}
+                onRemove={() => logger.removeStagedSegment(seg.id)}
+              />
+            );
           }
-          onRemove={() =>
-            setReview((r) =>
-              r ? { ...r, items: r.items.filter((_, i) => i !== index) } : r,
-            )
+          if (seg.item) {
+            return (
+              <FoodItemCard
+                key={seg.id}
+                item={seg.item}
+                status={seg.status}
+                onChange={(next) => logger.updateStagedItem(seg.id, next)}
+                onRemove={() => logger.removeStagedSegment(seg.id)}
+              />
+            );
           }
-        />
-      ))}
+          return null;
+        })
+      ) : (
+        items.map((item, index) => (
+          <FoodItemCard
+            key={`${item.name}-${index}`}
+            item={item}
+            status={
+              item.calories === 0 && item.protein === 0 && item.carbs === 0 && item.fat === 0
+                ? "needs-input"
+                : item.source === "saved" || item.source === "catalog"
+                  ? "matched"
+                  : "estimated"
+            }
+            onChange={(next) =>
+              setReview((r) =>
+                r ? { ...r, items: r.items.map((x, i) => (i === index ? next : x)) } : r,
+              )
+            }
+            onRemove={() =>
+              setReview((r) =>
+                r ? { ...r, items: r.items.filter((_, i) => i !== index) } : r,
+              )
+            }
+          />
+        ))
+      )}
       <Text style={s.total}>
         {Math.round(calories)} kcal · {Math.round(protein)}g protein
       </Text>
@@ -519,5 +663,77 @@ const s = StyleSheet.create({
   macroInput: {
     minHeight: 48,
     height: 48,
+  },
+  estimatingCard: {
+    backgroundColor: N.card,
+    borderRadius: NRadius.control,
+    borderWidth: 1,
+    borderColor: N.line,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  estimatingHint: {
+    color: N.mute,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  staticSpinner: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: N.mute,
+  },
+  failedCard: {
+    backgroundColor: N.card,
+    borderRadius: NRadius.control,
+    borderWidth: 1,
+    borderColor: N.bad,
+    padding: 14,
+    marginBottom: 10,
+  },
+  failedTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  failedRemoveBtn: {
+    padding: 4,
+  },
+  failedErrorText: {
+    color: N.bad,
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: "500",
+  },
+  failedActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 10,
+  },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: NRadius.control,
+    backgroundColor: N.card2,
+  },
+  retryBtnText: {
+    color: N.acc,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  manualBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  manualBtnText: {
+    color: N.mute,
+    fontSize: 13,
   },
 });

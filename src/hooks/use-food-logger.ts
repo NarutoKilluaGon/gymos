@@ -1,8 +1,16 @@
 import { useCallback, useState } from "react";
 
-import { isProxyCold } from "@/services/meal-description-ai-provider";
+import {
+  getDescriptionAiProvider,
+  isProxyCold,
+} from "@/services/meal-description-ai-provider";
+import { splitDescriptionSegments } from "@/services/meal-description-parsing";
 import { looksLikeCardio } from "@/services/nourish/cardio";
-import { resolveStaged } from "@/services/nourish/resolve-log";
+import {
+  resolveStage1,
+  resolveSingleSegment,
+  resolveStaged,
+} from "@/services/nourish/resolve-log";
 import { pickSlot, slotFromText } from "@/services/nourish/slots";
 import type { SavedFood } from "@/storage/repositories/saved-foods";
 import type { MealSlot } from "@/types/gymos";
@@ -10,8 +18,20 @@ import type { DraftItem } from "@/types/nourish";
 import { getTodayKey } from "@/utils/date";
 import { showToast } from "@/utils/toast";
 
+export type StagedSegment = {
+  id: string;
+  segment: string;
+  status: "matched" | "estimating" | "estimated" | "failed";
+  item?: DraftItem;
+  error?: string;
+};
+
 export type ReviewState = {
   items: DraftItem[];
+  stagedSegments?: StagedSegment[];
+  estimating?: boolean;
+  estimatingProgress?: { current: number; total: number };
+  isColdStart?: boolean;
   notice?: string;
   slot: MealSlot;
   /** "HH:MM" eaten, or "" for no clock time. */
@@ -123,58 +143,214 @@ export function useFoodLogger(input: {
 
       if (looksLikeCardio(trimmed) && onCardioText) {
         onCardioText(trimmed);
-
         return true;
       }
 
-      // Captured before resolving (which can take a while) so a slow
-      // lookup that finishes after midnight still logs to the day it began.
+      const rawSegments = splitDescriptionSegments(trimmed);
+      if (rawSegments.length === 0) return false;
+
       const context = snapshot();
+      const slot = pickSlot({
+        named: slotFromText(trimmed),
+        at: context.at || null,
+        filled,
+      });
 
-      setBusy(true);
-      setBusyMessage(isProxyCold() ? "Waking up the estimator..." : "Working it out…");
+      // Step 1: Instant local resolution (≤ 50ms)
+      const { resolutions, unknownSegments } = await resolveStage1(rawSegments, saved);
 
-      try {
-        const outcome = await resolveStaged(
-          trimmed,
-          { saved, eatingOut },
-          (liveItems) => {
-            // Progressive update as proxy answers stream in
-            setReview((prev) => (prev ? { ...prev, items: liveItems } : prev));
-          },
-        );
+      const staged: StagedSegment[] = resolutions.map((res, i) => {
+        if (res.status === "matched" && res.item) {
+          return {
+            id: `seg-${i}-${Date.now()}`,
+            segment: res.segment,
+            status: "matched" as const,
+            item: res.item,
+          };
+        }
+        return {
+          id: `seg-${i}-${Date.now()}`,
+          segment: res.segment,
+          status: "estimating" as const,
+        };
+      });
 
-        if (outcome.status === "empty") return false;
+      const provider = getDescriptionAiProvider();
+      const cold = isProxyCold();
 
-        if (outcome.status === "manual") {
-          showToast(
-            outcome.reason === "unreadable"
-              ? "Couldn't read that. Add it manually."
-              : "Offline and not a food I know. Add it manually.",
-          );
-          setManual({ name: outcome.name, ...context });
-
+      if (!provider || unknownSegments.length === 0) {
+        const matchedItems = staged.map((s) => s.item).filter(Boolean) as DraftItem[];
+        if (matchedItems.length === 0) {
+          showToast("Offline and not a food I know. Add it manually.");
+          setManual({ name: trimmed, ...context });
           return true;
         }
-
-        openReview(outcome.items, {
-          ...(outcome.notice ? { notice: outcome.notice } : {}),
-          named: slotFromText(trimmed),
-          context,
+        setReview({
+          items: matchedItems,
+          stagedSegments: staged,
+          estimating: false,
+          slot,
+          at: context.at,
+          dayKey: context.dayKey,
         });
-
         return true;
-      } catch {
-        showToast("Couldn't analyze that. Add it manually.");
-        setManual({ name: trimmed, ...context });
-
-        return true;
-      } finally {
-        setBusy(false);
-        setBusyMessage(null);
       }
+
+      // Step 2: Open "Check before saving" sheet IMMEDIATELY with live progress!
+      setReview({
+        items: staged.map((s) => s.item).filter(Boolean) as DraftItem[],
+        stagedSegments: staged,
+        estimating: true,
+        estimatingProgress: { current: 1, total: unknownSegments.length },
+        isColdStart: cold,
+        slot,
+        at: context.at,
+        dayKey: context.dayKey,
+      });
+
+      // Background Stage 2: Parallel proxy requests (max 3 concurrent, deduped)
+      (async () => {
+        let completedCount = 0;
+        const CONCURRENCY = 3;
+
+        const uniqueMap = new Map<string, { segment: string; indices: number[] }>();
+        for (const { segment, index } of unknownSegments) {
+          const key = segment.toLowerCase().trim();
+          const existing = uniqueMap.get(key);
+          if (existing) {
+            existing.indices.push(index);
+          } else {
+            uniqueMap.set(key, { segment, indices: [index] });
+          }
+        }
+
+        const queue = Array.from(uniqueMap.values());
+
+        for (let i = 0; i < queue.length; i += CONCURRENCY) {
+          const chunk = queue.slice(i, i + CONCURRENCY);
+          await Promise.all(
+            chunk.map(async ({ segment, indices }) => {
+              const item = await resolveSingleSegment(segment, provider);
+              completedCount += indices.length;
+
+              setReview((prev) => {
+                if (!prev || !prev.stagedSegments) return prev;
+                const nextStaged = [...prev.stagedSegments];
+                for (const idx of indices) {
+                  if (item) {
+                    nextStaged[idx] = {
+                      ...nextStaged[idx]!,
+                      status: "estimated",
+                      item: { ...item },
+                      error: undefined,
+                    };
+                  } else {
+                    nextStaged[idx] = {
+                      ...nextStaged[idx]!,
+                      status: "failed",
+                      error: "Couldn't estimate.",
+                      item: undefined,
+                    };
+                  }
+                }
+                const stillEstimating = nextStaged.some((s) => s.status === "estimating");
+                const currentItems = nextStaged.map((s) => s.item).filter(Boolean) as DraftItem[];
+                return {
+                  ...prev,
+                  items: currentItems,
+                  stagedSegments: nextStaged,
+                  estimating: stillEstimating,
+                  estimatingProgress: {
+                    current: Math.min(completedCount + 1, unknownSegments.length),
+                    total: unknownSegments.length,
+                  },
+                  isColdStart: false,
+                };
+              });
+            }),
+          );
+        }
+      })();
+
+      return true;
     },
-    [busy, eatingOut, onCardioText, openReview, saved, snapshot],
+    [busy, filled, onCardioText, saved, snapshot],
+  );
+
+  const retrySegment = useCallback(
+    async (segmentId: string) => {
+      const provider = getDescriptionAiProvider();
+      if (!provider) return;
+
+      let targetSeg: StagedSegment | undefined;
+      setReview((prev) => {
+        if (!prev || !prev.stagedSegments) return prev;
+        const next = prev.stagedSegments.map((s) => {
+          if (s.id === segmentId) {
+            targetSeg = s;
+            return { ...s, status: "estimating" as const, error: undefined };
+          }
+          return s;
+        });
+        return {
+          ...prev,
+          stagedSegments: next,
+          estimating: true,
+        };
+      });
+
+      if (!targetSeg) return;
+
+      const item = await resolveSingleSegment(targetSeg.segment, provider, true);
+
+      setReview((prev) => {
+        if (!prev || !prev.stagedSegments) return prev;
+        const next = prev.stagedSegments.map((s) => {
+          if (s.id === segmentId) {
+            if (item) {
+              return { ...s, status: "estimated" as const, item: { ...item }, error: undefined };
+            }
+            return { ...s, status: "failed" as const, error: "Couldn't estimate.", item: undefined };
+          }
+          return s;
+        });
+        const stillEstimating = next.some((s) => s.status === "estimating");
+        const nextItems = next.map((s) => s.item).filter(Boolean) as DraftItem[];
+        return {
+          ...prev,
+          items: nextItems,
+          stagedSegments: next,
+          estimating: stillEstimating,
+        };
+      });
+    },
+    [],
+  );
+
+  const updateStagedItem = useCallback(
+    (segmentId: string, updated: DraftItem) => {
+      setReview((prev) => {
+        if (!prev || !prev.stagedSegments) return prev;
+        const nextStaged = prev.stagedSegments.map((s) =>
+          s.id === segmentId ? { ...s, item: updated } : s,
+        );
+        const nextItems = nextStaged.map((s) => s.item).filter(Boolean) as DraftItem[];
+        return { ...prev, stagedSegments: nextStaged, items: nextItems };
+      });
+    },
+    [],
+  );
+
+  const removeStagedSegment = useCallback(
+    (segmentId: string) => {
+      setReview((prev) => {
+        if (!prev || !prev.stagedSegments) return prev;
+        const nextStaged = prev.stagedSegments.filter((s) => s.id !== segmentId);
+        const nextItems = nextStaged.map((s) => s.item).filter(Boolean) as DraftItem[];
+        return { ...prev, stagedSegments: nextStaged, items: nextItems };
+      });
+    },
+    [],
   );
 
   const openManual = useCallback(
@@ -191,7 +367,7 @@ export function useFoodLogger(input: {
   );
 
   const confirm = useCallback(async () => {
-    if (!review || busy) return;
+    if (!review || busy || review.estimating) return;
 
     const items = review.items.filter((item) => item.multiplier > 0);
 
@@ -257,6 +433,9 @@ export function useFoodLogger(input: {
     saveManual,
     openReview,
     openManual,
+    retrySegment,
+    updateStagedItem,
+    removeStagedSegment,
   };
 }
 

@@ -384,6 +384,57 @@ export async function resolveStage1(
  * Return per-segment resolution results for Kitchen and detailed reviews.
  * Runs Stage 1 local match instantly, then proxy enrichment for unknown items.
  */
+/**
+ * Resolve a single segment with proxy AI and Food DB precedence check.
+ */
+export async function resolveSingleSegment(
+  segment: string,
+  provider: DescriptionAiProvider,
+  fresh?: boolean,
+): Promise<DraftItem | null> {
+  const est = await fetchWithRetry(segment, provider, fresh);
+  if (!est || est.unresolved) return null;
+
+  const entry = matchFoodEntry(est.name, 3);
+  let item: DraftItem;
+  if (entry && isSameUnit(est.unit, entry.unit)) {
+    const scaled = scalePortionMacros(entry, est.estimatedAmount);
+    item = fromEstimated({
+      ...est,
+      entryId: entry.id,
+      calories: scaled.calories,
+      protein: scaled.protein,
+      carbs: scaled.carbs,
+      fat: scaled.fat,
+      ...pickMicronutrients(scaled),
+      nutritionSource: "food-db",
+    });
+  } else {
+    item = lenientDraftFromEstimate(est);
+  }
+
+  const isWater =
+    item.name.toLowerCase().includes("water") ||
+    item.name.toLowerCase().includes("paani");
+  const isZeroAllowed =
+    est.zeroCalorieOk === true ||
+    item.zeroCalorieOk === true ||
+    isWater;
+  const hasCalories = item.calories > 0 || isZeroAllowed;
+
+  if (isPlausibleItem(item) && hasCalories) {
+    await setAiCache(segment.toLowerCase().trim(), item);
+    const normKey = `${normalizeFoodName(item.name)}|${extractFoodUnit(item.qty)}`;
+    await setAiCache(normKey, item);
+    return item;
+  }
+  return null;
+}
+
+/**
+ * Return per-segment resolution results for Kitchen and detailed reviews.
+ * Runs Stage 1 local match instantly, then proxy enrichment for unknown items.
+ */
 export async function resolveSegments(
   text: string,
   options?: {
@@ -414,55 +465,46 @@ export async function resolveSegments(
   // Notify initial state if callback provided
   options?.onUpdate?.([...resolutions]);
 
-  // Stage 2: Parallel proxy requests (max 4 concurrent)
-  const CONCURRENCY = 4;
-  for (let i = 0; i < unknownSegments.length; i += CONCURRENCY) {
-    const chunk = unknownSegments.slice(i, i + CONCURRENCY);
+  // Stage 2: Parallel proxy requests (max 3 concurrent, deduped by normalized segment)
+  const CONCURRENCY = 3;
+
+  // Deduplicate identical segments across unknown items
+  const uniqueSegmentsMap = new Map<string, { segment: string; indices: number[] }>();
+  for (const { segment, index } of unknownSegments) {
+    const key = segment.toLowerCase().trim();
+    const existing = uniqueSegmentsMap.get(key);
+    if (existing) {
+      existing.indices.push(index);
+    } else {
+      uniqueSegmentsMap.set(key, { segment, indices: [index] });
+    }
+  }
+
+  const uniqueQueue = Array.from(uniqueSegmentsMap.values());
+
+  for (let i = 0; i < uniqueQueue.length; i += CONCURRENCY) {
+    const chunk = uniqueQueue.slice(i, i + CONCURRENCY);
     await Promise.all(
-      chunk.map(async ({ segment, index }) => {
-        const est = await fetchWithRetry(segment, provider, options?.fresh);
-        if (est && !est.unresolved) {
-          // Check Food DB precedence: catalog values win on exact match
-          const entry = matchFoodEntry(est.name, 3);
-          let item: DraftItem;
-          if (entry && isSameUnit(est.unit, entry.unit)) {
-            const scaled = scalePortionMacros(entry, est.estimatedAmount);
-            item = fromEstimated({
-              ...est,
-              entryId: entry.id,
-              calories: scaled.calories,
-              protein: scaled.protein,
-              carbs: scaled.carbs,
-              fat: scaled.fat,
-              ...pickMicronutrients(scaled),
-              nutritionSource: "food-db",
-            });
-          } else {
-            item = lenientDraftFromEstimate(est);
-          }
-
-          const isWater =
-            item.name.toLowerCase().includes("water") ||
-            item.name.toLowerCase().includes("paani");
-          const isZeroAllowed =
-            est.zeroCalorieOk === true ||
-            item.zeroCalorieOk === true ||
-            isWater;
-          const hasCalories = item.calories > 0 || isZeroAllowed;
-
-          if (isPlausibleItem(item) && hasCalories) {
+      chunk.map(async ({ segment, indices }) => {
+        const item = await resolveSingleSegment(segment, provider, options?.fresh);
+        if (item) {
+          for (const index of indices) {
             resolutions[index] = {
-              segment,
+              segment: resolutions[index]?.segment || segment,
               status: "estimated",
-              item,
+              item: { ...item },
             };
-            // Cache successful AI estimate by raw segment and normalised name+unit
-            await setAiCache(segment.toLowerCase().trim(), item);
-            const normKey = `${normalizeFoodName(item.name)}|${extractFoodUnit(item.qty)}`;
-            await setAiCache(normKey, item);
-            options?.onUpdate?.([...resolutions]);
+          }
+        } else {
+          for (const index of indices) {
+            resolutions[index] = {
+              segment: resolutions[index]?.segment || segment,
+              status: "needs-input",
+              reason: "Couldn't estimate.",
+            };
           }
         }
+        options?.onUpdate?.([...resolutions]);
       }),
     );
   }
