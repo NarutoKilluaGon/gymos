@@ -510,8 +510,10 @@ const s = StyleSheet.create({
   bigName: {
     color: F.ink,
     fontFamily: FSerif,
-    fontSize: 28,
-    fontWeight: "300",
+    fontSize: 38,
+    fontWeight: "500",
+    letterSpacing: -0.8,
+    lineHeight: 42,
   },
   recapStats: {
     fontFamily: Font.sans,

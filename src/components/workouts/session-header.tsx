@@ -2,8 +2,7 @@ import * as Haptics from "expo-haptics";
 import { ChevronLeft, MoreHorizontal } from "lucide-react-native";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
-import { Font } from "@/constants/design";
-import { F } from "@/constants/forge-theme";
+import { F, FSerif } from "@/constants/forge-theme";
 
 type SessionHeaderProps = {
   name: string;
@@ -72,12 +71,9 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: F.card,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: F.line,
   },
   titleContainer: {
     flex: 1,
@@ -86,8 +82,8 @@ const styles = StyleSheet.create({
   titleInput: {
     color: F.ink,
     fontSize: 20,
-    fontFamily: Font.serif,
-    fontWeight: "600",
+    fontFamily: FSerif,
+    fontWeight: "500",
     textAlign: "center",
     paddingVertical: 4,
     paddingHorizontal: 8,
