@@ -1,12 +1,12 @@
 import "@/global.css";
 
 import { Platform } from "react-native";
-
 import { HOME } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 
 /**
  * GymOS design tokens.
- * @deprecated Use Theme / HOME from '@/constants/design' instead.
+ * @deprecated Use Q from '@/constants/quiet' or Theme from '@/constants/design' instead.
  */
 export const GymColors = {
   background: {
@@ -30,26 +30,12 @@ export const GymColors = {
   },
 } as const;
 
-export const Fonts = Platform.select({
-  ios: {
-    sans: "system-ui",
-    serif: "ui-serif",
-    rounded: "ui-rounded",
-    mono: "ui-monospace",
-  },
-  default: {
-    sans: "normal",
-    serif: "serif",
-    rounded: "normal",
-    mono: "monospace",
-  },
-  web: {
-    sans: "var(--font-display)",
-    serif: "var(--font-serif)",
-    rounded: "var(--font-rounded)",
-    mono: "var(--font-mono)",
-  },
-});
+export const Fonts = {
+  sans: Q.font.sansRegular,
+  serif: Q.font.displayMedium,
+  rounded: Q.font.sansMedium,
+  mono: "monospace",
+};
 
 export const Spacing = {
   half: 2,
@@ -64,10 +50,15 @@ export const Spacing = {
 } as const;
 
 export const Radius = {
-  small: 6,
-  medium: 12,
-  large: 16,
-  extraLarge: 24,
+  none: 0,
+  sm: 4,
+  md: 8,
+  lg: 12,
+  full: 9999,
+  small: 4,
+  medium: 8,
+  large: 12,
+  extraLarge: 16,
 } as const;
 
 export const Typography = {

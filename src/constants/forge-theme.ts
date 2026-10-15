@@ -1,28 +1,30 @@
-import { Platform } from "react-native";
+import { Q } from "./quiet";
 
 /**
  * Forge palette: warm charcoal with an ember accent. The Workouts screens
  * take every colour from here.
  */
 export const F = {
-  bg: "#151311",
-  card: "#1f1b18",
-  card2: "#2a2521",
-  line: "rgba(255,240,225,0.09)",
-  ink: "#efe8de",
-  mute: "#9a9087",
-  dim: "#887e74",
-  acc: "#e0803f",
-  accInk: "#1c0f06",
-  warm: "#d9a441",
-  ok: "#6fae7a",
-  bad: "#d1604a",
-  scrim: "rgba(0,0,0,0.6)",
+  bg: Q.color.bg,
+  card: Q.color.card,
+  card2: Q.color.surface2,
+  line: Q.color.line,
+  ink: Q.color.ink,
+  mute: Q.color.mute,
+  dim: Q.color.mute,
+  acc: Q.accent.ember,
+  accInk: Q.color.bg,
+  warm: Q.accent.ember,
+  ok: Q.accent.sage,
+  bad: Q.accent.red,
+  scrim: Q.color.scrim,
+  accent: Q.accent.ember,
 } as const;
 
-export const FRadius = { card: 20, control: 14, pill: 999 } as const;
+export const FRadius = {
+  card: Q.radius.none,
+  control: Q.radius.sm,
+  pill: Q.radius.full,
+} as const;
 
-export const FSerif = Platform.select({
-  ios: "ui-serif",
-  default: "serif",
-}) as string;
+export const FSerif = Q.font.displayMedium;
