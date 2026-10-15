@@ -132,8 +132,9 @@ const styles = StyleSheet.create({
   dot: {
     width: 5,
     height: 5,
-    borderRadius: 2.5,
-    marginBottom: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 8,
   },
   tabLabel: {
     fontSize: 14,

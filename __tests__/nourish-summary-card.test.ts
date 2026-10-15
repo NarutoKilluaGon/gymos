@@ -197,4 +197,38 @@ describe("SummaryCard ViewModel (Step 5)", () => {
     });
     expect(vmOver5.calories.fontSize).toBe(17);
   });
+
+  it("formats displayNumber correctly for over (+1,210), under (1,210), and zero (0) without double signs", () => {
+    const vmOver = computeSummaryCardViewModel({
+      eatenKcal: 3468,
+      budgetKcal: 2258,
+      burnedKcal: 0,
+      macrosEaten: { protein: 0, carbs: 0, fat: 0 },
+      macroTargets: defaultTargets,
+    });
+    expect(vmOver.calories.isOver).toBe(true);
+    expect(vmOver.calories.displayNumber).toBe("+1,210");
+    expect(vmOver.calories.displayNumber.startsWith("++")).toBe(false);
+
+    const vmUnder = computeSummaryCardViewModel({
+      eatenKcal: 1048,
+      budgetKcal: 2258,
+      burnedKcal: 0,
+      macrosEaten: { protein: 0, carbs: 0, fat: 0 },
+      macroTargets: defaultTargets,
+    });
+    expect(vmUnder.calories.isOver).toBe(false);
+    expect(vmUnder.calories.displayNumber).toBe("1,210");
+    expect(vmUnder.calories.displayNumber.startsWith("+")).toBe(false);
+
+    const vmZero = computeSummaryCardViewModel({
+      eatenKcal: 2258,
+      budgetKcal: 2258,
+      burnedKcal: 0,
+      macrosEaten: { protein: 0, carbs: 0, fat: 0 },
+      macroTargets: defaultTargets,
+    });
+    expect(vmZero.calories.isOver).toBe(false);
+    expect(vmZero.calories.displayNumber).toBe("0");
+  });
 });

@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DailyTargetsCard } from "@/components/dashboard/daily-targets-card";
 import { FirstRunChecklistCard } from "@/components/dashboard/first-run-checklist";
@@ -32,6 +33,7 @@ import { useModules } from "@/contexts/modules-context";
 import { useTodayKey } from "@/hooks/use-today-key";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { buildHomeSummarySentence } from "@/services/dashboard/home-sentence";
+import { fromKg, sessionVolumeKg } from "@/services/forge/load";
 import { dayFor } from "@/services/forge/plan";
 import { activePlan } from "@/services/forge/settings";
 import { getStreak, type Streak } from "@/services/streak";
@@ -118,6 +120,7 @@ type RecentEvent = {
 };
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const { enabled } = useModules();
   const { unit: weightUnit } = useWeightUnit();
   const todayKey = useTodayKey();
@@ -322,17 +325,34 @@ export default function HomeScreen() {
   const todayDayOfWeek = (new Date().getDay() + 6) % 7;
   const completedDays = streak.todayActive ? [todayDayOfWeek] : [];
 
+  const totalSleepMinutes = sleep.reduce((sum, s) => {
+    if (s.endedAt === undefined) return sum;
+    return (
+      sum +
+      (new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime()) /
+        60_000
+    );
+  }, 0);
+  const totalSleepHours =
+    totalSleepMinutes > 0
+      ? Number((totalSleepMinutes / 60).toFixed(1))
+      : undefined;
+
   // Summary sentence below North Star
   const summarySentence = buildHomeSummarySentence({
     activeWorkout: Boolean(activeWorkout),
     workoutTitle: activeWorkout?.name || plannedDay?.name,
     workoutDone: Boolean(finishedWorkout),
+    isRestDay,
     caloriesEaten: macros.calories,
     calorieTarget: calorieTarget ?? 2258,
+    proteinEaten: macros.protein,
+    proteinTarget,
     steps,
     stepTarget: DAILY_TARGETS.steps,
     waterL: water,
     waterTargetL: DAILY_TARGETS.waterL,
+    sleepHours: totalSleepHours,
   });
 
   // Recent activity list
@@ -382,11 +402,22 @@ export default function HomeScreen() {
   }
   const topRecentEvents = mergedEvents;
 
+  const finishedVolumeKg = finishedWorkout
+    ? sessionVolumeKg(finishedWorkout)
+    : 0;
+  const finishedVolumeUserUnit = Math.round(
+    fromKg(finishedVolumeKg, weightUnit),
+  );
+
   // Forge row subtitle & action
   const forgeSubtitle = activeWorkout
-    ? `${activeWorkout.name || "Workout"} · in progress`
+    ? `${activeWorkout.name || plannedDay?.name || "Push"} · in progress`
     : finishedWorkout
-      ? `${finishedWorkout.name || "Workout"} · complete`
+      ? `${finishedWorkout.name || plannedDay?.name || "Push"} · done${
+          finishedVolumeUserUnit > 0
+            ? ` · ${formatNumber(finishedVolumeUserUnit)} ${weightUnit}`
+            : ""
+        }`
       : isRestDay
         ? "Rest day"
         : plannedDay
@@ -421,7 +452,7 @@ export default function HomeScreen() {
       : undefined;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -687,12 +718,13 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Q.color.bg,
+    overflow: "hidden",
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 58,
+    paddingTop: 16,
     paddingHorizontal: 24,
     paddingBottom: 96,
   },
@@ -758,9 +790,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   actionLinksBar: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: Q.color.line,
+    marginTop: 26,
   },
   checklistSection: {
     marginTop: 16,

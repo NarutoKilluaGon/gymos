@@ -14,9 +14,7 @@ export const SummaryCard = memo(function SummaryCard({
   onOpenMicros: () => void;
 }) {
   const isOver = vm.calories.isOver;
-  const displayNumber = isOver
-    ? `+${vm.calories.displayNumber}`
-    : vm.calories.displayNumber;
+  const displayNumber = vm.calories.displayNumber;
 
   const subtitle = vm.isEmpty
     ? `kcal budget for today. You haven't logged yet.`

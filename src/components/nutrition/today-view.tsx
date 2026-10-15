@@ -1,9 +1,9 @@
 import * as Haptics from "expo-haptics";
 import {
+  ArrowUp,
   Bookmark,
   BookmarkPlus,
   Pencil,
-  Send,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -122,7 +122,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   }, []);
 
   const insets = useSafeAreaInsets();
-  const BASE_DOCK_BOTTOM = 12 + (insets.bottom || 0);
+  const BASE_DOCK_BOTTOM = 0;
 
   const dockBottomAnim = useRef(new Animated.Value(BASE_DOCK_BOTTOM)).current;
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -523,7 +523,12 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           s.scroll,
           {
             paddingBottom:
-              (keyboardOpen ? 8 : BASE_DOCK_BOTTOM) + dockHeight + 16,
+              Math.max(
+                160,
+                dockHeight +
+                  (keyboardOpen ? 8 : insets.bottom || 0) +
+                  48,
+              ),
           },
         ]}
         keyboardShouldPersistTaps="handled"
@@ -791,7 +796,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
             }}
             style={[s.send, (logger.busy || input.trim() === "") && s.sendOff]}
           >
-            <Send size={18} color={Q.color.bg} />
+            <ArrowUp size={18} color={Q.color.bg} strokeWidth={2} />
           </Pressable>
         </View>
       </Animated.View>
@@ -1261,8 +1266,12 @@ const s = StyleSheet.create({
   },
   dockWrapper: {
     position: "absolute",
-    left: 20,
-    right: 20,
+    left: 0,
+    right: 0,
+    backgroundColor: Q.color.bg,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   dockLinks: {
     flexDirection: "row",
@@ -1318,5 +1327,5 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  sendOff: { opacity: 0.25 },
+  sendOff: { opacity: 0.4 },
 });

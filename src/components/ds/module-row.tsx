@@ -125,7 +125,8 @@ export function ModuleRow({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 16,
+    paddingTop: 16,
+    paddingBottom: 15,
     borderTopWidth: 1,
     borderTopColor: Q.color.line,
   },
