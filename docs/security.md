@@ -46,16 +46,11 @@ Render web services run behind Cloudflare reverse proxies. When requests arrive 
 - Standard headers set directly and securely by Cloudflare edge:
   1. `cf-connecting-ip`: Injected directly by Cloudflare edge from the client TCP connection. It **cannot** be spoofed by client request headers because Cloudflare overwrites any client-supplied value at the edge.
   2. `true-client-ip`: Injected by Cloudflare Enterprise / edge layers.
-  3. `x-forwarded-for`: A comma-separated list `client, proxy1, proxy2`. The leftmost entry is the client, but could be pre-pended by an attacker if an intermediary does not strip it.
-- **GymOS proxy precedence:**
-  ```javascript
-  const clientIp =
-    req.headers["cf-connecting-ip"]?.trim() ||
-    req.headers["true-client-ip"]?.trim() ||
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.socket?.remoteAddress ||
-    "unknown";
-  ```
+  3. **FALLBACK:** Direct socket remote address (`req.socket?.remoteAddress`).
+
+### Security Rationale on `x-forwarded-for`
+- **Why we do NOT fall back to leftmost `x-forwarded-for`:** The leftmost entry is client-supplied and easily forged by malicious actors sending arbitrary headers (e.g. rotating `X-Forwarded-For: 1.1.1.1`, `X-Forwarded-For: 1.1.1.2` on every call). Naively trusting leftmost entries allows attackers to bypass per-IP rate limits.
+- **Logging for Verification:** The proxy logs the resolution source (`ip_source="cf-connecting-ip"` or `ip_source="socket.remoteAddress"`) at startup and on a sampled basis (req #1 and every 10th request). Raw client IPs are never logged.
 
 ---
 
@@ -79,3 +74,22 @@ The proxy maintains several operational safeguards in Node.js memory:
 - Transmitted upstream strictly via the `x-goog-api-key` HTTP header.
 - The URL query string does not carry the API key.
 - Upstream network errors and timeout aborts sanitize all logs, ensuring keys are never leaked to logs or client error payloads.
+
+---
+
+## 5. Grounding Costs, Quotas & Graceful Degradation
+
+### Billing & Model Quotas
+- Grounding availability, free quota allowance, and pricing depend strictly on the configured Gemini model and your Google Cloud billing tier.
+- Official documentation and pricing reference: [Google AI Studio Pricing](https://ai.google.dev/pricing).
+- **Billable Requests:** Each call using the Google Search tool (`tools: [{ googleSearch: {} }]`) counts as **one billable grounding request** ($35 per 1,000 search queries on Flash models once beyond any tier allowances).
+- Hard caps implemented in proxy:
+  1. `MAX_GROUNDED_CALLS_PER_REQUEST = 2` (never more than 2 search calls for a single meal).
+  2. `MAX_GROUNDED_SEARCHES_PER_DAY = 100` (daily spend safeguard).
+
+### Automatic 4xx Fallback & Process-Level Circuit Breaker
+If Google returns an HTTP 4xx error (e.g. 400 Bad Request, 403 Forbidden, 404 Not Found) indicating that search grounding is unsupported or unpermitted on the configured model/tier:
+1. The proxy catches the error and logs a clear warning.
+2. Grounding is **permanently disabled for the remainder of the Node.js process** (`groundingDisabledForProcess = true`).
+3. The request deterministically falls back to standard model-only estimation.
+4. Subsequent requests in the same process bypass grounding entirely without incurring failed upstream round-trips.
