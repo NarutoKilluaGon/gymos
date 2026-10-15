@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useModules } from "@/contexts/modules-context";
-import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
+import { Q } from "@/constants/quiet";
 import type { ModuleId } from "@/storage/repositories/modules";
 import type { LucideIcon } from "lucide-react-native";
 
@@ -34,7 +34,7 @@ export function ModuleDisabled({
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Icon size={48} color={GymColors.text.tertiary} />
+        <Icon size={40} color={Q.color.mute} />
       </View>
 
       <Text style={styles.title}>{title} is disabled</Text>
@@ -69,64 +69,70 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: Spacing.five,
-    paddingBottom: Spacing.six,
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+    backgroundColor: Q.color.bg,
   },
 
   iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: Radius.extraLarge,
-    backgroundColor: GymColors.background.card,
+    width: 64,
+    height: 64,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.four,
+    marginBottom: 16,
   },
 
   title: {
-    color: GymColors.text.primary,
-    fontSize: Typography.h2,
-    fontWeight: "700",
+    fontFamily: Q.font.displayMedium,
+    color: Q.color.ink,
+    fontSize: 24,
+    fontWeight: "500",
     textAlign: "center",
-    marginBottom: Spacing.two,
+    marginBottom: 8,
   },
 
   description: {
-    color: GymColors.text.secondary,
-    fontSize: Typography.body,
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.mute,
+    fontSize: 15,
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: Spacing.five,
+    marginBottom: 28,
+    maxWidth: 280,
   },
 
   enableButton: {
-    backgroundColor: GymColors.semantic.accent,
-    borderRadius: Radius.medium,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.five,
+    backgroundColor: Q.color.ink,
+    borderRadius: 12,
+    minHeight: 48,
+    justifyContent: "center",
     width: "100%",
     alignItems: "center",
-    marginBottom: Spacing.two,
+    marginBottom: 10,
   },
 
   enableButtonText: {
-    color: GymColors.text.primary,
-    fontSize: Typography.body,
-    fontWeight: "700",
+    fontFamily: Q.font.sansSemiBold,
+    color: Q.color.bg,
+    fontSize: 15,
+    fontWeight: "600",
   },
 
   hubButton: {
-    backgroundColor: GymColors.background.surface,
-    borderRadius: Radius.medium,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.five,
+    backgroundColor: "transparent",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Q.color.line,
+    minHeight: 48,
+    justifyContent: "center",
     width: "100%",
     alignItems: "center",
   },
 
   hubButtonText: {
-    color: GymColors.text.secondary,
-    fontSize: Typography.body,
-    fontWeight: "600",
+    fontFamily: Q.font.sansMedium,
+    color: Q.color.mute,
+    fontSize: 15,
+    fontWeight: "500",
   },
 });

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { LucideIcon } from "lucide-react-native";
 
-import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { Q } from "@/constants/quiet";
 
 type HubSectionRowProps = {
   icon: LucideIcon;
@@ -21,12 +21,12 @@ export function HubSectionRow({
 }: HubSectionRowProps) {
   return (
     <Pressable
-    accessibilityRole="button"
-    onPress={onPress}
-    style={styles.row}
-  >
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.row}
+    >
       <View style={styles.iconContainer}>
-        <Icon size={20} color={GymColors.text.primary} />
+        <Icon size={18} color={Q.color.mute} />
       </View>
 
       <View style={styles.textBlock}>
@@ -48,15 +48,14 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.three,
-    paddingVertical: Spacing.two,
+    gap: 14,
+    paddingVertical: 14,
+    minHeight: 52,
   },
 
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: Spacing.two,
-    backgroundColor: GymColors.background.surface,
+    width: 24,
+    height: 24,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -66,19 +65,23 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    color: GymColors.text.primary,
-    fontSize: Typography.body,
-    fontWeight: "600",
+    fontFamily: Q.font.sansMedium,
+    color: Q.color.ink,
+    fontSize: 16,
+    fontWeight: "500",
   },
 
   subtitle: {
-    color: GymColors.text.tertiary,
-    fontSize: Typography.caption,
-    marginTop: Spacing.half,
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.mute,
+    fontSize: 13,
+    marginTop: 2,
   },
 
   chevron: {
-    color: GymColors.text.tertiary,
-    fontSize: 24,
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.mute,
+    fontSize: 18,
+    lineHeight: 20,
   },
 });

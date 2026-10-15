@@ -16,7 +16,7 @@ import { SupplementsSheet } from "@/components/hub/supplements-sheet";
 import { InsightsSheet } from "@/components/insights/insights-sheet";
 import { JournalTimeline } from "@/components/journal/journal-timeline";
 import { GymCard } from "@/components/ui/gym-card";
-import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
+import { Q } from "@/constants/quiet";
 import { useWeightUnit } from "@/hooks/use-weight-unit";
 import { applyReminders } from "@/services/notifications";
 import type { ReminderPrefs } from "@/storage/repositories/reminders";
@@ -355,25 +355,31 @@ export default function HubScreen() {
 const styles = StyleSheet.create({
   card: {
     gap: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderRadius: 0,
+    padding: 0,
   },
 
   divider: {
     height: 1,
-    backgroundColor: GymColors.background.surface,
-    marginVertical: Spacing.one,
+    backgroundColor: Q.color.line,
   },
 
   unitBadge: {
-    backgroundColor: GymColors.background.surface,
-    borderRadius: Radius.medium,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
+    backgroundColor: Q.color.surface,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Q.color.line,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
 
   unitBadgeText: {
-    color: GymColors.text.primary,
-    fontSize: Typography.body,
-    fontWeight: "700",
+    fontFamily: Q.font.sansMedium,
+    color: Q.color.ink,
+    fontSize: 14,
+    fontWeight: "600",
   },
 
   modal: {
@@ -383,6 +389,6 @@ const styles = StyleSheet.create({
 
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    backgroundColor: Q.color.scrim,
   },
 });
