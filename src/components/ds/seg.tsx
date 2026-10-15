@@ -9,7 +9,8 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { Font, Metric, Radius } from "@/constants/design";
+import { Metric } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 import { PressableScale } from "./pressable-scale";
 
@@ -60,8 +61,8 @@ export function Seg<T extends string | number>({
   const activeIndex = options.findIndex((o) => o.value === value);
   const safeIndex = activeIndex >= 0 ? activeIndex : 0;
   const itemWidth =
-    containerWidth > 6 && options.length > 0
-      ? (containerWidth - 6) / options.length
+    containerWidth > 0 && options.length > 0
+      ? containerWidth / options.length
       : 0;
 
   useEffect(() => {
@@ -85,8 +86,7 @@ export function Seg<T extends string | number>({
       style={[
         styles.track,
         {
-          backgroundColor: theme.card,
-          borderColor: theme.line,
+          borderBottomColor: theme.line,
         },
         style,
       ]}
@@ -97,7 +97,7 @@ export function Seg<T extends string | number>({
             styles.slider,
             {
               width: itemWidth,
-              backgroundColor: theme.card2,
+              backgroundColor: theme.accent ?? theme.ink,
               transform: [{ translateX: slideAnim }],
             },
           ]}
@@ -114,14 +114,7 @@ export function Seg<T extends string | number>({
             accessibilityLabel={option.label}
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.value)}
-            style={[
-              styles.item,
-              (containerWidth === 0 || itemWidth === 0) &&
-                active && [
-                  styles.itemActive,
-                  { backgroundColor: theme.card2 },
-                ],
-            ]}
+            style={styles.item}
           >
             <Text
               style={[
@@ -195,41 +188,28 @@ const styles = StyleSheet.create({
   track: {
     position: "relative",
     flexDirection: "row",
-    borderRadius: Radius.pill,
-    padding: 3,
-    borderWidth: 1,
+    borderBottomWidth: 1,
+    backgroundColor: "transparent",
     alignItems: "center",
   },
   slider: {
     position: "absolute",
-    top: 3,
-    bottom: 3,
-    left: 3,
-    borderRadius: Radius.pill,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 1,
+    bottom: 0,
+    left: 0,
+    height: 1.5,
+    borderRadius: 0.75,
   },
   item: {
     flex: 1,
     minHeight: Metric.touchMin,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: Radius.pill,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     zIndex: 1,
   },
-  itemActive: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 1,
-  },
   label: {
-    fontFamily: Font.sans,
+    fontFamily: Q.font.sansMedium,
     fontSize: 14,
     fontWeight: "500",
   },

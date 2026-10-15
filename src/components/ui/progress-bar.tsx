@@ -6,7 +6,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { GymColors, Radius, Spacing, Typography } from '@/constants/theme';
+import { GymColors, Spacing, Typography } from '@/constants/theme';
 import { formatNumber } from '@/utils/format';
 import { TimingConfig } from '@/utils/motion';
 
@@ -163,8 +163,8 @@ const styles = StyleSheet.create({
   },
 
   track: {
-    height: 6,
-    borderRadius: Radius.medium,
+    height: 3,
+    borderRadius: 1.5,
     backgroundColor: GymColors.background.surface,
     overflow: 'hidden',
   },
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: GymColors.semantic.accent,
-    borderRadius: Radius.medium,
+    borderRadius: 1.5,
     transformOrigin: 'left',
   },
 
@@ -220,8 +220,8 @@ const styles = StyleSheet.create({
   },
 
   trackCompact: {
-    height: 4,
-    borderRadius: Radius.small,
+    height: 2,
+    borderRadius: 1,
     backgroundColor: GymColors.background.surface,
     overflow: 'hidden',
   },
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: GymColors.semantic.accent,
-    borderRadius: Radius.small,
+    borderRadius: 1,
     transformOrigin: 'left',
   },
 

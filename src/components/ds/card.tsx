@@ -6,7 +6,7 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { Radius } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 import { PressableScale } from "./pressable-scale";
 
@@ -24,16 +24,16 @@ export type CardProps = {
 
 const TONE_ACCENTS: Record<CardTone, { border: string; wash: string }> = {
   forge: {
-    border: "#e0803f",
-    wash: "rgba(224, 128, 63, 0.07)",
+    border: Q.accent.ember,
+    wash: "transparent",
   },
   nourish: {
-    border: "#81a996",
-    wash: "rgba(129, 169, 150, 0.07)",
+    border: Q.accent.sage,
+    wash: "transparent",
   },
   gold: {
-    border: "#d4a24c",
-    wash: "rgba(212, 162, 76, 0.07)",
+    border: Q.accent.brass,
+    wash: "transparent",
   },
 };
 
@@ -63,21 +63,7 @@ export function Card({
     style,
   ];
 
-  const content = (
-    <>
-      {toneConfig ? (
-        <View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFill,
-            styles.wash,
-            { backgroundColor: toneConfig.wash },
-          ]}
-        />
-      ) : null}
-      {children}
-    </>
-  );
+  const content = <>{children}</>;
 
   if (onPress) {
     return (
@@ -107,12 +93,9 @@ export function Card({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.card,
+    borderRadius: Q.radius.none,
     borderWidth: 1,
     padding: 16,
     overflow: "hidden",
-  },
-  wash: {
-    borderRadius: Radius.card,
   },
 });

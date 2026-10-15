@@ -8,7 +8,8 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { Font, Metric } from "@/constants/design";
+import { Metric } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 import { PressableScale } from "./pressable-scale";
 
@@ -63,7 +64,7 @@ export function ListRow({
       {trailing ? (
         <View style={styles.trailingContainer}>{trailing}</View>
       ) : showChevron ? (
-        <ChevronRight size={18} strokeWidth={1.75} color={theme.mute} />
+        <ChevronRight size={14} strokeWidth={1.5} color={theme.mute} />
       ) : null}
     </View>
   );
@@ -102,12 +103,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontFamily: Font.sans,
+    fontFamily: Q.font.sansMedium,
     fontSize: 15,
     fontWeight: "500",
   },
   subtitle: {
-    fontFamily: Font.sans,
+    fontFamily: Q.font.sansRegular,
     fontSize: 13,
     marginTop: 2,
   },

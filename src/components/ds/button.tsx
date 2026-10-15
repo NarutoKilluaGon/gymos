@@ -7,7 +7,8 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { Font, Metric, Radius } from "@/constants/design";
+import { Metric } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 import { PressableScale } from "./pressable-scale";
 
@@ -43,18 +44,21 @@ export function Button({
   const v = variant ?? kind ?? "primary";
   const off = disabled || busy;
 
-  let bgColor = theme.acc;
-  let textColor = theme.accInk;
+  let bgColor: string = theme.accent ?? theme.acc;
+  let textColor: string = Q.color.bg;
+  let borderColor: string | undefined = undefined;
 
   if (v === "secondary") {
-    bgColor = theme.card2;
+    bgColor = "transparent";
     textColor = theme.ink;
+    borderColor = theme.line;
   } else if (v === "ghost") {
     bgColor = "transparent";
     textColor = theme.ink;
   } else if (v === "danger") {
-    bgColor = "rgba(200, 99, 75, 0.08)";
+    bgColor = "transparent";
     textColor = theme.bad;
+    borderColor = `${theme.bad}44`;
   }
 
   return (
@@ -68,7 +72,11 @@ export function Button({
       haptic={!off}
       style={[
         styles.button,
-        { backgroundColor: bgColor },
+        {
+          backgroundColor: bgColor,
+          borderColor: borderColor ?? "transparent",
+          borderWidth: borderColor ? 1 : 0,
+        },
         off && styles.disabled,
         style,
       ]}
@@ -90,17 +98,17 @@ export function Button({
 const styles = StyleSheet.create({
   button: {
     minHeight: Metric.buttonHeight,
-    borderRadius: Radius.control,
-    paddingHorizontal: 18,
+    borderRadius: Q.radius.sm,
+    paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
   },
   text: {
-    fontFamily: Font.sans,
-    fontSize: 15,
-    fontWeight: "600",
+    fontFamily: Q.font.sansMedium,
+    fontSize: 14,
+    fontWeight: "500",
   },
   disabled: {
     opacity: 0.45,

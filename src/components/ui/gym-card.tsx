@@ -1,6 +1,5 @@
 import { StyleSheet, View, type ViewProps } from "react-native";
-
-import { GymColors, Radius, Spacing } from "@/constants/theme";
+import { Q } from "@/constants/quiet";
 
 export type GymCardProps = ViewProps;
 
@@ -10,8 +9,10 @@ export function GymCard({ style, ...otherProps }: GymCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: GymColors.background.card,
-    borderRadius: Radius.large,
-    padding: Spacing.three,
+    backgroundColor: Q.color.card,
+    borderRadius: Q.radius.none,
+    borderWidth: 1,
+    borderColor: Q.color.line,
+    padding: 16,
   },
 });

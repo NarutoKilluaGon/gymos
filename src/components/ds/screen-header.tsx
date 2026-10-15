@@ -9,7 +9,7 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { Font } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 
 export type ScreenHeaderProps = {
@@ -39,13 +39,13 @@ export function ScreenHeader({
                 accessibilityRole="button"
                 accessibilityLabel="Back"
                 onPress={onBack}
-                style={[styles.backButton, { backgroundColor: theme.card2 }]}
+                style={styles.backButton}
               >
-                <ChevronLeft size={20} strokeWidth={1.75} color={theme.ink} />
+                <ChevronLeft size={22} strokeWidth={1.5} color={theme.ink} />
               </Pressable>
             ) : null}
             {eyebrow ? (
-              <Text style={[styles.eyebrow, { color: theme.acc }]}>{eyebrow}</Text>
+              <Text style={[styles.eyebrow, { color: theme.accent ?? theme.acc }]}>{eyebrow}</Text>
             ) : null}
           </View>
 
@@ -71,26 +71,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     minHeight: 44,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   leftGroup: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
   eyebrow: {
-    fontFamily: Font.sans,
-    fontSize: 11,
-    letterSpacing: 2,
+    fontFamily: Q.font.sansMedium,
+    fontSize: 12,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
-    fontWeight: "600",
+    fontWeight: "500",
   },
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
+    backgroundColor: "transparent",
   },
   rightSlot: {
     minWidth: 44,
@@ -99,9 +99,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontFamily: Font.serif,
-    fontSize: 34,
-    fontWeight: "300",
-    lineHeight: 40,
+    fontFamily: Q.font.displayMedium,
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: "500",
+    letterSpacing: -0.5,
   },
 });
