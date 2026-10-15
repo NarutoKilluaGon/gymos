@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Batch 2 Verification - Home Polish</title>
+  <link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400;500;600&family=Funnel+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0D0D0C; color: #F2EEE6; font-family: 'Funnel Sans', sans-serif; }
+    .screen { width: 390px; min-height: 844px; position: relative; overflow: hidden; background: #0D0D0C; }
+    .status-bar { height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; font-size: 13px; color: #8F8A80; background: #0D0D0C; }
+    .content { padding: 16px 24px 100px; }
+    .header-row { display: flex; justify-content: space-between; align-items: center; }
+    .greeting { font-size: 13px; color: #8F8A80; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    /* 2.5 Offline Indicator: Plain small mute text */
+    .offline-text { font-size: 13px; color: #8F8A80; font-family: 'Funnel Sans', sans-serif; }
+    .streak { font-size: 13px; color: #C9A25A; font-weight: 500; }
+    .hero { margin-top: 34px; }
+    .north-star-label { font-size: 13px; color: #8F8A80; display: flex; align-items: center; gap: 8px; }
+    .north-star-goal { font-family: 'Funnel Display', sans-serif; font-size: 50px; font-weight: 500; letter-spacing: -1.5px; line-height: 1.02; margin-top: 10px; color: #F2EEE6; }
+    .sentence { font-size: 16px; line-height: 1.4; color: #8F8A80; margin-top: 12px; max-width: 300px; }
+    .module-row { padding: 16px 0 15px; border-top: 1px solid #2B2924; }
+    .module-header { display: flex; justify-content: space-between; align-items: center; }
+    .module-title { font-family: 'Funnel Display', sans-serif; font-size: 21px; font-weight: 500; color: #F2EEE6; display: flex; align-items: center; gap: 9px; }
+    .dot-cyan { width: 8px; height: 8px; border-radius: 4px; background: #6CC4D8; }
+    .dot-brass { width: 8px; height: 8px; border-radius: 4px; background: #C9A25A; }
+    .module-sub { font-size: 14px; color: #8F8A80; margin-top: 3px; margin-left: 17px; }
+    .btn-outline { height: 38px; padding: 0 14px; border-radius: 11px; font-size: 14px; font-weight: 600; background: transparent; border: 1px solid #C9A25A66; color: #C9A25A; }
+    .progress-bar { height: 2px; background: #2B2924; margin-top: 12px; position: relative; }
+    /* 2.1 Action links row: 14/600 ink, left-aligned, gap 18, marginTop 26, no bullets */
+    .action-links { margin-top: 26px; display: flex; gap: 18px; font-size: 14px; font-weight: 600; color: #F2EEE6; }
+    .action-link { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+    /* 2.2 First-run checklist: flat hairline rows, sentence case, mute check/chevron */
+    .checklist-section { margin-top: 24px; }
+    .checklist-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .section-label { font-size: 13px; color: #8F8A80; }
+    .dismiss-link { font-size: 13px; color: #8F8A80; cursor: pointer; }
+    .checklist-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 1px solid #2B2924; }
+    .checklist-item-title { font-size: 16px; font-weight: 500; color: #F2EEE6; }
+    .checklist-item-title.done { color: #8F8A80; }
+    /* 2.4 Recent Activity: flat hairline rows, 16/500 ink, 13 mute sub, 13 mute timestamp */
+    .activity-section { margin-top: 24px; }
+    .activity-row { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0; border-top: 1px solid #2B2924; }
+    .activity-title { font-size: 16px; font-weight: 500; color: #F2EEE6; }
+    .activity-sub { font-size: 13px; color: #8F8A80; margin-top: 2px; }
+    .activity-time { font-size: 13px; color: #8F8A80; }
+    /* Tab Bar */
+    .tab-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; border-top: 1px solid #2B2924; display: flex; background: #0D0D0C; }
+    .tab-item { flex: 1; text-align: center; font-size: 14px; padding-top: 14px; }
+    .tab-dot { width: 5px; height: 5px; border-radius: 3px; overflow: hidden; margin: 0 auto 8px; }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span>100%</span>
+    </div>
+    <div class="content">
+      <!-- 2.3 & 2.5 Header with minimal sentence-case greeting and Offline indicator -->
+      <div class="header-row">
+        <span class="greeting"><span style="color:#F2EEE6;font-weight:600">Good evening</span></span>
+        <div class="header-right">
+          <span class="offline-text">Offline</span>
+          <span class="streak">1 day streak</span>
+        </div>
+      </div>
+
+      <!-- 2.3 North star sentence case -->
+      <div class="hero">
+        <div class="north-star-label">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#C9A25A"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <span>North star</span>
+        </div>
+        <div class="north-star-goal">23 inch waist</div>
+        <div class="sentence">Push done. 840 kcal remaining today.</div>
+      </div>
+
+      <!-- 2.6 Supplements module row below Water -->
+      <div style="margin-top: 22px;">
+        <div class="module-row">
+          <div class="module-header">
+            <div>
+              <div class="module-title"><span class="dot-cyan"></span>Water</div>
+              <div class="module-sub">2.5 of 3.5 L</div>
+            </div>
+            <button class="btn-outline" style="border-color:#6CC4D866;color:#6CC4D8">+250 ml</button>
+          </div>
+          <div class="progress-bar"></div>
+        </div>
+
+        <div class="module-row">
+          <div class="module-header">
+            <div>
+              <div class="module-title"><span class="dot-brass"></span>Supplements</div>
+              <div class="module-sub">2 of 3 taken</div>
+            </div>
+            <button class="btn-outline">Log</button>
+          </div>
+          <div class="progress-bar"></div>
+        </div>
+
+        <!-- 2.1 Action links row: 14/600 ink, left-aligned, gap 18, marginTop 26, no bullets -->
+        <div class="action-links">
+          <span class="action-link">Weigh in</span>
+          <span class="action-link">Sleep</span>
+          <span class="action-link">Journal</span>
+          <span class="action-link">Cardio</span>
+        </div>
+      </div>
+
+      <!-- 2.2 First-run checklist: flat hairline rows, sentence case label, mute icons -->
+      <div class="checklist-section">
+        <div class="checklist-header">
+          <span class="section-label">Get started · 2 of 3 done</span>
+          <span class="dismiss-link">Dismiss</span>
+        </div>
+        <div class="checklist-item">
+          <span class="checklist-item-title done">Log your first meal</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8F8A80" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="checklist-item">
+          <span class="checklist-item-title done">Start your first workout</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8F8A80" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="checklist-item">
+          <span class="checklist-item-title">Add water</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8F8A80" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <!-- 2.3 & 2.4 Recent activity: sentence case heading, flat hairline rows, max 3 rows -->
+      <div class="activity-section">
+        <div class="section-label" style="margin-bottom:8px">Recent activity</div>
+        <div class="activity-row">
+          <div>
+            <div class="activity-title">Push session</div>
+            <div class="activity-sub">5 exercises logged</div>
+          </div>
+          <span class="activity-time">2h ago</span>
+        </div>
+        <div class="activity-row">
+          <div>
+            <div class="activity-title">Lunch</div>
+            <div class="activity-sub">650 kcal · 42g protein</div>
+          </div>
+          <span class="activity-time">4h ago</span>
+        </div>
+        <div class="activity-row">
+          <div>
+            <div class="activity-title">Morning snack</div>
+            <div class="activity-sub">220 kcal · 15g protein</div>
+          </div>
+          <span class="activity-time">7h ago</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <div class="tab-item" style="color:#F2EEE6;font-weight:600">
+        <div class="tab-dot" style="background:#C9A25A"></div>
+        Home
+      </div>
+      <div class="tab-item" style="color:#8F8A80;font-weight:500">
+        <div class="tab-dot" style="background:transparent"></div>
+        Forge
+      </div>
+      <div class="tab-item" style="color:#8F8A80;font-weight:500">
+        <div class="tab-dot" style="background:transparent"></div>
+        Nourish
+      </div>
+      <div class="tab-item" style="color:#8F8A80;font-weight:500">
+        <div class="tab-dot" style="background:transparent"></div>
+        Hub
+      </div>
+    </div>
+  </div>
+</body>
+</html>

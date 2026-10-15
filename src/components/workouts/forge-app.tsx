@@ -18,6 +18,10 @@ import { FORGE } from "@/constants/design";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { Screen } from "@/components/ds/screen";
 import { ScreenHeader } from "@/components/ds/screen-header";
+import { Q } from "@/constants/quiet";
+import { dayFor } from "@/services/forge/plan";
+import { activePlan } from "@/services/forge/settings";
+import { getTodayKey } from "@/utils/date";
 import { useForge } from "@/hooks/use-forge";
 import type { WorkoutSession } from "@/types/gymos";
 
@@ -125,14 +129,38 @@ export function ForgeApp() {
     );
   }
 
+  const todayKey = getTodayKey();
+  const plannedDay = forge.data
+    ? dayFor(
+        activePlan(forge.data.settings) ?? undefined,
+        todayKey,
+        todayKey,
+        forge.data.sessions,
+      )
+    : null;
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(
+    new Date(),
+  );
+  const forgeContext =
+    tab === "today"
+      ? `${plannedDay?.name || "Push"} · ${weekday}`
+      : tab === "plan"
+        ? "Plan"
+        : "History";
+
   return (
     <ThemeProvider theme={FORGE}>
       <Screen scroll={false}>
-        <ScreenHeader eyebrow="FORGE" title="Workouts" />
+        <ScreenHeader
+          module="Forge"
+          accentColor={Q.accent.ember}
+          context={forgeContext}
+        />
         <View style={s.tabs}>
           <Seg
             options={TABS}
             value={tab}
+            accentColor={Q.accent.ember}
             onChange={(next) => {
               planDrafts.flushAll();
               setTab(next);

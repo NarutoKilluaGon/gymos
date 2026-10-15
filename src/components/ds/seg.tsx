@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   AccessibilityInfo,
   Animated,
@@ -9,7 +9,7 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { Font, Metric, Radius } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 import { PressableScale } from "./pressable-scale";
 
@@ -22,6 +22,7 @@ export type SegProps<T extends string | number> = {
   options: readonly SegOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  accentColor?: string;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -29,81 +30,14 @@ export function Seg<T extends string | number>({
   options,
   value,
   onChange,
+  accentColor,
   style,
 }: SegProps<T>) {
   const theme = useTheme();
-  const [containerWidth, setContainerWidth] = useState(0);
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const isReducedMotion = useRef(process.env.NODE_ENV === "test");
-
-  useEffect(() => {
-    if (process.env.NODE_ENV === "test") return;
-    try {
-      AccessibilityInfo.isReduceMotionEnabled()
-        ?.then((enabled) => {
-          isReducedMotion.current = enabled;
-        })
-        ?.catch(() => {});
-
-      const sub = AccessibilityInfo.addEventListener?.(
-        "reduceMotionChanged",
-        (enabled) => {
-          isReducedMotion.current = enabled;
-        },
-      );
-      return () => {
-        sub?.remove?.();
-      };
-    } catch {}
-  }, []);
-
-  const activeIndex = options.findIndex((o) => o.value === value);
-  const safeIndex = activeIndex >= 0 ? activeIndex : 0;
-  const itemWidth =
-    containerWidth > 6 && options.length > 0
-      ? (containerWidth - 6) / options.length
-      : 0;
-
-  useEffect(() => {
-    if (containerWidth <= 0 || itemWidth <= 0) return;
-    const targetX = safeIndex * itemWidth;
-    if (isReducedMotion.current || process.env.NODE_ENV === "test") {
-      slideAnim.setValue(targetX);
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: targetX,
-        duration: 160,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [safeIndex, itemWidth, containerWidth, slideAnim]);
+  const acc = accentColor ?? theme.accent ?? theme.acc ?? Q.accent.brass;
 
   return (
-    <View
-      accessibilityRole="tablist"
-      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
-      style={[
-        styles.track,
-        {
-          backgroundColor: theme.card,
-          borderColor: theme.line,
-        },
-        style,
-      ]}
-    >
-      {containerWidth > 0 && itemWidth > 0 ? (
-        <Animated.View
-          style={[
-            styles.slider,
-            {
-              width: itemWidth,
-              backgroundColor: theme.card2,
-              transform: [{ translateX: slideAnim }],
-            },
-          ]}
-        />
-      ) : null}
-
+    <View accessibilityRole="tablist" style={[styles.track, style]}>
       {options.map((option) => {
         const active = option.value === value;
 
@@ -114,20 +48,18 @@ export function Seg<T extends string | number>({
             accessibilityLabel={option.label}
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.value)}
-            style={[
-              styles.item,
-              (containerWidth === 0 || itemWidth === 0) &&
-                active && [
-                  styles.itemActive,
-                  { backgroundColor: theme.card2 },
-                ],
-            ]}
+            style={styles.item}
           >
+            <View
+              style={[
+                styles.dot,
+                { backgroundColor: active ? acc : "transparent" },
+              ]}
+            />
             <Text
               style={[
                 styles.label,
-                { color: active ? theme.ink : theme.mute },
-                active && styles.labelActive,
+                active ? styles.labelActive : styles.labelInactive,
               ]}
             >
               {option.label}
@@ -164,6 +96,16 @@ export function Crossfade({
           isReduced.current = e;
         })
         ?.catch(() => {});
+
+      const sub = AccessibilityInfo.addEventListener?.(
+        "reduceMotionChanged",
+        (enabled) => {
+          isReduced.current = enabled;
+        },
+      );
+      return () => {
+        sub?.remove?.();
+      };
     } catch {}
   }, []);
 
@@ -193,47 +135,36 @@ export function Crossfade({
 
 const styles = StyleSheet.create({
   track: {
-    position: "relative",
     flexDirection: "row",
-    borderRadius: Radius.pill,
-    padding: 3,
-    borderWidth: 1,
     alignItems: "center",
-  },
-  slider: {
-    position: "absolute",
-    top: 3,
-    bottom: 3,
-    left: 3,
-    borderRadius: Radius.pill,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 1,
+    backgroundColor: "transparent",
   },
   item: {
     flex: 1,
-    minHeight: Metric.touchMin,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: Radius.pill,
-    paddingHorizontal: 12,
-    zIndex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
-  itemActive: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 1,
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 6,
   },
   label: {
-    fontFamily: Font.sans,
     fontSize: 14,
+  },
+  labelInactive: {
+    fontFamily: Q.font.sansMedium,
     fontWeight: "500",
+    color: Q.color.mute,
   },
   labelActive: {
+    fontFamily: Q.font.sansSemiBold,
     fontWeight: "600",
+    color: Q.color.ink,
   },
 });

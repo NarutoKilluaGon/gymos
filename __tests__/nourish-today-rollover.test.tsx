@@ -27,6 +27,7 @@ jest.mock("lucide-react-native", () => ({
   Pencil: () => null,
   Plus: () => null,
   Send: () => null,
+  ArrowUp: () => null,
   RotateCcw: () => null,
   Bookmark: () => null,
   BookmarkPlus: () => null,
@@ -317,7 +318,7 @@ describe("Nourish TodayView day handling", () => {
     expect(view.actions.addCardio).toHaveBeenLastCalledWith("2026-10-05", expect.anything());
 
     // Feel and cardio removal act on what is on screen: the new day's entries.
-    view.press("Just right");
+    view.press("Good");
     expect(view.actions.setFeel).toHaveBeenLastCalledWith("2026-10-05", "occasion-b", 2);
     view.press("Remove Run");
     expect(view.actions.removeCardio).toHaveBeenLastCalledWith("2026-10-05", "run-1");

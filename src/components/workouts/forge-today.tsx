@@ -3,14 +3,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Trophy } from "lucide-react-native";
 
 import { CardioSheet } from "@/components/nutrition/more-sheets";
-import { CardioSection, DateNavigator } from "@/components/ds";
+import { CardioSection, DateNavigator, WeekStrip } from "@/components/ds";
 import {
   CalendarSheet,
   StaleSessionSheet,
 } from "@/components/workouts/forge-sheets";
-import { Button, FCard, Pill, tap } from "@/components/workouts/forge-ui";
-import { Font } from "@/constants/design";
-import { F, FSerif } from "@/constants/forge-theme";
+import { Button } from "@/components/workouts/forge-ui";
+import { Q } from "@/constants/quiet";
 import type { ForgeData } from "@/hooks/use-forge";
 import { useTodayKey } from "@/hooks/use-today-key";
 import { buildCalendarSummaryMap } from "@/services/forge/calendar";
@@ -67,8 +66,6 @@ export function TodayView({
   onGoPlan: () => void;
 }) {
   const todayKey = useTodayKey();
-  // null follows "today" (so it rolls over at midnight); a string is a past
-  // day the user deliberately navigated to and stays put.
   const [picked, setPicked] = useState<string | null>(null);
   const [cardioOpen, setCardioOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -133,16 +130,43 @@ export function TodayView({
 
   const nextDay = plan ? nextRotationDay(plan, data.sessions) : null;
 
+  // WeekStrip day indices (Monday = 0, Sunday = 6)
+  const jsDay = dateFromKey(dateKey).getDay();
+  const dayIndex = (jsDay + 6) % 7;
+  const mondayKey = addDaysToKey(dateKey, -dayIndex);
+  const completedDayIndices: number[] = [];
+  for (let i = 0; i < 7; i += 1) {
+    const k = addDaysToKey(mondayKey, i);
+    if (data.sessions.some((s) => sessionDate(s) === k && s.endedAt)) {
+      completedDayIndices.push(i);
+    }
+  }
+
+  const workoutHeadline = planned
+    ? displayName(planned.name)
+    : plan?.rotate && !isToday
+      ? "Nothing logged"
+      : !plan || plan.days.length === 0
+        ? "No plan"
+        : "Rest day";
+
+  const workoutSentence = planned
+    ? `${plural(planned.exercises.length, "exercise")}, about ${Math.max(
+        20,
+        planned.exercises.length * 10,
+      )} minutes. ${plural(lastWeek, "workout")} in the last 7 days.`
+    : `${plural(lastWeek, "workout")} in the last 7 days.`;
+
   return (
     <View style={s.root}>
-      {/* COMPACT DATE ROW */}
+      {/* 3.4 COMPACT DATE ROW */}
       <DateNavigator
         dateKey={dateKey}
         todayKey={todayKey}
         onStep={stepDay}
         onOpenCalendar={() => setCalendarOpen(true)}
         onBackToToday={() => setPicked(null)}
-        accentColor={F.acc}
+        accentColor={Q.accent.ember}
       />
 
       {!isToday ? (
@@ -153,24 +177,26 @@ export function TodayView({
 
       {/* ACTIVE WORKOUT IN PROGRESS */}
       {active ? (
-        <FCard style={s.card}>
+        <View style={s.sectionBlock}>
           <Text style={s.meta}>{`Workout in progress · ${active.date ?? ""}`}</Text>
-          <Text style={s.bigName}>{active.name}</Text>
-          <Button
-            label="Resume"
-            onPress={() => {
-              const activeDay = sessionDate(active);
-              if (activeDay < todayKey) {
-                setStaleSheetOpen(true);
-              } else {
-                onOpen(active);
-              }
-            }}
-          />
-        </FCard>
+          <Text style={s.homeGoal}>{displayName(active.name)}</Text>
+          <View style={{ marginTop: 18 }}>
+            <Button
+              label="Resume workout"
+              onPress={() => {
+                const activeDay = sessionDate(active);
+                if (activeDay < todayKey) {
+                  setStaleSheetOpen(true);
+                } else {
+                  onOpen(active);
+                }
+              }}
+            />
+          </View>
+        </View>
       ) : null}
 
-      {/* COMPLETED WORKOUT RECAP HERO (NOT AN INVITATION) */}
+      {/* COMPLETED WORKOUT RECAP (FLAT HAIRLINES) */}
       {done.map((session) => {
         const totalSets = session.exercises.reduce(
           (sum, e) => sum + e.sets.filter((st) => st.completed).length,
@@ -189,111 +215,77 @@ export function TodayView({
           <Pressable
             key={session.id}
             accessibilityRole="button"
-            onPress={() => {
-              tap();
-              onOpen(session);
-            }}
+            onPress={() => onOpen(session)}
+            style={s.sectionBlock}
           >
-            <FCard style={s.card}>
-              <View style={s.recapHead}>
-                <Text style={s.recapEyebrow}>
-                  {session.backdated
-                    ? "LOGGED WORKOUT"
-                    : `DONE · ${formatDuration(durationMs(session, 0))}`}
+            <Text style={s.meta}>
+              {session.backdated
+                ? "Logged workout"
+                : `Done · ${formatDuration(durationMs(session, 0))}`}
+            </Text>
+
+            <Text style={s.homeGoal}>{displayName(session.name)}</Text>
+
+            <Text style={s.sentence}>
+              {`${formatDuration(durationMs(session, 0))} · ${formatWeight(
+                fromKg(sessionVolumeKg(session), unit),
+                unit,
+              )} · ${plural(totalSets, "set")}`}
+            </Text>
+
+            {(session.prs ?? []).length > 0 ? (
+              <View style={s.prBadgeRow}>
+                <Trophy size={14} color={Q.accent.ember} />
+                <Text style={s.prBadgeText}>
+                  {plural(session.prs?.length ?? 0, "new record")}
                 </Text>
               </View>
+            ) : null}
 
-              <Text style={s.bigName}>{displayName(session.name)}</Text>
-
-              <Text style={s.recapStats}>
-                {`${formatDuration(durationMs(session, 0))} · ${formatWeight(
-                  fromKg(sessionVolumeKg(session), unit),
-                  unit,
-                )} · ${plural(totalSets, "set")}`}
+            {musclesHit.length > 0 ? (
+              <Text style={s.musclesText}>
+                {`Muscles hit: ${musclesHit.join(" · ")}`}
               </Text>
+            ) : null}
 
-              {(session.prs ?? []).length > 0 ? (
-                <View style={s.prBadgeRow}>
-                  <Trophy size={14} color={F.acc} />
-                  <Text style={s.prBadgeText}>
-                    {plural(session.prs?.length ?? 0, "new record")}
+            {/* Tight exercise list */}
+            <View style={s.hairlineList}>
+              {session.exercises.map((exercise) => (
+                <View key={exercise.id} style={s.exerciseRow}>
+                  <Text style={s.exerciseName} numberOfLines={1}>
+                    {displayName(exercise.name)}
+                  </Text>
+                  <Text style={s.exerciseSets}>
+                    {formatSetGroup(exercise.sets, unit, exercise.bodyweight)}
                   </Text>
                 </View>
-              ) : null}
+              ))}
+            </View>
 
-              {musclesHit.length > 0 ? (
-                <Text style={s.musclesText}>
-                  {`Muscles hit: ${musclesHit.join(" · ")}`}
-                </Text>
-              ) : null}
-
-              {/* Tight exercise list */}
-              <View style={s.tightList}>
-                {session.exercises.map((exercise) => (
-                  <View key={exercise.id} style={s.exerciseRow}>
-                    <Text style={s.exerciseName} numberOfLines={1}>
-                      {displayName(exercise.name)}
-                    </Text>
-                    <Text style={s.exerciseSets}>
-                      {formatSetGroup(exercise.sets, unit, exercise.bodyweight)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Up next guidance */}
-              <Text style={s.upNextText}>
-                {`Up next: ${nextDay ? displayName(nextDay.name) : "Rest day"} · tomorrow`}
-              </Text>
-            </FCard>
+            {/* Up next guidance */}
+            <Text style={s.upNextText}>
+              {`Up next: ${nextDay ? displayName(nextDay.name) : "Rest day"} · tomorrow`}
+            </Text>
           </Pressable>
         );
       })}
 
-      {/* CARDIO SECTION WITH UNDO REMOVAL */}
-      {cardio.length > 0 ? (
-        <CardioSection
-          entries={cardio}
-          onAddPress={() => setCardioOpen(true)}
-          onRemovePress={(entry, index) => {
-            const originalLog = cardio.find((c) => c.id === entry.id);
-            onRemoveCardio(dateKey, entry.id);
-            showUndoToast({
-              message: `Removed ${displayName(entry.name)}`,
-              onUndo: () => {
-                if (originalLog) onRestoreCardio?.(dateKey, originalLog, index);
-              },
-            });
-          }}
-        />
-      ) : null}
-
-      {/* NOT STARTED / REST DAY CARD */}
+      {/* 4.1 TODAY NOT STARTED (HERO + WEEKSTRIP + HAIRLINE LIST + PRIMARY BTN) */}
       {!active && done.length === 0 ? (
-        <FCard style={s.card}>
-          <Text style={s.meta}>
-            {planned
-              ? `${plan?.rotate ? "Next in rotation" : "Planned"}${
-                  plan?.deload ? " · deload week" : ""
-                }`
-              : "No session planned"}
-          </Text>
-          <Text style={s.bigName}>
-            {planned
-              ? displayName(planned.name)
-              : plan?.rotate && !isToday
-                ? "Nothing logged"
-                : "Rest day"}
-          </Text>
+        <View style={s.sectionBlock}>
+          <Text style={s.homeGoal}>{workoutHeadline}</Text>
+          <Text style={s.sentence}>{workoutSentence}</Text>
+
+          <WeekStrip
+            todayIndex={dayIndex}
+            completedDays={completedDayIndices}
+            accentColor={Q.accent.ember}
+            style={s.weekStrip}
+          />
+
           {planned ? (
             <>
-              <Text style={s.meta}>
-                {`${plural(planned.exercises.length, "exercise")} · ~${Math.max(
-                  20,
-                  planned.exercises.length * 10,
-                )} min`}
-              </Text>
-              <View style={s.previewList}>
+              <View style={s.hairlineList}>
                 {planned.exercises.map((exercise) => (
                   <View key={exercise.exerciseId} style={s.exerciseRow}>
                     <Text style={s.exerciseName} numberOfLines={1}>
@@ -305,93 +297,111 @@ export function TodayView({
                   </View>
                 ))}
               </View>
-              <View style={s.buttonRow}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label={`Start ${displayName(planned.name)}`}
-                    onPress={() => start(planned.id)}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label="Blank workout"
-                    kind="secondary"
-                    onPress={() => start(null)}
-                  />
-                </View>
+
+              <View style={{ marginTop: 24 }}>
+                <Button
+                  label={`Start ${displayName(planned.name)}`}
+                  onPress={() => start(planned.id)}
+                />
               </View>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Blank workout"
+                hitSlop={10}
+                style={s.textLinkBtn}
+                onPress={() => start(null)}
+              >
+                <Text style={s.textLinkText}>Blank workout</Text>
+              </Pressable>
+
+              {others.length > 0 ? (
+                <View style={s.otherDaysRow}>
+                  <Text style={s.meta}>Other days: </Text>
+                  {others.map((day) => (
+                    <Pressable
+                      key={day.id}
+                      accessibilityRole="button"
+                      onPress={() => start(day.id)}
+                      hitSlop={8}
+                    >
+                      <Text style={s.otherDayLink}>{displayName(day.name)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
             </>
           ) : !plan || plan.days.length === 0 ? (
-            <>
-              <View style={s.gap}>
-                <Button label="Build your plan" onPress={onGoPlan} />
-              </View>
-              <View style={s.pills}>
-                <Pill label="Blank workout" onPress={() => start(null)} />
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={s.buttonRow}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label="Blank workout"
-                    kind="secondary"
-                    onPress={() => start(null)}
-                  />
-                </View>
-              </View>
-              <View style={s.pills}>
-                {others.map((day) => (
-                  <Pill
-                    key={day.id}
-                    label={displayName(day.name)}
-                    onPress={() => start(day.id)}
-                  />
-                ))}
-              </View>
-            </>
-          )}
-          {planned && others.length > 0 ? (
-            <View style={s.pills}>
-              {others.map((day) => (
-                <Pill
-                  key={day.id}
-                  label={displayName(day.name)}
-                  onPress={() => start(day.id)}
-                />
-              ))}
+            <View style={{ marginTop: 20 }}>
+              <Button label="Build your plan" onPress={onGoPlan} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Blank workout"
+                hitSlop={10}
+                style={s.textLinkBtn}
+                onPress={() => start(null)}
+              >
+                <Text style={s.textLinkText}>Blank workout</Text>
+              </Pressable>
             </View>
-          ) : null}
-          <Text style={[s.meta, { marginTop: 14 }]}>
-            {`${plural(lastWeek, "workout")} in the last 7 days`}
-          </Text>
-        </FCard>
+          ) : (
+            <View style={{ marginTop: 20 }}>
+              <Button
+                label="Start workout"
+                onPress={() => start(others[0]?.id ?? null)}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Blank workout"
+                hitSlop={10}
+                style={s.textLinkBtn}
+                onPress={() => start(null)}
+              >
+                <Text style={s.textLinkText}>Blank workout</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
       ) : null}
 
-      {/* MISSED DAYS PILLS */}
+      {/* 4.1 MISSED DAYS SENTENCE WITH ACCENT TEXT LINKS */}
       {missed.length > 0 && !active ? (
-        <View style={s.gap}>
-          <Text style={s.meta}>Missed. Tap to log.</Text>
-          <View style={s.pills}>
+        <View style={s.missedSection}>
+          <Text style={s.meta}>Missed. Tap to log:</Text>
+          <View style={s.missedLinks}>
             {missed.slice(0, 3).map((entry) => (
-              <Pill
+              <Pressable
                 key={entry.key}
-                label={`${entry.name} · ${dayLabel(entry.key).slice(0, 3)}`}
+                accessibilityRole="button"
+                hitSlop={8}
                 onPress={() => start(entry.id, entry.key)}
-              />
+                style={s.missedLinkBtn}
+              >
+                <Text style={s.textLinkText}>
+                  {`${entry.name} · ${dayLabel(entry.key).slice(0, 3)}`}
+                </Text>
+              </Pressable>
             ))}
           </View>
         </View>
       ) : null}
 
-      {/* SECONDARY ACTIONS */}
-      <View style={s.pills}>
-        {done.length > 0 ? (
-          <Pill label="Add another workout" onPress={() => start(null)} />
-        ) : null}
-        <Pill label="Log cardio" onPress={() => setCardioOpen(true)} />
-      </View>
+      {/* 4.1 CARDIO SECTION (FLAT HAIRLINES WITH ACCENT LINK) */}
+      <CardioSection
+        entries={cardio}
+        onAddPress={() => setCardioOpen(true)}
+        accentColor={Q.accent.ember}
+        onRemovePress={(entry, index) => {
+          const originalLog = cardio.find((c) => c.id === entry.id);
+          onRemoveCardio(dateKey, entry.id);
+          showUndoToast({
+            message: `Removed ${displayName(entry.name)}`,
+            onUndo: () => {
+              if (originalLog) onRestoreCardio?.(dateKey, originalLog, index);
+            },
+          });
+        }}
+      />
 
       {/* SHEETS */}
       <CardioSheet
@@ -450,133 +460,129 @@ export function TodayView({
 }
 
 const s = StyleSheet.create({
-  root: { gap: 14 },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 4,
+  root: {
+    gap: 18,
   },
-  stepBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: F.card,
-    borderWidth: 1,
-    borderColor: F.line,
-    alignItems: "center",
-    justifyContent: "center",
+  sectionBlock: {
+    marginTop: 8,
   },
-  stepBtnDisabled: { opacity: 0.3 },
-  stepText: { color: F.ink, fontSize: 20, fontWeight: "500" },
-  stepTextDisabled: { color: F.dim },
-  dateCenter: { alignItems: "center", flex: 1, paddingHorizontal: 8 },
-  dateTitle: {
-    color: F.ink,
-    fontFamily: FSerif,
-    fontSize: 22,
-    fontWeight: "300",
-  },
-  dateSubtitle: { color: F.mute, fontSize: 13, marginTop: 2 },
-  jumpChip: {
-    marginTop: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: "rgba(217, 164, 65, 0.15)",
-  },
-  jumpChipText: { color: F.acc, fontSize: 12, fontWeight: "600" },
-  dateActions: { flexDirection: "row", alignItems: "center", gap: 6 },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: F.card,
-    borderWidth: 1,
-    borderColor: F.line,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  card: { gap: 8 },
-  recapHead: { flexDirection: "row", alignItems: "center" },
-  recapEyebrow: {
-    fontFamily: Font.sans,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    fontWeight: "700",
-    color: F.acc,
-  },
-  meta: { color: F.mute, fontSize: 13 },
-  bigName: {
-    color: F.ink,
-    fontFamily: FSerif,
-    fontSize: 28,
-    fontWeight: "300",
-  },
-  recapStats: {
-    fontFamily: Font.sans,
-    color: F.ink,
-    fontSize: 15,
+  homeGoal: {
+    fontFamily: Q.font.displayMedium,
+    fontSize: 50,
+    lineHeight: 51,
+    letterSpacing: -1.5,
     fontWeight: "500",
+    color: Q.color.ink,
   },
-  prBadgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(217, 164, 65, 0.15)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: "flex-start",
+  sentence: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 16,
+    lineHeight: 22,
+    color: Q.color.mute,
+    marginTop: 10,
   },
-  prBadgeText: { color: F.acc, fontSize: 13, fontWeight: "600" },
-  musclesText: { color: F.mute, fontSize: 13, fontStyle: "italic" },
-  tightList: {
-    marginTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: F.line,
+  weekStrip: {
+    marginVertical: 18,
   },
-  upNextText: {
-    color: F.dim,
+  meta: {
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.mute,
     fontSize: 13,
-    marginTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: F.line,
-    paddingTop: 8,
   },
-  lineStrong: { color: F.ink, fontSize: 15, fontWeight: "500" },
-  gap: { marginTop: 8 },
-  pills: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  cardioRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 8,
+  hairlineList: {
+    marginTop: 12,
   },
-  cardioRemoveBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: F.card2,
-  },
-  removeText: { color: F.mute, fontSize: 12, fontWeight: "500" },
   exerciseRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     minHeight: 46,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: F.line,
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
     gap: 12,
   },
-  exerciseName: { color: F.ink, fontSize: 15, fontWeight: "500", flex: 1 },
-  exerciseSets: { color: F.mute, fontSize: 13, textAlign: "right" },
-  previewList: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: F.line,
+  exerciseName: {
+    color: Q.color.ink,
+    fontFamily: Q.font.sansMedium,
+    fontSize: 16,
+    fontWeight: "500",
+    flex: 1,
   },
-  buttonRow: { flexDirection: "row", gap: 10, marginTop: 14 },
+  exerciseSets: {
+    color: Q.color.mute,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 14,
+    textAlign: "right",
+  },
+  textLinkBtn: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  textLinkText: {
+    fontFamily: Q.font.sansSemiBold,
+    fontSize: 13,
+    fontWeight: "600",
+    color: Q.accent.ember,
+  },
+  otherDaysRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  otherDayLink: {
+    fontFamily: Q.font.sansSemiBold,
+    fontSize: 13,
+    color: Q.color.mute,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  missedSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 6,
+  },
+  missedLinks: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  missedLinkBtn: {
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  prBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+  },
+  prBadgeText: {
+    color: Q.accent.ember,
+    fontFamily: Q.font.sansSemiBold,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  musclesText: {
+    color: Q.color.mute,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  upNextText: {
+    color: Q.color.mute,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
+    paddingTop: 12,
+  },
 });

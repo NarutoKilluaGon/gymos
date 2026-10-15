@@ -19,6 +19,7 @@ import { NOURISH } from "@/constants/design";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { Screen } from "@/components/ds/screen";
 import { ScreenHeader } from "@/components/ds/screen-header";
+import { Q } from "@/constants/quiet";
 import { pingProxyHealth } from "@/services/meal-estimator";
 import { useNourish } from "@/hooks/use-nourish";
 import {
@@ -109,6 +110,21 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
     }
   }
 
+  const fullDate = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
+
+  const nourishContext =
+    view === "today"
+      ? fullDate
+      : view === "insights"
+        ? "Insights"
+        : view === "kitchen"
+          ? "Kitchen"
+          : "Targets";
+
   return (
     <ThemeProvider theme={NOURISH}>
       <Screen scroll={false}>
@@ -117,8 +133,9 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <ScreenHeader
-            eyebrow="NOURISH"
-            title="Nutrition"
+            module="Nourish"
+            accentColor={Q.accent.sage}
+            context={nourishContext}
             onBack={view !== "today" ? () => changeView("today") : undefined}
           />
 
@@ -126,6 +143,7 @@ export function NourishApp({ requestedView }: { requestedView?: NourishViewId })
             <Seg
               options={NOURISH_TABS}
               value={view}
+              accentColor={Q.accent.sage}
               onChange={changeView}
             />
           </View>

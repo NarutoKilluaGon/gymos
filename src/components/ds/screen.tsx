@@ -55,7 +55,6 @@ export function Screen({
     ? { maxWidth: 800, width: "100%" as const, alignSelf: "center" as const }
     : undefined;
 
-  const topInset = (insets.top || 0) + 12;
   const bottomInset = (insets.bottom || 0) + bottomPadding;
 
   if (!scroll) {
@@ -64,11 +63,16 @@ export function Screen({
         testID={testID}
         style={[
           styles.root,
-          { backgroundColor: theme.bg, paddingTop: topInset, paddingBottom: insets.bottom || 0 },
+          {
+            backgroundColor: theme.bg,
+            paddingTop: insets.top || 0,
+            paddingBottom: insets.bottom || 0,
+            overflow: "hidden",
+          },
           style,
         ]}
       >
-        <View style={[styles.innerFixed, webWrapperStyle]}>
+        <View style={[styles.innerFixed, { paddingTop: 12 }, webWrapperStyle]}>
           {children}
         </View>
       </View>
@@ -76,14 +80,25 @@ export function Screen({
   }
 
   return (
-    <View testID={testID} style={[styles.root, { backgroundColor: theme.bg }, style]}>
+    <View
+      testID={testID}
+      style={[
+        styles.root,
+        {
+          backgroundColor: theme.bg,
+          paddingTop: insets.top || 0,
+          overflow: "hidden",
+        },
+        style,
+      ]}
+    >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
           webWrapperStyle,
           {
-            paddingTop: topInset,
+            paddingTop: 12,
             paddingBottom: bottomInset,
             paddingHorizontal: Gutter,
           },

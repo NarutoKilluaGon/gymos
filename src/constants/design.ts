@@ -1,6 +1,6 @@
-import { Platform } from "react-native";
 import { F } from "./forge-theme";
 import { N } from "./nourish-theme";
+import { Q } from "./quiet";
 
 export type Theme = {
   bg: string;
@@ -16,26 +16,27 @@ export type Theme = {
   bad: string;
   warn: string;
   scrim: string;
+  accent: string;
 };
 
 /**
- * HOME palette: Calm charcoal surfaces with GymOS shared gold identity.
- * Raised dim text to >= 4.5:1 contrast against bg.
+ * HOME palette: L · Quiet tokens with brass accent.
  */
 export const HOME: Theme = {
-  bg: "#101010",
-  card: "#181818",
-  card2: "#222222",
-  line: "rgba(255, 255, 255, 0.08)",
-  ink: "#f5f2eb",
-  mute: "#a39e95",
-  dim: "#888278",
-  acc: "#d4a24c",
-  accInk: "#1a1408",
-  ok: "#4c9a6a",
-  bad: "#c8634b",
-  warn: "#d9a441",
-  scrim: "rgba(0, 0, 0, 0.6)",
+  bg: Q.color.bg,
+  card: Q.color.card,
+  card2: Q.color.surface2,
+  line: Q.color.line,
+  ink: Q.color.ink,
+  mute: Q.color.mute,
+  dim: Q.color.mute,
+  acc: Q.accent.brass,
+  accInk: Q.color.bg,
+  ok: Q.accent.sage,
+  bad: Q.accent.red,
+  warn: Q.accent.ember,
+  scrim: Q.color.scrim,
+  accent: Q.accent.brass,
 };
 
 /**
@@ -56,6 +57,7 @@ export const FORGE: Theme & { warm: string } = {
   warn: F.warm,
   warm: F.warm,
   scrim: F.scrim,
+  accent: F.accent,
 };
 
 /**
@@ -84,6 +86,7 @@ export const NOURISH: Theme & {
   carbs: N.carbs,
   fat: N.fat,
   scrim: N.scrim,
+  accent: N.accent,
 };
 
 export type ModuleThemeKey = "home" | "forge" | "nourish" | "hub";
@@ -99,138 +102,99 @@ export function getTheme(moduleKey: ModuleThemeKey): Theme {
   return THEMES[moduleKey] ?? HOME;
 }
 
-export const Gutter = 20;
+export const Gutter = 16;
 
 export const Space = {
-  xxs: 4,
-  xs: 8,
-  s: 12,
-  m: 16,
-  l: 20,
-  xl: 24,
-  xxl: 32,
+  xxs: Q.space[1],
+  xs: Q.space[2],
+  s: Q.space[3],
+  m: Q.space[4],
+  l: Q.space[5],
+  xl: Q.space[6],
+  xxl: Q.space[8],
 } as const;
 
 export const Metric = {
   touchMin: 44,
-  buttonHeight: 48,
-  setRowHeight: 52,
-  listRowHeight: 56,
-  cardRadius: 20,
-  controlRadius: 14,
-  pillRadius: 999,
+  buttonHeight: 44,
+  setRowHeight: 48,
+  listRowHeight: 52,
+  cardRadius: Q.radius.none,
+  controlRadius: Q.radius.sm,
+  pillRadius: Q.radius.full,
   gutter: Gutter,
 } as const;
 
 export const Radius = {
-  card: 20,
-  control: 14,
-  pill: 999,
+  card: Q.radius.none,
+  control: Q.radius.sm,
+  pill: Q.radius.full,
 } as const;
 
 export const Font = {
-  serif: Platform.select({
-    ios: "ui-serif",
-    default: "serif",
-  }) as string,
-  sans: Platform.select({
-    ios: "system-ui",
-    default: "normal",
-  }) as string,
-  mono: Platform.select({
-    ios: "ui-monospace",
-    default: "monospace",
-  }) as string,
+  serif: Q.font.displayMedium,
+  sans: Q.font.sansRegular,
+  mono: "monospace",
 };
 
 export const Type = {
-  // Serif roles (>= 20px, titles & big numerals only)
-  display: {
-    fontFamily: Font.serif,
-    fontSize: 34,
-    lineHeight: 40,
-    fontWeight: "300" as const,
-  },
-  title: {
-    fontFamily: Font.serif,
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: "300" as const,
-  },
+  // Quiet Display roles
+  display: Q.type.display,
+  title: Q.type.title,
+  titleLarge: Q.type.titleLarge,
   section: {
-    fontFamily: Font.serif,
+    fontFamily: Q.font.displayMedium,
     fontSize: 20,
-    lineHeight: 26,
-    fontWeight: "300" as const,
-  },
-  numeralXL: {
-    fontFamily: Font.serif,
-    fontSize: 40,
-    lineHeight: 44,
-    fontWeight: "300" as const,
-    fontVariant: ["tabular-nums" as const],
-  },
-  numeralM: {
-    fontFamily: Font.serif,
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: "300" as const,
-    fontVariant: ["tabular-nums" as const],
-  },
-
-  // Sans roles (never above 20px)
-  body: {
-    fontFamily: Font.sans,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "400" as const,
-  },
-  rowTitle: {
-    fontFamily: Font.sans,
-    fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 24,
     fontWeight: "500" as const,
+    letterSpacing: -0.2,
   },
-  meta: {
-    fontFamily: Font.sans,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "400" as const,
-  },
-  eyebrow: {
-    fontFamily: Font.sans,
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 1.6,
-    textTransform: "uppercase" as const,
-    fontWeight: "600" as const,
-  },
-  button: {
-    fontFamily: Font.sans,
+  numeralXL: Q.type.numDisplay,
+  numeralM: Q.type.numMedium,
+
+  // Quiet Sans roles
+  body: Q.type.body,
+  bodyLarge: Q.type.bodyLarge,
+  bodyMedium: Q.type.bodyMedium,
+  rowTitle: {
+    fontFamily: Q.font.sansMedium,
     fontSize: 15,
     lineHeight: 20,
-    fontWeight: "600" as const,
+    fontWeight: "500" as const,
+  },
+  meta: Q.type.caption,
+  eyebrow: {
+    fontFamily: Q.font.sansMedium,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 1.2,
+    textTransform: "uppercase" as const,
+    fontWeight: "500" as const,
+  },
+  button: {
+    fontFamily: Q.font.sansMedium,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "500" as const,
   },
   input: {
-    fontFamily: Font.sans,
-    fontSize: 17,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 15,
     fontWeight: "400" as const,
   },
 
   // Backward compatibility aliases
   titleSm: {
-    fontFamily: Font.serif,
-    fontSize: 22,
-    fontWeight: "300" as const,
-    lineHeight: 28,
+    fontFamily: Q.font.displayMedium,
+    fontSize: 18,
+    fontWeight: "500" as const,
+    lineHeight: 22,
   },
-  caption: {
-    fontFamily: Font.sans,
-    fontSize: 13,
-    lineHeight: 16,
-  },
+  caption: Q.type.caption,
+  captionMedium: Q.type.captionMedium,
+  micro: Q.type.micro,
   numeral: {
-    fontFamily: Font.serif,
+    fontFamily: Q.font.displaySemiBold,
     fontVariant: ["tabular-nums" as const],
   },
 };

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Batch 3 Verification - Headers, Tabs, Date Navigation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400;500;600&family=Funnel+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0D0D0C; color: #F2EEE6; font-family: 'Funnel Sans', sans-serif; }
+    .screen { width: 390px; min-height: 844px; position: relative; overflow: hidden; background: #0D0D0C; }
+    .status-bar { height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; font-size: 13px; color: #8F8A80; background: #0D0D0C; }
+    .content { padding: 12px 24px 100px; display: flex; flex-direction: column; gap: 32px; }
+
+    /* 3.1 ScreenHeader: Single row top bar */
+    .screen-header { display: flex; justify-content: space-between; align-items: center; min-height: 44px; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .module-badge { font-size: 13px; font-weight: 600; }
+    .badge-forge { color: #D97746; }
+    .badge-nourish { color: #8BA888; }
+    .badge-hub { color: #C9A25A; }
+    .header-context { font-size: 13px; color: #8F8A80; }
+
+    /* 3.2 Back Button: plain ChevronLeft, 20px, stroke 1.5, mute, 44x44 min hit area */
+    .back-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin-left: -12px; cursor: pointer; }
+
+    /* 3.3 Seg (Text Tabs): No background pills, no sliding indicator, 5x5 circular dot above active tab */
+    .seg-container { display: flex; align-items: center; justify-content: flex-start; gap: 28px; }
+    .seg-tab { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+    .seg-dot { width: 5px; height: 5px; border-radius: 50%; margin-bottom: 6px; }
+    .seg-label { font-size: 14px; }
+    .seg-tab.active .seg-label { font-weight: 600; color: #F2EEE6; }
+    .seg-tab.inactive .seg-label { font-weight: 500; color: #8F8A80; }
+
+    /* 3.4 DateNavigator: Plain Chevrons, center date 16/500 ink, 18px Calendar icon, no border/pill */
+    .date-nav { display: flex; align-items: center; justify-content: space-between; height: 44px; }
+    .date-nav-btn { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .date-nav-center { font-size: 16px; font-weight: 500; color: #F2EEE6; }
+
+    /* Section divider */
+    .section-box { border: 1px solid #2B2924; border-radius: 12px; padding: 16px; }
+    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #8F8A80; margin-bottom: 12px; }
+
+    /* Bottom Tab Bar */
+    .tab-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; border-top: 1px solid #2B2924; display: flex; background: #0D0D0C; }
+    .tab-item { flex: 1; text-align: center; font-size: 14px; padding-top: 14px; }
+    .tab-dot { width: 5px; height: 5px; border-radius: 3px; overflow: hidden; margin: 0 auto 8px; }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span>100%</span>
+    </div>
+    <div class="content">
+
+      <!-- SECTION 1: Forge Header + Text Tabs -->
+      <div class="section-box">
+        <div class="section-title">3.1 & 3.3 Forge Module Header & Text Tabs</div>
+        <div class="screen-header">
+          <div class="header-left">
+            <span class="module-badge badge-forge">Forge</span>
+          </div>
+          <span class="header-context">Push · Thursday</span>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <div class="seg-container">
+            <div class="seg-tab active">
+              <div class="seg-dot" style="background: #D97746;"></div>
+              <span class="seg-label">Today</span>
+            </div>
+            <div class="seg-tab inactive">
+              <div class="seg-dot" style="background: transparent;"></div>
+              <span class="seg-label">Plan</span>
+            </div>
+            <div class="seg-tab inactive">
+              <div class="seg-dot" style="background: transparent;"></div>
+              <span class="seg-label">History</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: Nourish Header + Text Tabs + Date Navigator -->
+      <div class="section-box">
+        <div class="section-title">3.1, 3.3 & 3.4 Nourish Header, Tabs & Date Navigator</div>
+        <div class="screen-header">
+          <div class="header-left">
+            <span class="module-badge badge-nourish">Nourish</span>
+          </div>
+          <span class="header-context">Thursday, 15 October</span>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <div class="seg-container">
+            <div class="seg-tab active">
+              <div class="seg-dot" style="background: #8BA888;"></div>
+              <span class="seg-label">Today</span>
+            </div>
+            <div class="seg-tab inactive">
+              <div class="seg-dot" style="background: transparent;"></div>
+              <span class="seg-label">Insights</span>
+            </div>
+            <div class="seg-tab inactive">
+              <div class="seg-dot" style="background: transparent;"></div>
+              <span class="seg-label">Kitchen</span>
+            </div>
+            <div class="seg-tab inactive">
+              <div class="seg-dot" style="background: transparent;"></div>
+              <span class="seg-label">Me</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.4 Date Navigator (Plain Chevrons, 16/500 center, 18px calendar icon, no pill) -->
+        <div style="margin-top: 16px; border-top: 1px solid #2B2924; padding-top: 10px;">
+          <div class="date-nav">
+            <div class="date-nav-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8F8A80" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </div>
+            <span class="date-nav-center">Today, 15 Oct</span>
+            <div style="display: flex; align-items: center;">
+              <div class="date-nav-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8F8A80" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
+              </div>
+              <div class="date-nav-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8F8A80" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: Standardized Plain Back Button (Sub-screens / Active Session) -->
+      <div class="section-box">
+        <div class="section-title">3.2 Standardized Back Button (Plain ChevronLeft)</div>
+        <div class="screen-header">
+          <div class="header-left">
+            <div class="back-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8F8A80" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </div>
+            <span class="module-badge badge-forge">Active Session</span>
+          </div>
+          <span class="header-context">Push · Set 2 of 4</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <div class="tab-item" style="color:#8F8A80;font-weight:500">
+        <div class="tab-dot" style="background:transparent"></div>
+        Home
+      </div>
+      <div class="tab-item" style="color:#F2EEE6;font-weight:600">
+        <div class="tab-dot" style="background:#D97746"></div>
+        Forge
+      </div>
+      <div class="tab-item" style="color:#8F8A80;font-weight:500">
+        <div class="tab-dot" style="background:transparent"></div>
+        Nourish
+      </div>
+      <div class="tab-item" style="color:#8F8A80;font-weight:500">
+        <div class="tab-dot" style="background:transparent"></div>
+        Hub
+      </div>
+    </div>
+  </div>
+</body>
+</html>

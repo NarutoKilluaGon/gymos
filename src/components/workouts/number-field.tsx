@@ -9,7 +9,7 @@ import {
 import { StyleSheet, TextInput, type TextInputProps } from "react-native";
 
 import { Field } from "@/components/workouts/forge-ui";
-import { F } from "@/constants/forge-theme";
+import { Q } from "@/constants/quiet";
 import { round1 } from "@/services/forge/load";
 
 export type DraftRegistry = {
@@ -88,8 +88,8 @@ export function NumberField({
       accessibilityLabel={label}
       value={shown}
       placeholder={placeholder}
-      placeholderTextColor={F.dim}
-      selectionColor={F.acc}
+      placeholderTextColor={Q.color.mute}
+      selectionColor={Q.accent.ember}
       keyboardType={decimal ? "decimal-pad" : "number-pad"}
       onChangeText={(text) => {
         draftRef.current = text;
@@ -155,14 +155,15 @@ export function DraftTextField({
 const styles = StyleSheet.create({
   numberInput: {
     width: 68,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: F.card2,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: F.line,
-    color: F.ink,
+    borderColor: Q.color.lineStrong,
+    color: Q.color.ink,
     textAlign: "center",
-    fontSize: 17,
+    fontSize: 16,
+    fontFamily: Q.font.sansMedium,
     fontWeight: "500",
   },
 });

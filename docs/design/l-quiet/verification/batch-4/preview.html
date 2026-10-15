@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Batch 4 Verification - Forge</title>
+  <link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400;500;600&family=Funnel+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0D0D0C; color: #F2EEE6; font-family: 'Funnel Sans', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
+    .device-container { display: flex; flex-wrap: wrap; gap: 32px; justify-content: center; }
+    .screen { width: 390px; height: 844px; position: relative; overflow: hidden; background: #141311; color: #F2EEE6; }
+    .screen-scrollable { width: 390px; height: 844px; position: relative; overflow-y: auto; background: #141311; color: #F2EEE6; }
+    .screen-scrollable::-webkit-scrollbar { display: none; }
+    .screen-title-banner { background: #1B1A17; border-bottom: 1px solid #2B2924; padding: 10px 16px; font-size: 13px; font-weight: 600; color: #D97746; }
+
+    /* Top bar */
+    .top-bar { padding: 48px 24px 0; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #8F8A80; }
+    .module-badge { color: #D97746; font-weight: 600; }
+
+    /* Tabs */
+    .seg-container { display: flex; align-items: center; gap: 28px; padding: 20px 24px 0; }
+    .seg-tab { display: flex; flex-direction: column; align-items: center; }
+    .seg-dot { width: 5px; height: 5px; border-radius: 50%; margin-bottom: 6px; }
+    .seg-label { font-size: 14px; }
+
+    /* Bottom Tab Bar */
+    .tab-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; border-top: 1px solid #2B2924; display: flex; padding-top: 14px; background: #141311; }
+    .tab-item { flex: 1; text-align: center; font-size: 14px; color: #8F8A80; font-weight: 500; }
+    .tab-item.active { color: #F2EEE6; font-weight: 600; }
+    .tab-dot { width: 5px; height: 5px; border-radius: 50%; margin: 0 auto 8px; background: transparent; }
+    .tab-item.active .tab-dot { background: #D97746; }
+
+    /* Buttons & links */
+    .btn-ink { width: 100%; height: 58px; border: 0; border-radius: 14px; background: #F2EEE6; color: #141311; font-weight: 600; font-size: 17px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .link-accent { font-size: 14px; font-weight: 600; color: #D97746; cursor: pointer; text-align: center; padding: 12px 0; }
+
+    /* Hairline list */
+    .hairline-row { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-top: 1px solid #2B2924; }
+  </style>
+</head>
+<body>
+  <div class="device-container">
+
+    <!-- 1. Forge Today (No Active Session) -->
+    <div>
+      <div class="screen-title-banner">4.1 Forge Today (Rest / Idle)</div>
+      <div class="screen">
+        <div class="top-bar">
+          <span class="module-badge">Forge</span>
+          <span>Thursday · Today</span>
+        </div>
+        <div class="seg-container">
+          <div class="seg-tab"><div class="seg-dot" style="background:#D97746"></div><span class="seg-label" style="font-weight:600;color:#F2EEE6">Today</span></div>
+          <div class="seg-tab"><div class="seg-dot" style="background:transparent"></div><span class="seg-label" style="font-weight:500;color:#8F8A80">Plan</span></div>
+          <div class="seg-tab"><div class="seg-dot" style="background:transparent"></div><span class="seg-label" style="font-weight:500;color:#8F8A80">History</span></div>
+        </div>
+
+        <div style="padding: 24px 24px 0;">
+          <div style="font-family:'Funnel Display',sans-serif;font-size:50px;font-weight:400;letter-spacing:-0.03em;line-height:1.05;color:#F2EEE6">Push</div>
+          <div style="font-size:14px;color:#8F8A80;margin-top:6px">4 exercises · ~45 min planned</div>
+        </div>
+
+        <!-- Week Strip -->
+        <div style="padding: 20px 24px 0; display:flex; justify-content:space-between;">
+          <div style="text-align:center"><div style="font-size:11px;color:#8F8A80">M</div><div style="font-size:13px;font-weight:600;color:#D97746;margin-top:4px">●</div></div>
+          <div style="text-align:center"><div style="font-size:11px;color:#8F8A80">T</div><div style="font-size:13px;font-weight:600;color:#D97746;margin-top:4px">●</div></div>
+          <div style="text-align:center"><div style="font-size:11px;color:#8F8A80">W</div><div style="font-size:13px;color:#3A3731;margin-top:4px">○</div></div>
+          <div style="text-align:center"><div style="font-size:11px;color:#F2EEE6;font-weight:600">T</div><div style="width:5px;height:5px;border-radius:50%;background:#D97746;margin:6px auto 0"></div></div>
+          <div style="text-align:center"><div style="font-size:11px;color:#8F8A80">F</div><div style="font-size:13px;color:#3A3731;margin-top:4px">○</div></div>
+          <div style="text-align:center"><div style="font-size:11px;color:#8F8A80">S</div><div style="font-size:13px;color:#3A3731;margin-top:4px">○</div></div>
+          <div style="text-align:center"><div style="font-size:11px;color:#8F8A80">S</div><div style="font-size:13px;color:#3A3731;margin-top:4px">○</div></div>
+        </div>
+
+        <!-- Exercises List -->
+        <div style="padding: 20px 24px 0;">
+          <div class="hairline-row">
+            <div><div style="font-size:15px;font-weight:500">Incline Bench Press</div><div style="font-size:13px;color:#8F8A80;margin-top:2px">Chest · 3 sets</div></div>
+            <div style="font-size:13px;color:#8F8A80">8–10 reps</div>
+          </div>
+          <div class="hairline-row">
+            <div><div style="font-size:15px;font-weight:500">Pec Fly</div><div style="font-size:13px;color:#8F8A80;margin-top:2px">Chest · 3 sets</div></div>
+            <div style="font-size:13px;color:#8F8A80">10–12 reps</div>
+          </div>
+          <div class="hairline-row">
+            <div><div style="font-size:15px;font-weight:500">Tricep Pushdown</div><div style="font-size:13px;color:#8F8A80;margin-top:2px">Triceps · 3 sets</div></div>
+            <div style="font-size:13px;color:#8F8A80">12–15 reps</div>
+          </div>
+        </div>
+
+        <div style="padding: 24px 24px 0;">
+          <button class="btn-ink">Start Push</button>
+          <div class="link-accent">Blank workout</div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-dot"></div>Home</div>
+          <div class="tab-item active"><div class="tab-dot"></div>Forge</div>
+          <div class="tab-item"><div class="tab-dot"></div>Nourish</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Forge Active Session (L_Forge.dc.html replica) -->
+    <div>
+      <div class="screen-title-banner">4.2 Forge Active Session Focus View</div>
+      <div class="screen">
+        <div class="top-bar">
+          <span class="module-badge">Forge</span>
+          <span>Push · Thursday</span>
+        </div>
+
+        <div style="padding:30px 24px 0">
+          <div style="font-size:14px;color:#8F8A80">Exercise 1 of 4</div>
+          <div style="font-family:'Funnel Display',sans-serif;font-variant-numeric:tabular-nums;font-size:38px;font-weight:500;letter-spacing:-.025em;line-height:1.05;margin-top:6px">Incline Bench Press</div>
+          <div style="font-size:15px;color:#8F8A80;margin-top:8px">Chest · 8–10 reps · Last time 40 reps at 22 lb</div>
+        </div>
+
+        <!-- 3px Segment set bar -->
+        <div style="padding:26px 24px 0">
+          <div style="display:flex;gap:6px">
+            <div style="flex:1;height:3px;border-radius:2px;background:#D97746"></div>
+            <div style="flex:1;height:3px;border-radius:2px;background:#2B2924"></div>
+            <div style="flex:1;height:3px;border-radius:2px;background:#2B2924"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:#8F8A80;margin-top:10px">
+            <span style="color:#D97746;font-weight:600">Set 1 of 3</span>
+            <span>Rest 1:30</span>
+          </div>
+        </div>
+
+        <!-- Steppers & NumeralHero -->
+        <div style="padding:26px 24px 0;display:flex;gap:20px">
+          <div style="flex:1">
+            <div style="font-size:13px;color:#8F8A80">Weight</div>
+            <div style="font-family:'Funnel Display',sans-serif;font-variant-numeric:tabular-nums;font-size:84px;font-weight:500;letter-spacing:-.04em;line-height:1;margin-top:6px">22<span style="font-size:18px;color:#8F8A80;letter-spacing:0;font-weight:400"> lb</span></div>
+            <div style="display:flex;gap:10px;margin-top:14px">
+              <span style="width:52px;height:48px;border-radius:12px;box-shadow:inset 0 0 0 1px #3A3731;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer">−</span>
+              <span style="width:52px;height:48px;border-radius:12px;box-shadow:inset 0 0 0 1px #3A3731;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer">+</span>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;color:#8F8A80">Reps</div>
+            <div style="font-family:'Funnel Display',sans-serif;font-variant-numeric:tabular-nums;font-size:84px;font-weight:500;letter-spacing:-.04em;line-height:1;margin-top:6px">10<span style="font-size:18px;color:#8F8A80;letter-spacing:0;font-weight:400"> </span></div>
+            <div style="display:flex;gap:10px;margin-top:14px">
+              <span style="width:52px;height:48px;border-radius:12px;box-shadow:inset 0 0 0 1px #3A3731;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer">−</span>
+              <span style="width:52px;height:48px;border-radius:12px;box-shadow:inset 0 0 0 1px #3A3731;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer">+</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Primary Log Button -->
+        <div style="padding:26px 24px 0">
+          <button class="btn-ink">Log set 1</button>
+        </div>
+
+        <!-- Hairline Upcoming Exercises -->
+        <div style="padding:26px 24px 0;font-size:15px">
+          <div style="display:flex;justify-content:space-between;padding:13px 0;border-top:1px solid #2B2924">
+            <span style="font-weight:500">Pec Fly</span>
+            <span style="color:#8F8A80;font-size:14px">3 sets</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:13px 0;border-top:1px solid #2B2924">
+            <span style="font-weight:500">Tricep Pushdown</span>
+            <span style="color:#8F8A80;font-size:14px">3 sets</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:13px 0;border-top:1px solid #2B2924">
+            <span style="font-weight:500">Skull Crusher</span>
+            <span style="color:#8F8A80;font-size:14px">3 sets</span>
+          </div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-dot"></div>Home</div>
+          <div class="tab-item active"><div class="tab-dot"></div>Forge</div>
+          <div class="tab-item"><div class="tab-dot"></div>Nourish</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Forge Plan -->
+    <div>
+      <div class="screen-title-banner">4.3 Forge Plan (Flat & Outlined)</div>
+      <div class="screen">
+        <div class="top-bar">
+          <span class="module-badge">Forge</span>
+          <span>4-Day Split</span>
+        </div>
+        <div class="seg-container">
+          <div class="seg-tab"><div class="seg-dot" style="background:transparent"></div><span class="seg-label" style="font-weight:500;color:#8F8A80">Today</span></div>
+          <div class="seg-tab"><div class="seg-dot" style="background:#D97746"></div><span class="seg-label" style="font-weight:600;color:#F2EEE6">Plan</span></div>
+          <div class="seg-tab"><div class="seg-dot" style="background:transparent"></div><span class="seg-label" style="font-weight:500;color:#8F8A80">History</span></div>
+        </div>
+
+        <!-- Day selector text tabs -->
+        <div style="display:flex;gap:20px;padding:20px 24px 0">
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:#D97746;margin:0 auto 4px"></div><span style="font-size:14px;font-weight:600;color:#F2EEE6">Push</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto 4px"></div><span style="font-size:14px;font-weight:500;color:#8F8A80">Pull</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto 4px"></div><span style="font-size:14px;font-weight:500;color:#8F8A80">Legs</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto 4px"></div><span style="font-size:14px;font-weight:500;color:#8F8A80">Upper</span></div>
+        </div>
+
+        <!-- Weekday toggles -->
+        <div style="display:flex;justify-content:space-between;padding:16px 24px 0">
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto 4px"></div><span style="font-size:12px;color:#8F8A80">Su</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:#D97746;margin:0 auto 4px"></div><span style="font-size:12px;color:#F2EEE6;font-weight:600">Mo</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto 4px"></div><span style="font-size:12px;color:#8F8A80">Tu</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto 4px"></div><span style="font-size:12px;color:#8F8A80">We</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:#D97746;margin:0 auto 4px"></div><span style="font-size:12px;color:#F2EEE6;font-weight:600">Th</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto 4px"></div><span style="font-size:12px;color:#8F8A80">Fr</span></div>
+          <div style="text-align:center"><div style="width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto 4px"></div><span style="font-size:12px;color:#8F8A80">Sa</span></div>
+        </div>
+
+        <!-- Exercise flat rows with outline inputs -->
+        <div style="padding:16px 24px 0">
+          <div class="hairline-row">
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:500">Barbell Bench Press</div>
+              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <input value="3" style="width:48px;height:40px;background:transparent;border:1px solid #3A3731;border-radius:10px;color:#F2EEE6;text-align:center;font-size:15px">
+                <span style="font-size:13px;color:#8F8A80">sets ×</span>
+                <input value="8–10" style="width:64px;height:40px;background:transparent;border:1px solid #3A3731;border-radius:10px;color:#F2EEE6;text-align:center;font-size:15px">
+                <span style="font-size:13px;color:#8F8A80">reps</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center">
+              <span style="font-size:13px;color:#D97746;cursor:pointer">Superset</span>
+              <span style="font-size:13px;color:#8F8A80;cursor:pointer">Remove</span>
+            </div>
+          </div>
+          <div class="hairline-row">
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:500">Overhead Press</div>
+              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <input value="3" style="width:48px;height:40px;background:transparent;border:1px solid #3A3731;border-radius:10px;color:#F2EEE6;text-align:center;font-size:15px">
+                <span style="font-size:13px;color:#8F8A80">sets ×</span>
+                <input value="10" style="width:64px;height:40px;background:transparent;border:1px solid #3A3731;border-radius:10px;color:#F2EEE6;text-align:center;font-size:15px">
+                <span style="font-size:13px;color:#8F8A80">reps</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center">
+              <span style="font-size:13px;color:#D97746;cursor:pointer">Superset</span>
+              <span style="font-size:13px;color:#8F8A80;cursor:pointer">Remove</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:16px 24px 0">
+          <div class="link-accent">+ Add exercise</div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-dot"></div>Home</div>
+          <div class="tab-item active"><div class="tab-dot"></div>Forge</div>
+          <div class="tab-item"><div class="tab-dot"></div>Nourish</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Forge History -->
+    <div>
+      <div class="screen-title-banner">4.4 Forge History (Hairline Grid & PR Dot)</div>
+      <div class="screen">
+        <div class="top-bar">
+          <span class="module-badge">Forge</span>
+          <span>Logs & Grid</span>
+        </div>
+        <div class="seg-container">
+          <div class="seg-tab"><div class="seg-dot" style="background:transparent"></div><span class="seg-label" style="font-weight:500;color:#8F8A80">Today</span></div>
+          <div class="seg-tab"><div class="seg-dot" style="background:transparent"></div><span class="seg-label" style="font-weight:500;color:#8F8A80">Plan</span></div>
+          <div class="seg-tab"><div class="seg-dot" style="background:#D97746"></div><span class="seg-label" style="font-weight:600;color:#F2EEE6">History</span></div>
+        </div>
+
+        <!-- Sub toggle: Grid vs List -->
+        <div style="padding:16px 24px 0;display:flex;gap:20px">
+          <span style="font-size:13px;font-weight:600;color:#F2EEE6">Grid view</span>
+          <span style="font-size:13px;font-weight:500;color:#8F8A80">List view</span>
+        </div>
+
+        <!-- Hairline Grid -->
+        <div style="padding:16px 24px 0">
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #2B2924;font-size:13px;color:#8F8A80">
+            <span>Exercise</span>
+            <div style="display:flex;gap:24px">
+              <span>24 Sep</span>
+              <span>27 Sep</span>
+              <span>30 Sep</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #2B2924">
+            <span style="font-size:14px;font-weight:500">Incline Bench</span>
+            <div style="display:flex;gap:24px;font-variant-numeric:tabular-nums;font-size:14px;color:#F2EEE6">
+              <span style="color:#8F8A80">45 lb</span>
+              <span style="color:#8F8A80">47.5 lb</span>
+              <span style="font-weight:600;color:#F2EEE6;display:flex;align-items:center;gap:4px">
+                50 lb<span style="width:5px;height:5px;border-radius:50%;background:#D97746;display:inline-block"></span>
+              </span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #2B2924">
+            <span style="font-size:14px;font-weight:500">Overhead Press</span>
+            <div style="display:flex;gap:24px;font-variant-numeric:tabular-nums;font-size:14px;color:#F2EEE6">
+              <span style="color:#8F8A80">35 lb</span>
+              <span style="color:#8F8A80">35 lb</span>
+              <span style="color:#F2EEE6">37.5 lb</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab-item"><div class="tab-dot"></div>Home</div>
+          <div class="tab-item active"><div class="tab-dot"></div>Forge</div>
+          <div class="tab-item"><div class="tab-dot"></div>Nourish</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

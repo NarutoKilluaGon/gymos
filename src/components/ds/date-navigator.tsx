@@ -2,8 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react-native";
 
-import { Font } from "@/constants/design";
-import { useTheme } from "@/contexts/theme-context";
+import { Q } from "@/constants/quiet";
 import { dateFromKey } from "@/utils/date";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -36,9 +35,12 @@ export function DateNavigator({
   accentColor,
   extraAction,
 }: DateNavigatorProps) {
-  const theme = useTheme();
-  const acc = accentColor ?? theme.acc;
   const isToday = dateKey === todayKey;
+  const dateObj = dateFromKey(dateKey);
+  const formattedDay = dayLabel(dateKey);
+  const accessibilityLabel = isToday
+    ? `Today, ${dateObj.getDate()} ${MONTHS[dateObj.getMonth()]}`
+    : formattedDay;
 
   return (
     <View style={styles.dateRow}>
@@ -46,33 +48,29 @@ export function DateNavigator({
         accessibilityRole="button"
         accessibilityLabel="Previous day"
         hitSlop={8}
-        style={[styles.stepBtn, { backgroundColor: theme.card, borderColor: theme.line }]}
+        style={styles.stepBtn}
         onPress={() => onStep(-1)}
       >
-        <ChevronLeft size={20} color={theme.ink} />
+        <ChevronLeft size={20} strokeWidth={1.5} color={Q.color.mute} />
       </Pressable>
 
-      <View style={styles.dateCenter}>
-        <Text style={[styles.dateTitle, { color: theme.ink }]}>
-          {isToday ? "Today" : dayLabel(dateKey)}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        onPress={onOpenCalendar}
+        style={styles.dateCenter}
+      >
+        <Text style={styles.dateTitle}>
+          {isToday ? (
+            <>
+              <Text>Today</Text>
+              <Text>{`, ${dateObj.getDate()} ${MONTHS[dateObj.getMonth()]}`}</Text>
+            </>
+          ) : (
+            <Text>{formattedDay}</Text>
+          )}
         </Text>
-        {isToday ? (
-          <Text style={[styles.dateSubtitle, { color: theme.mute }]}>
-            {dayLabel(dateKey)}
-          </Text>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back to today"
-            style={[styles.jumpChip, { backgroundColor: `${acc}26` }]}
-            onPress={onBackToToday}
-          >
-            <Text style={[styles.jumpChipText, { color: acc }]}>
-              Back to today
-            </Text>
-          </Pressable>
-        )}
-      </View>
+      </Pressable>
 
       <View style={styles.dateActions}>
         <Pressable
@@ -80,14 +78,10 @@ export function DateNavigator({
           accessibilityLabel="Next day"
           disabled={isToday}
           hitSlop={8}
-          style={[
-            styles.stepBtn,
-            { backgroundColor: theme.card, borderColor: theme.line },
-            isToday && styles.stepBtnDisabled,
-          ]}
+          style={[styles.stepBtn, isToday && styles.stepBtnDisabled]}
           onPress={() => onStep(1)}
         >
-          <ChevronRight size={20} color={isToday ? theme.dim : theme.ink} />
+          <ChevronRight size={20} strokeWidth={1.5} color={Q.color.mute} />
         </Pressable>
 
         {onOpenCalendar ? (
@@ -95,10 +89,10 @@ export function DateNavigator({
             accessibilityRole="button"
             accessibilityLabel="Open calendar"
             hitSlop={8}
-            style={[styles.iconBtn, { backgroundColor: theme.card, borderColor: theme.line }]}
+            style={styles.stepBtn}
             onPress={onOpenCalendar}
           >
-            <Calendar size={18} color={theme.mute} />
+            <Calendar size={18} strokeWidth={1.5} color={Q.color.mute} />
           </Pressable>
         ) : null}
 
@@ -113,54 +107,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    minHeight: 44,
     marginBottom: 12,
   },
   stepBtn: {
     width: 44,
     height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
   stepBtnDisabled: {
-    opacity: 0.35,
+    opacity: 0.3,
   },
   dateCenter: {
     alignItems: "center",
-    flex: 1,
+    justifyContent: "center",
     paddingHorizontal: 8,
+    minHeight: 44,
   },
   dateTitle: {
-    fontFamily: Font.serif,
-    fontSize: 22,
-    fontWeight: "300",
-  },
-  dateSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  jumpChip: {
-    marginTop: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  jumpChipText: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontFamily: Q.font.sansMedium,
+    fontSize: 16,
+    fontWeight: "500",
+    color: Q.color.ink,
   },
   dateActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-  },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: 4,
   },
 });
