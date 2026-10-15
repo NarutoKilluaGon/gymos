@@ -486,9 +486,21 @@ export default function HomeScreen() {
         />
       </FadeIn>
 
-      {/* 2. FIRST-RUN CHECKLIST */}
+      {/* 2. NORTH STAR CARD */}
+      <FadeIn delay={10}>
+        {northStar ? (
+          <NorthStarCard
+            northStar={northStar}
+            onNorthStarChange={setNorthStar}
+          />
+        ) : (
+          <NorthStarSetupCard onCreated={setNorthStar} />
+        )}
+      </FadeIn>
+
+      {/* 3. FIRST-RUN CHECKLIST */}
       {!checklistDismissed && (
-        <FadeIn delay={10}>
+        <FadeIn delay={15}>
           <FirstRunChecklistCard
             mealsCount={meals.length}
             hasWorkout={Boolean(finishedWorkout || activeWorkout)}
@@ -501,7 +513,7 @@ export default function HomeScreen() {
         </FadeIn>
       )}
 
-      {/* 3. DYNAMIC HERO CARD (Forge Workout) */}
+      {/* 4. DYNAMIC HERO CARD (Forge Workout) */}
       {enabled.workouts && (
         <FadeIn delay={20}>
           <WorkoutCard
@@ -513,7 +525,7 @@ export default function HomeScreen() {
         </FadeIn>
       )}
 
-      {/* 3. QUICK ACTION SHELF */}
+      {/* 5. QUICK ACTION SHELF */}
       <FadeIn delay={30}>
         <View style={styles.shelfContainer}>
           <ScrollView
@@ -572,7 +584,7 @@ export default function HomeScreen() {
         </View>
       </FadeIn>
 
-      {/* 4. MIDDLE: NOURISH DAILY MACRO SPLIT */}
+      {/* 6. MIDDLE: NOURISH DAILY MACRO SPLIT */}
       {enabled.nutrition && (
         <FadeIn delay={40}>
           <Card tone="nourish" style={styles.nourishCard}>
@@ -615,7 +627,7 @@ export default function HomeScreen() {
         </FadeIn>
       )}
 
-      {/* 5. DAILY TARGETS */}
+      {/* 7. DAILY TARGETS */}
       <FadeIn delay={50}>
         <DailyTargetsCard
           water={water}
@@ -637,20 +649,8 @@ export default function HomeScreen() {
         />
       </FadeIn>
 
-      {/* 6. NORTH STAR CARD */}
+      {/* 8. RECENT ACTIVITY FEED */}
       <FadeIn delay={60}>
-        {northStar ? (
-          <NorthStarCard
-            northStar={northStar}
-            onNorthStarChange={setNorthStar}
-          />
-        ) : (
-          <NorthStarSetupCard onCreated={setNorthStar} />
-        )}
-      </FadeIn>
-
-      {/* 7. RECENT ACTIVITY FEED */}
-      <FadeIn delay={70}>
         <Card style={styles.activityCard}>
           <View style={styles.activityHeader}>
             <Text style={styles.activityEyebrow}>RECENT ACTIVITY</Text>
