@@ -208,36 +208,33 @@ describe("TodayView Phase B UI Integration", () => {
     expect(texts()).not.toContain('"Save as meal"');
   });
 
-  it("renders Save meal header icon and compact feel pills in occasion card", () => {
+  it("renders Save meal header icon and satiety text links in occasion card", () => {
     const { findByLabel, press, setFeelMock } = renderTodayView();
 
     // Save meal icon in occasion header
     const saveMealBtns = findByLabel(/Save .* as meal/i);
     expect(saveMealBtns.length).toBeGreaterThan(0);
 
-    // Compact feel pills (Still hungry / Just right / Too full)
-    expect(findByLabel("Still hungry").length).toBe(1);
-    expect(findByLabel("Just right").length).toBe(1);
-    expect(findByLabel("Too full").length).toBe(1);
+    // Satiety text links (Very light / Light / Good / Heavy / Stuffed)
+    expect(findByLabel("Very light").length).toBe(1);
+    expect(findByLabel("Light").length).toBe(1);
+    expect(findByLabel("Good").length).toBe(1);
+    expect(findByLabel("Heavy").length).toBe(1);
+    expect(findByLabel("Stuffed").length).toBe(1);
 
-    // Tapping feel pill triggers setFeel
-    press("Just right");
+    // Tapping feel link triggers setFeel
+    press("Good");
     expect(setFeelMock).toHaveBeenCalled();
   });
 
-  it("collapses feel to a single compact chip after a choice, and tapping re-opens options", () => {
-    const { findByLabel, press } = renderTodayView({
+  it("renders satiety text links with selected state", () => {
+    const { findByLabel } = renderTodayView({
       feel: { m1: 2 },
     });
 
-    // Should render the compact chip
-    expect(findByLabel(/Just right\. Tap to change\./i).length).toBe(1);
-
-    // Tapping re-opens options
-    press(/Just right\. Tap to change\./i);
-    expect(findByLabel("Still hungry").length).toBe(1);
-    expect(findByLabel("Just right").length).toBe(1);
-    expect(findByLabel("Too full").length).toBe(1);
+    expect(findByLabel("Very light").length).toBe(1);
+    expect(findByLabel("Good").length).toBe(1);
+    expect(findByLabel("Stuffed").length).toBe(1);
   });
 
   it("renders bookmark icons for each food row, indicating saved state", () => {

@@ -3,17 +3,15 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BarChart, LineChart } from "@/components/nutrition/nourish-charts";
 import { ChangeLogSheet, WeeklyReadSheet } from "@/components/nutrition/more-sheets";
+import { ProgressLine } from "@/components/ds/progress-line";
 import {
-  Bar,
   Button,
   Field,
-  Label,
-  NCard,
   Seg,
   fmtInt,
   tap,
 } from "@/components/nutrition/nourish-ui";
-import { N, NSerif } from "@/constants/nourish-theme";
+import { Q } from "@/constants/quiet";
 import type { useNourish } from "@/hooks/use-nourish";
 import { useTodayKey } from "@/hooks/use-today-key";
 import {
@@ -46,10 +44,10 @@ import { showToast, showUndoToast } from "@/utils/toast";
 type Nourish = ReturnType<typeof useNourish>;
 
 const SERIES: readonly { value: SeriesKey; label: string; color: string }[] = [
-  { value: "protein", label: "Protein", color: N.protein },
-  { value: "carbs", label: "Carbs", color: N.carbs },
-  { value: "fat", label: "Fat", color: N.fat },
-  { value: "calories", label: "Calories", color: N.acc },
+  { value: "protein", label: "Protein", color: Q.accent.sage },
+  { value: "carbs", label: "Carbs", color: "rgba(140, 197, 162, 0.7)" },
+  { value: "fat", label: "Fat", color: "rgba(140, 197, 162, 0.45)" },
+  { value: "calories", label: "Calories", color: Q.accent.sage },
 ];
 
 export function InsightsView({
@@ -95,7 +93,7 @@ export function InsightsView({
   const targets = macroTargets(settings.kcal, settings);
   const target =
     seriesKey === "calories" ? settings.kcal : targets[seriesKey];
-  const color = SERIES.find((x) => x.value === seriesKey)?.color ?? N.acc;
+  const color = SERIES.find((x) => x.value === seriesKey)?.color ?? Q.accent.sage;
 
   const weights = data.weights;
   const recentWeights = weights.slice(-14);
@@ -121,41 +119,45 @@ export function InsightsView({
   return (
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
       {ranges.length > 1 ? (
-        <View style={s.gap}>
+        <View style={s.rangeNav}>
           <Seg
             value={range.id}
             onChange={setRangeId}
             options={ranges.map((r) => ({ value: r.id, label: r.label }))}
+            accentColor={Q.accent.sage}
           />
         </View>
       ) : null}
 
       {logged.length === 0 ? (
-        <NCard>
+        <View style={s.section}>
           <Text style={s.body}>
             Nothing logged in this range yet. Log a few meals and your trends
             show up here.
           </Text>
-        </NCard>
+        </View>
       ) : (
         <>
-          <NCard style={s.gap}>
-            <View style={s.summary}>
-              <Summary label="Avg calories" value={fmtInt(averageOf(logged, "calories"))} />
-              <Summary label="Avg protein" value={`${Math.round(averageOf(logged, "protein"))}g`} />
-              <Summary label="On target" value={`${daysOnTarget(logged)}/${logged.length}`} />
-            </View>
-          </NCard>
+          {/* Summary Row: flat hairline separated */}
+          <View style={s.summarySection}>
+            <Summary label="Avg calories" value={fmtInt(averageOf(logged, "calories"))} />
+            <Summary label="Avg protein" value={`${Math.round(averageOf(logged, "protein"))}g`} />
+            <Summary label="On target" value={`${daysOnTarget(logged)}/${logged.length}`} />
+          </View>
 
-          <NCard style={s.gap}>
-            <View style={s.gap}>
+          {/* Chart Section */}
+          <View style={s.section}>
+            <View style={s.seriesSegWrap}>
               <Seg
                 value={seriesKey}
                 onChange={setSeriesKey}
                 options={SERIES.map(({ value, label }) => ({ value, label }))}
+                accentColor={Q.accent.sage}
               />
             </View>
-            <BarChart data={series} color={color} target={target} />
+            <View style={s.chartWrap}>
+              <BarChart data={series} color={color} target={target} />
+            </View>
             <Text style={s.mute}>
               Averages over logged days. Dashed line is your{" "}
               {seriesKey === "calories" ? "calorie" : seriesKey} target.
@@ -171,49 +173,58 @@ export function InsightsView({
             >
               <Text style={s.whyLink}>Why did my targets change? ›</Text>
             </Pressable>
-          </NCard>
+          </View>
 
-          <NCard style={s.gap}>
-            <Label>Meal by meal</Label>
-            {rows.map((row) => {
-              const feel = FEEL_OPTIONS.find((o) => Math.round(row.feel) === o.value);
+          {/* Meal by meal section: flat with ProgressLine */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Meal by meal</Text>
+            <View style={s.mealList}>
+              {rows.map((row, idx) => {
+                const feel = FEEL_OPTIONS.find((o) => Math.round(row.feel) === o.value);
 
-              return (
-                <View key={row.slot} style={s.mealRow}>
-                  <View style={s.mealHead}>
-                    <Text style={s.body}>{row.slot}</Text>
-                    <Text style={s.mute}>
-                      {fmtInt(row.calories)} kcal · {Math.round(row.protein)}g
-                      {feel ? ` · ${feel.label.toLowerCase()}` : ""}
-                    </Text>
+                return (
+                  <View key={row.slot} style={[s.mealRow, idx > 0 && s.mealRowBorder]}>
+                    <View style={s.mealHead}>
+                      <Text style={s.mealSlotName}>{row.slot}</Text>
+                      <Text style={s.mealSlotMeta}>
+                        {fmtInt(row.calories)} kcal · {Math.round(row.protein)}g
+                        {feel ? ` · ${feel.label.toLowerCase()}` : ""}
+                      </Text>
+                    </View>
+                    <ProgressLine
+                      value={row.protein}
+                      target={Math.max(1, settings.protein / 3)}
+                      color={Q.accent.sage}
+                      trackColor={Q.color.line}
+                      height={3}
+                    />
                   </View>
-                  <Bar value={row.protein} max={Math.max(1, settings.protein / 3)} color={N.protein} />
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
             {weakest && weakest.protein < settings.protein / 5 ? (
               <Text style={s.mute}>
                 {weakest.slot} is your lightest meal for protein.
               </Text>
             ) : null}
-          </NCard>
+          </View>
         </>
       )}
 
-      <NCard style={s.gap}>
-        <View style={s.rowBetween}>
-          <Label>Your week</Label>
-        </View>
+      {/* Your week */}
+      <View style={s.section}>
+        <Text style={s.sectionTitle}>Your week</Text>
         <Text style={s.body}>
           Patterns and a few concrete changes from your last two weeks.
         </Text>
         <View style={s.top}>
           <Button label="Read my week" kind="ghost" onPress={() => setReadOpen(true)} />
         </View>
-      </NCard>
+      </View>
 
-      <NCard style={s.gap}>
-        <Label>Weight</Label>
+      {/* Weight */}
+      <View style={s.section}>
+        <Text style={s.sectionTitle}>Weight</Text>
         {latest ? (
           <>
             <Text style={s.weight}>{formatWeight(latest.kg, weightUnit)}</Text>
@@ -291,7 +302,7 @@ export function InsightsView({
             ))}
           </View>
         ) : null}
-      </NCard>
+      </View>
 
       <WeeklyReadSheet visible={readOpen} onClose={() => setReadOpen(false)} read={read} />
       <ChangeLogSheet
@@ -313,26 +324,97 @@ function Summary({ label, value }: { label: string; value: string }) {
 }
 
 const s = StyleSheet.create({
-  scroll: { paddingHorizontal: 0, paddingVertical: 8, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 24, paddingVertical: 12, paddingBottom: 100 },
   fill: { flex: 1 },
-  whyBtn: { marginTop: 8, alignSelf: "flex-start" },
-  whyLink: { color: N.acc, fontSize: 13, fontWeight: "600" },
-  gap: { marginBottom: 12 },
-  top: { marginTop: 12 },
-  body: { color: N.ink, fontSize: 15, lineHeight: 21 },
-  mute: { color: N.mute, fontSize: 13, lineHeight: 18 },
-  summary: { flexDirection: "row", justifyContent: "space-between" },
-  summaryItem: { alignItems: "center", flex: 1 },
-  summaryValue: { fontFamily: NSerif, fontWeight: "300", fontSize: 26, color: N.ink },
-  mealRow: { marginBottom: 14 },
-  mealHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
-  rowBetween: { flexDirection: "row", justifyContent: "space-between" },
-  weight: { fontFamily: NSerif, fontWeight: "300", fontSize: 34, color: N.ink },
-  weightRow: { flexDirection: "row", gap: 10, alignItems: "flex-end", marginTop: 12 },
+  rangeNav: { marginBottom: 20 },
+  section: {
+    paddingVertical: 20,
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
+  },
+  sectionTitle: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
+    marginBottom: 12,
+  },
+  whyBtn: { marginTop: 12, alignSelf: "flex-start" },
+  whyLink: {
+    fontFamily: Q.font.sansSemiBold,
+    color: Q.accent.sage,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  top: { marginTop: 14 },
+  body: {
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.ink,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  mute: {
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.mute,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+  summarySection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 18,
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
+  },
+  summaryItem: { alignItems: "flex-start", flex: 1 },
+  summaryValue: {
+    fontFamily: Q.font.displayMedium,
+    fontWeight: "500",
+    fontSize: 26,
+    color: Q.color.ink,
+    fontVariant: ["tabular-nums"] as unknown as ("tabular-nums")[],
+    marginBottom: 4,
+  },
+  seriesSegWrap: { marginBottom: 16 },
+  chartWrap: { marginVertical: 8 },
+  mealList: { marginTop: 4 },
+  mealRow: { paddingVertical: 12 },
+  mealRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
+  },
+  mealHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    marginBottom: 8,
+  },
+  mealSlotName: {
+    fontFamily: Q.font.sansMedium,
+    fontSize: 15,
+    fontWeight: "500",
+    color: Q.color.ink,
+  },
+  mealSlotMeta: {
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.mute,
+    fontSize: 13,
+    fontVariant: ["tabular-nums"] as unknown as ("tabular-nums")[],
+  },
+  weight: {
+    fontFamily: Q.font.displayMedium,
+    fontWeight: "500",
+    fontSize: 34,
+    color: Q.color.ink,
+    fontVariant: ["tabular-nums"] as unknown as ("tabular-nums")[],
+  },
+  weightRow: { flexDirection: "row", gap: 10, alignItems: "flex-end", marginTop: 14 },
   logBtn: { marginBottom: 12 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   chip: {
-    backgroundColor: N.card2,
+    backgroundColor: Q.color.surface,
+    borderWidth: 1,
+    borderColor: Q.color.line,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,

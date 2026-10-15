@@ -2,7 +2,6 @@ import * as Haptics from "expo-haptics";
 import {
   ArrowUp,
   Bookmark,
-  BookmarkPlus,
   Pencil,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -48,8 +47,7 @@ import { N, NSerif } from "@/constants/nourish-theme";
 import { useFoodLogger } from "@/hooks/use-food-logger";
 import type { useNourish } from "@/hooks/use-nourish";
 import { useTodayKey } from "@/hooks/use-today-key";
-import { dayTitle, FEEL_OPTIONS } from "@/services/nourish/format";
-import { confidenceLabel, confidenceOf } from "@/services/nourish/nutrition";
+import { dayTitle } from "@/services/nourish/format";
 import { slotOfMeal, timeOfDay } from "@/services/nourish/slots";
 import { savedFoodToDraft } from "@/services/nourish/resolve-log";
 import { normalizeFoodName } from "@/services/food-db";
@@ -76,13 +74,21 @@ import {
 } from "@/storage/repositories/saved-foods";
 import type { Meal, MealSlot } from "@/types/gymos";
 import { pickMicronutrients } from "@/types/gymos";
-import type { DraftItem } from "@/types/nourish";
+import type { DraftItem, FeelValue } from "@/types/nourish";
 import {
   addDaysToKey,
   dateKeyFromTimestamp,
   getTodayKey,
 } from "@/utils/date";
 import { showToast, showUndoToast } from "@/utils/toast";
+
+const SATIETY_OPTIONS: readonly { value: FeelValue; label: string }[] = [
+  { value: 1, label: "Very light" },
+  { value: 1, label: "Light" },
+  { value: 2, label: "Good" },
+  { value: 3, label: "Heavy" },
+  { value: 3, label: "Stuffed" },
+];
 
 type Nourish = ReturnType<typeof useNourish>;
 
@@ -107,7 +113,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
   const [savingMealOccasion, setSavingMealOccasion] = useState<EatingOccasion | null>(null);
   const [saveMealName, setSaveMealName] = useState("");
   const [saveMealBusy, setSaveMealBusy] = useState(false);
-  const [expandedFeelKeys, setExpandedFeelKeys] = useState<Record<string, boolean>>({});
+  const [selectedFeelLabels, setSelectedFeelLabels] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -570,7 +576,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                       }}
                       style={s.renameBtn}
                     >
-                      <Pencil size={13} color={N.mute} />
+                      <Pencil size={16} color={Q.color.mute} />
                     </Pressable>
                   </View>
                   <View style={s.sectionRightWrap}>
@@ -588,7 +594,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                       }}
                       style={s.saveMealHeaderBtn}
                     >
-                      <BookmarkPlus size={16} color={N.acc} />
+                      <Text style={s.saveMealText}>Save meal</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -606,53 +612,48 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
                 ))}
                 {(() => {
                   const currentFeel = occasion.feel ?? day.feel[id] ?? day.feel[slot];
-                  const isExpanded = expandedFeelKeys[id] ?? false;
-                  const chosenOption = currentFeel
-                    ? FEEL_OPTIONS.find((o) => o.value === currentFeel)
-                    : undefined;
-
-                  if (chosenOption && !isExpanded) {
-                    return (
-                      <View style={s.feelBar}>
-                        <Text style={s.feelPrompt}>How did it feel?</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`${chosenOption.label}. Tap to change.`}
-                          hitSlop={4}
-                          onPress={() => {
-                            tap();
-                            setExpandedFeelKeys((prev) => ({ ...prev, [id]: true }));
-                          }}
-                          style={s.feelCollapsedChip}
-                        >
-                          <Text style={s.feelCollapsedChipText}>{chosenOption.label}</Text>
-                          <Pencil size={11} color={N.acc} />
-                        </Pressable>
-                      </View>
-                    );
-                  }
 
                   return (
                     <View style={s.feelBar}>
                       <Text style={s.feelPrompt}>How did it feel?</Text>
-                      <View style={s.feelPills}>
-                        {FEEL_OPTIONS.map((option) => {
-                          const active = currentFeel === option.value;
+                      <View style={s.feelLinks}>
+                        {SATIETY_OPTIONS.map((item) => {
+                          const active =
+                            selectedFeelLabels[id] === item.label ||
+                            (!selectedFeelLabels[id] &&
+                              ((currentFeel === 1 && item.label === "Light") ||
+                                (currentFeel === 2 && item.label === "Good") ||
+                                (currentFeel === 3 && item.label === "Heavy")));
+
                           return (
                             <Pressable
-                              key={option.value}
+                              key={item.label}
                               accessibilityRole="button"
-                              accessibilityLabel={option.label}
-                              hitSlop={4}
+                              accessibilityLabel={item.label}
+                              hitSlop={6}
                               onPress={() => {
                                 tap();
-                                setExpandedFeelKeys((prev) => ({ ...prev, [id]: false }));
-                                void actions.setFeel(dayKey, id, option.value);
+                                setSelectedFeelLabels((prev) => ({
+                                  ...prev,
+                                  [id]: item.label,
+                                }));
+                                void actions.setFeel(dayKey, id, item.value);
                               }}
-                              style={[s.feelPill, active && s.feelPillActive]}
+                              style={s.feelLink}
                             >
-                              <Text style={[s.feelPillText, active && s.feelPillTextActive]}>
-                                {option.label}
+                              <View
+                                style={[
+                                  s.feelDot,
+                                  active && s.feelDotActive,
+                                ]}
+                              />
+                              <Text
+                                style={[
+                                  s.feelLinkText,
+                                  active && s.feelLinkTextActive,
+                                ]}
+                              >
+                                {item.label}
                               </Text>
                             </Pressable>
                           );
@@ -670,6 +671,7 @@ export function TodayView({ nourish }: { nourish: Nourish }) {
           <CardioSection
             entries={day.burn}
             cardStyle={false}
+            accentColor={Q.accent.sage}
             emptyText="Log cardio to add part of it back to today’s budget."
             onAddPress={() => {
               tap();
@@ -979,8 +981,6 @@ function EntryRow({
   onPress: () => void;
   onBookmark: () => void;
 }) {
-  const conf = confidenceLabel(confidenceOf(meal));
-
   return (
     <View style={[s.entry, !last && s.entryLine]}>
       <Pressable
@@ -993,13 +993,12 @@ function EntryRow({
         style={s.entryMainPressable}
       >
         <View style={s.entryMain}>
-          <Text style={s.entryName}>{meal.name}</Text>
-          <View style={s.entrySub}>
-            <View style={[s.dot, { backgroundColor: conf.color }]} />
-            <Text style={s.mute}>
-              {meal.qty ?? "1 serving"} · {Math.round(meal.protein ?? 0)}g protein
-            </Text>
-          </View>
+          <Text style={s.entryName} numberOfLines={2}>
+            {meal.name}
+          </Text>
+          <Text style={s.entrySubText}>
+            {meal.qty ?? "1 serving"} · {Math.round(meal.protein ?? 0)}g protein
+          </Text>
         </View>
         <Text style={s.entryKcal}>{fmtInt(meal.calories ?? 0)} kcal</Text>
       </Pressable>
@@ -1015,8 +1014,8 @@ function EntryRow({
       >
         <Bookmark
           size={16}
-          color={isSaved ? N.acc : N.mute}
-          fill={isSaved ? N.acc : "none"}
+          color={isSaved ? Q.accent.sage : Q.color.mute}
+          fill={isSaved ? Q.accent.sage : "none"}
         />
       </Pressable>
     </View>
@@ -1108,22 +1107,22 @@ const s = StyleSheet.create({
     gap: 8,
   },
   saveMealHeaderBtn: {
-    minWidth: 44,
     minHeight: 44,
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: N.card2,
-    borderWidth: 1,
-    borderColor: N.line,
-    alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  saveMealText: {
+    fontFamily: Q.font.sansSemiBold,
+    fontSize: 13,
+    fontWeight: "600",
+    color: Q.accent.sage,
   },
   renameBtn: {
     padding: 2,
     alignItems: "center",
     justifyContent: "center",
   },
-  sectionTitle: { fontFamily: Q.font.sansSemiBold, fontWeight: "600", fontSize: 16, color: Q.color.ink },
+  sectionTitle: { fontFamily: Q.font.sansRegular, fontSize: 13, color: Q.color.mute },
   sectionSub: {
     fontFamily: Q.font.sansRegular,
     color: Q.color.mute,
@@ -1142,8 +1141,9 @@ const s = StyleSheet.create({
   entryMainPressable: {
     flex: 1,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
+    marginRight: 8,
   },
   bookmarkBtn: {
     minWidth: 44,
@@ -1153,58 +1153,57 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   entryLine: { borderBottomWidth: 1, borderBottomColor: Q.color.line },
-  entryMain: { flex: 1, paddingRight: 8 },
+  entryMain: { flex: 1, paddingRight: 12 },
   entryName: { fontFamily: Q.font.sansMedium, color: Q.color.ink, fontSize: 16, fontWeight: "500" },
-  entrySub: { flexDirection: "row", alignItems: "center", marginTop: 3 },
-  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  entrySubText: { fontFamily: Q.font.sansRegular, color: Q.color.mute, fontSize: 13, marginTop: 2 },
   entryKcal: {
-    fontFamily: Q.font.displayMedium,
-    color: Q.color.ink,
-    fontSize: 16,
-    fontWeight: "500",
+    fontFamily: Q.font.sansRegular,
+    color: Q.color.mute,
+    fontSize: 14,
     fontVariant: ["tabular-nums"] as unknown as ("tabular-nums")[],
   },
   remove: { color: Q.color.mute, fontSize: 16, paddingHorizontal: 4 },
   feelBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: Q.color.line,
   },
   feelPrompt: {
     fontFamily: Q.font.sansRegular,
     color: Q.color.mute,
-    fontSize: 12,
+    fontSize: 13,
+    marginBottom: 8,
   },
-  feelPills: {
+  feelLinks: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: 6,
   },
-  feelPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: Q.color.surface,
-    borderWidth: 1,
-    borderColor: Q.color.line,
+  feelLink: {
+    alignItems: "center",
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 4,
   },
-  feelPillActive: {
-    backgroundColor: "rgba(140, 197, 162, 0.2)",
-    borderColor: Q.accent.sage,
+  feelDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginBottom: 6,
+    backgroundColor: "transparent",
   },
-  feelPillText: {
-    fontFamily: Q.font.sansRegular,
+  feelDotActive: {
+    backgroundColor: Q.accent.sage,
+  },
+  feelLinkText: {
+    fontFamily: Q.font.sansSemiBold,
     color: Q.color.mute,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  feelPillTextActive: {
-    color: Q.accent.sage,
+    fontSize: 13,
     fontWeight: "600",
+  },
+  feelLinkTextActive: {
+    color: Q.color.ink,
   },
   saveMealItemsContainer: {
     marginTop: 4,

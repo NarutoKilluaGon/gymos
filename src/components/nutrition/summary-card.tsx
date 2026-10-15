@@ -55,8 +55,11 @@ export const SummaryCard = memo(function SummaryCard({
 
       {/* 4. Macro 3 Columns (Protein, Carbs, Fat) */}
       <View style={styles.macroRow}>
-        {vm.macros.map((m) => (
-          <View key={m.name} style={styles.macroCol}>
+        {vm.macros.map((m, idx) => (
+          <View
+            key={m.name}
+            style={[styles.macroCol, idx > 0 && styles.macroColDivider]}
+          >
             <Text style={styles.macroValue}>
               {Math.round(m.eaten)}
               <Text style={styles.macroUnit}> g</Text>
@@ -87,8 +90,8 @@ export const SummaryCard = memo(function SummaryCard({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 24,
+    paddingTop: 28,
     paddingBottom: 12,
   },
   kcalNumber: {
@@ -96,7 +99,7 @@ const styles = StyleSheet.create({
     fontSize: 84,
     fontWeight: "500",
     letterSpacing: -0.04 * 84,
-    lineHeight: 88,
+    lineHeight: 84,
     color: Q.color.ink,
     fontVariant: ["tabular-nums"] as unknown as ("tabular-nums")[],
   },
@@ -116,7 +119,6 @@ const styles = StyleSheet.create({
   },
   macroRow: {
     flexDirection: "row",
-    gap: 12,
     paddingTop: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
@@ -124,6 +126,12 @@ const styles = StyleSheet.create({
   },
   macroCol: {
     flex: 1,
+  },
+  macroColDivider: {
+    borderLeftWidth: 1,
+    borderLeftColor: Q.color.line,
+    paddingLeft: 12,
+    marginLeft: 12,
   },
   macroValue: {
     fontFamily: Q.font.displayMedium,
@@ -149,12 +157,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     minHeight: 40,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   footerText: {
     fontFamily: Q.font.sansRegular,
     color: Q.color.mute,
-    fontSize: 12,
+    fontSize: 13,
     flex: 1,
     paddingRight: 8,
   },
