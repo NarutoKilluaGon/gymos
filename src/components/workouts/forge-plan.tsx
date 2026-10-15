@@ -27,9 +27,9 @@ import {
   RenameSheet,
   SupersetInfoSheet,
 } from "@/components/workouts/forge-sheets";
-import { Button, FCard, Field, Label, Pill, Seg } from "@/components/workouts/forge-ui";
-import { Font } from "@/constants/design";
+import { Button, Field, Label, Pill, Seg } from "@/components/workouts/forge-ui";
 import { F } from "@/constants/forge-theme";
+import { Q } from "@/constants/quiet";
 import type { MuscleGroup } from "@/data/exercises";
 import type { ForgeData } from "@/hooks/use-forge";
 import { hapticLight } from "@/utils/haptics";
@@ -240,16 +240,16 @@ export function PlanView({
         </View>
 
         {!plan ? (
-          <FCard>
+          <View style={s.gap}>
             <Text style={s.meta}>No plan yet. Pick a template or start blank.</Text>
             <View style={{ marginTop: 12 }}>
               <Button label="Create a plan" onPress={() => setNewOpen(true)} />
             </View>
-          </FCard>
+          </View>
         ) : (
           <>
-            {/* PLAN CONFIGURATION CARD */}
-            <FCard style={s.gap}>
+            {/* PLAN CONFIGURATION (FLAT) */}
+            <View style={s.gap}>
               <DraftTextField
                 heading="Plan name"
                 accessibilityLabel="Plan name"
@@ -287,22 +287,26 @@ export function PlanView({
                   ? "Each workout starts the day after the one you did last."
                   : "Pick the weekdays each day is scheduled on."}
               </Text>
-              <View style={s.pills}>
-                <Pill
-                  label="Deload week"
-                  active={plan.deload}
-                  onPress={() =>
-                    edit((current, now) => ({
-                      ...current,
-                      deload: !current.deload,
-                      updatedAt: now.toISOString(),
-                    }))
-                  }
-                />
-              </View>
-            </FCard>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Deload week"
+                hitSlop={8}
+                style={s.textLinkBtn}
+                onPress={() =>
+                  edit((current, now) => ({
+                    ...current,
+                    deload: !current.deload,
+                    updatedAt: now.toISOString(),
+                  }))
+                }
+              >
+                <Text style={[s.textLink, plan.deload && { color: Q.accent.ember }]}>
+                  {plan.deload ? "Deload week (active)" : "Deload week"}
+                </Text>
+              </Pressable>
+            </View>
 
-            {/* DAY PICKER STRIP */}
+            {/* 4.3 DAY PICKER STRIP: TEXT TABS (3.3) */}
             {plan.days.length > 0 ? (
               <View style={s.dayPickerContainer}>
                 <ScrollView
@@ -311,13 +315,6 @@ export function PlanView({
                   contentContainerStyle={s.dayStrip}
                 >
                   {plan.days.map((day) => {
-                    const assignedDays = !plan.rotate
-                      ? Object.entries(plan.schedule)
-                          .filter(([, id]) => id === day.id)
-                          .map(([wd]) => WEEKDAYS[Number(wd)])
-                          .filter(Boolean)
-                      : [];
-                    const scheduleBadge = assignedDays.length > 0 ? assignedDays.join("·") : null;
                     const isActive = day.id === currentDay?.id;
 
                     return (
@@ -326,18 +323,17 @@ export function PlanView({
                         accessibilityRole="button"
                         accessibilityLabel={`Day ${day.name}`}
                         onPress={() => setActiveDayId(day.id)}
-                        style={[s.dayChip, isActive && s.dayChipActive]}
+                        style={s.dayTab}
                       >
-                        <Text style={[s.dayChipText, isActive && s.dayChipTextActive]}>
+                        <View
+                          style={[
+                            s.tabDot,
+                            { backgroundColor: isActive ? Q.accent.ember : "transparent" },
+                          ]}
+                        />
+                        <Text style={[s.dayTabText, isActive && s.dayTabTextActive]}>
                           {day.name}
                         </Text>
-                        {scheduleBadge ? (
-                          <View style={[s.chipBadge, isActive && s.chipBadgeActive]}>
-                            <Text style={[s.chipBadgeText, isActive && s.chipBadgeTextActive]}>
-                              {scheduleBadge}
-                            </Text>
-                          </View>
-                        ) : null}
                       </Pressable>
                     );
                   })}
@@ -345,10 +341,10 @@ export function PlanView({
               </View>
             ) : null}
 
-            {/* ACTIVE DAY VIEW */}
+            {/* ACTIVE DAY VIEW (FLAT) */}
             {currentDay ? (
               <Crossfade triggerKey={currentDay.id} duration={160}>
-                <FCard key={currentDay.id} style={s.gap}>
+                <View key={currentDay.id} style={s.gap}>
                 <View style={s.dayHead}>
                   <DraftTextField
                     value={currentDay.name}
@@ -371,22 +367,41 @@ export function PlanView({
                   </Pressable>
                 </View>
 
+                {/* 4.3 WEEKDAY ASSIGNMENT: SEVEN SMALL TEXT TOGGLES */}
                 {!plan.rotate ? (
-                  <View style={s.pills}>
+                  <View style={s.weekdayRow}>
                     {WEEKDAYS.map((label, weekday) => {
                       const owner = plan.schedule[String(weekday)];
+                      const isSelected = owner === currentDay.id;
 
                       return (
-                        <Pill
+                        <Pressable
                           key={label}
-                          label={label}
-                          active={owner === currentDay.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={label}
+                          hitSlop={8}
                           onPress={() =>
                             edit((current, now) =>
                               toggleScheduleDay(current, weekday, currentDay.id, now),
                             )
                           }
-                        />
+                          style={s.weekdayToggle}
+                        >
+                          <View
+                            style={[
+                              s.tabDot,
+                              { backgroundColor: isSelected ? Q.accent.ember : "transparent" },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              s.weekdayText,
+                              isSelected && s.weekdayTextSelected,
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
                       );
                     })}
                   </View>
@@ -676,12 +691,12 @@ export function PlanView({
                 <View style={s.pills}>
                   <Pill label="+ Exercise" onPress={() => setPickFor(currentDay.id)} />
                 </View>
-              </FCard>
+              </View>
             </Crossfade>
           ) : null}
 
-            {/* ADD DAY INPUT CARD */}
-            <FCard style={s.gap}>
+            {/* ADD DAY INPUT */}
+            <View style={s.gap}>
               <Field
                 label="Add a day"
                 placeholder="Push, Legs, Day A…"
@@ -694,7 +709,7 @@ export function PlanView({
                 label="Add day"
                 onPress={() => void submitDay()}
               />
-            </FCard>
+            </View>
 
             <Button
               kind="danger"
@@ -705,7 +720,7 @@ export function PlanView({
         )}
 
         {/* REST TIMER & BAR WEIGHT */}
-        <FCard style={s.gap}>
+        <View style={s.gap}>
           <Label>Rest timer</Label>
           <Seg
             options={REST_CHOICES}
@@ -730,7 +745,7 @@ export function PlanView({
             placeholder="20"
             onCommit={(barKg) => void onSave((current) => ({ ...current, barKg }))}
           />
-        </FCard>
+        </View>
 
         {/* SHEETS */}
         <NewPlanSheet
@@ -1052,60 +1067,70 @@ function Action({
   danger?: boolean;
 }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} hitSlop={6}>
-      <Text style={[s.action, danger && { color: F.bad }]}>{label}</Text>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hitSlop={8}
+      style={s.actionBtn}
+    >
+      <Text style={[s.action, danger ? s.actionRemove : s.actionSuperset]}>{label}</Text>
     </Pressable>
   );
 }
 
 const s = StyleSheet.create({
-  root: { gap: 14 },
-  gap: { gap: 10 },
+  root: { gap: 18 },
+  gap: { gap: 14 },
   pills: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  meta: { color: F.mute, fontSize: 13 },
+  meta: { color: Q.color.mute, fontSize: 13, fontFamily: Q.font.sansRegular },
   dayPickerContainer: { marginHorizontal: -4 },
-  dayStrip: { flexDirection: "row", gap: 8, paddingHorizontal: 4, paddingVertical: 2 },
-  dayChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 14,
-    backgroundColor: F.card,
-    borderWidth: 1,
-    borderColor: F.line,
-    flexDirection: "row",
+  dayStrip: { flexDirection: "row", gap: 16, paddingHorizontal: 4, paddingVertical: 4 },
+  dayTab: {
+    flexDirection: "column",
     alignItems: "center",
-    gap: 6,
+    paddingHorizontal: 8,
+    minHeight: 44,
+    justifyContent: "center",
   },
-  dayChipActive: {
-    backgroundColor: "rgba(217, 164, 65, 0.15)",
-    borderColor: F.acc,
+  tabDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginBottom: 6,
   },
-  dayChipText: {
-    fontFamily: Font.sans,
+  dayTabText: {
+    fontFamily: Q.font.sansMedium,
     fontSize: 14,
     fontWeight: "500",
-    color: F.mute,
+    color: Q.color.mute,
   },
-  dayChipTextActive: {
-    color: F.acc,
+  dayTabTextActive: {
+    color: Q.color.ink,
     fontWeight: "600",
   },
-  chipBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: F.card2,
+  weekdayRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginVertical: 12,
   },
-  chipBadgeActive: {
-    backgroundColor: "rgba(217, 164, 65, 0.25)",
+  weekdayToggle: {
+    flexDirection: "column",
+    alignItems: "center",
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
   },
-  chipBadgeText: {
-    fontSize: 11,
+  weekdayText: {
+    fontFamily: Q.font.sansMedium,
+    fontSize: 14,
+    fontWeight: "500",
+    color: Q.color.mute,
+  },
+  weekdayTextSelected: {
+    color: Q.color.ink,
     fontWeight: "600",
-    color: F.dim,
-  },
-  chipBadgeTextActive: {
-    color: F.acc,
   },
   dayHead: {
     flexDirection: "row",
@@ -1114,9 +1139,10 @@ const s = StyleSheet.create({
     gap: 10,
   },
   dayName: {
-    color: F.ink,
-    fontSize: 22,
-    fontWeight: "300",
+    color: Q.color.ink,
+    fontFamily: Q.font.displayMedium,
+    fontSize: 26,
+    fontWeight: "500",
     flex: 1,
     paddingVertical: 4,
   },
@@ -1127,16 +1153,16 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
   },
-  menuIcon: { color: F.mute, fontSize: 20 },
+  menuIcon: { color: Q.color.mute, fontSize: 20 },
   exRow: {
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: F.line,
-    gap: 8,
+    borderTopColor: Q.color.line,
+    gap: 10,
   },
   exRowSuperset: {
     borderLeftWidth: 3,
-    borderLeftColor: F.acc,
+    borderLeftColor: Q.accent.ember,
     paddingLeft: 10,
   },
   supersetTagRow: {
@@ -1146,23 +1172,19 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   supersetBadge: {
-    backgroundColor: "rgba(217, 164, 65, 0.18)",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(217, 164, 65, 0.35)",
   },
   supersetBadgeText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: F.acc,
+    fontSize: 11,
+    fontWeight: "600",
+    color: Q.accent.ember,
     letterSpacing: 0.8,
   },
   supersetHelpLink: {
     fontSize: 12,
-    color: F.mute,
-    textDecorationLine: "underline",
+    color: Q.color.mute,
   },
   exHeaderLine: {
     flexDirection: "row",
@@ -1173,98 +1195,122 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: F.card2,
     borderWidth: 1,
-    borderColor: F.line,
+    borderColor: Q.color.lineStrong,
     alignItems: "center",
     justifyContent: "center",
   },
   indexBadgeText: {
-    fontFamily: Font.sans,
+    fontFamily: Q.font.sansMedium,
     fontSize: 13,
-    fontWeight: "600",
-    color: F.mute,
+    fontWeight: "500",
+    color: Q.color.mute,
   },
   nameWrapper: {
     flex: 1,
   },
   exName: {
-    fontFamily: Font.serif,
-    color: F.ink,
-    fontSize: 19,
-    fontWeight: "400",
+    fontFamily: Q.font.sansMedium,
+    color: Q.color.ink,
+    fontSize: 16,
+    fontWeight: "500",
   },
   muscleLine: {
-    fontFamily: Font.sans,
-    fontSize: 12,
-    color: F.mute,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
     marginTop: 2,
   },
   rowMenuBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
   },
   targets: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginTop: 2,
+    marginTop: 4,
   },
-  times: { color: F.mute, fontSize: 13 },
+  times: { color: Q.color.mute, fontSize: 13 },
   reps: {
     width: 68,
     height: 44,
     borderRadius: 12,
-    backgroundColor: F.card2,
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: F.line,
-    color: F.ink,
+    borderColor: Q.color.lineStrong,
+    color: Q.color.ink,
     textAlign: "center",
     fontSize: 15,
+    fontFamily: Q.font.sansMedium,
     fontWeight: "500",
   },
   failBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    borderRadius: 10,
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: F.line,
-    backgroundColor: F.card2,
+    borderColor: Q.color.lineStrong,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
   },
   failBtnActive: {
-    backgroundColor: "rgba(209, 96, 74, 0.15)",
-    borderColor: F.bad,
+    borderColor: Q.accent.ember,
   },
   failBtnText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "600",
-    color: F.mute,
+    color: Q.color.mute,
+    fontFamily: Q.font.sansSemiBold,
   },
   failBtnTextActive: {
-    color: F.bad,
+    color: Q.accent.ember,
   },
   unitText: {
     fontSize: 13,
-    color: F.mute,
+    color: Q.color.mute,
     fontWeight: "500",
+    fontFamily: Q.font.sansRegular,
   },
   repHintText: {
     fontSize: 11,
-    color: F.dim,
+    color: Q.color.mute,
     marginTop: -2,
+    fontFamily: Q.font.sansRegular,
   },
   rowActions: {
     flexDirection: "row",
-    gap: 16,
-    marginTop: 2,
+    gap: 18,
+    marginTop: 4,
+  },
+  actionBtn: {
+    minHeight: 44,
+    justifyContent: "center",
   },
   action: {
-    color: F.acc,
     fontSize: 13,
-    fontWeight: "500",
+    fontFamily: Q.font.sansSemiBold,
+    fontWeight: "600",
+  },
+  actionSuperset: {
+    color: Q.accent.ember,
+  },
+  actionRemove: {
+    color: Q.color.mute,
+  },
+  textLinkBtn: {
+    minHeight: 44,
+    justifyContent: "center",
+    alignSelf: "flex-start",
+  },
+  textLink: {
+    fontSize: 13,
+    fontFamily: Q.font.sansSemiBold,
+    fontWeight: "600",
+    color: Q.color.mute,
   },
   addExDashed: {
     flexDirection: "row",
@@ -1273,16 +1319,15 @@ const s = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(217, 164, 65, 0.4)",
+    borderColor: Q.color.lineStrong,
     borderRadius: 14,
-    paddingVertical: 12,
-    backgroundColor: "rgba(217, 164, 65, 0.05)",
-    marginTop: 4,
+    paddingVertical: 14,
+    marginTop: 8,
   },
   addExDashedText: {
-    fontFamily: Font.sans,
+    fontFamily: Q.font.sansSemiBold,
     fontSize: 14,
     fontWeight: "600",
-    color: F.acc,
+    color: Q.accent.ember,
   },
 });

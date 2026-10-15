@@ -132,8 +132,8 @@ describe("Forge History v2 (Part 9)", () => {
     const { renderer } = mount(mockData);
     const tree = JSON.stringify(renderer.toJSON());
 
-    // Contains THIS WEEK eyebrow
-    expect(tree).toContain("THIS WEEK");
+    // Contains This week eyebrow
+    expect(tree).toContain("This week");
     // Displays workout count
     expect(tree).toContain("2 workouts");
   });
@@ -212,7 +212,7 @@ describe("Forge History v2 (Part 9)", () => {
     await pressText(renderer, "Grid");
 
     const gridTree = JSON.stringify(renderer.toJSON());
-    expect(gridTree).toContain("EXERCISE");
+    expect(gridTree).toContain("Exercise");
     expect(gridTree).toContain("Best set by workout");
     expect(gridTree).toContain("Bench Press");
     expect(gridTree).toContain("Back Squat");

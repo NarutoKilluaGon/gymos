@@ -12,6 +12,7 @@ import { CalendarSheet } from "@/components/workouts/forge-sheets";
 import { Bar, FCard, Label, Pill, Seg, tap } from "@/components/workouts/forge-ui";
 import { Font } from "@/constants/design";
 import { F, FSerif } from "@/constants/forge-theme";
+import { Q } from "@/constants/quiet";
 import type { ForgeData } from "@/hooks/use-forge";
 import { useTodayKey } from "@/hooks/use-today-key";
 import { muscleBalance } from "@/services/forge/balance";
@@ -226,14 +227,14 @@ export function HistoryView({
       </View>
 
       {viewMode === "grid" ? (
-        /* FULL-WIDTH SPREADSHEET GRID VIEW */
-        <FCard style={s.gap}>
-          <Label>Best set by workout</Label>
+        /* FULL-WIDTH SPREADSHEET GRID VIEW (FLAT) */
+        <View style={s.gap}>
+          <Text style={s.sectionTitle}>Best set by workout</Text>
           <View style={s.gridContainer}>
             {/* STICKY FIRST COLUMN: EXERCISES */}
             <View style={s.gridStickyCol}>
               <View style={[s.gridCellHead, s.gridStickyHead]}>
-                <Text style={s.gridHeadText}>EXERCISE</Text>
+                <Text style={s.gridHeadText}>Exercise</Text>
               </View>
               {grid.rows.map((row) => (
                 <View key={row.exerciseId} style={[s.gridCellRow, s.gridStickyCell]}>
@@ -285,18 +286,20 @@ export function HistoryView({
                           style={[
                             s.gridCellRow,
                             s.gridColWidth,
-                            isPr && s.gridCellPr,
                           ]}
                         >
-                          <Text
-                            style={[
-                              s.gridCellText,
-                              isPr && s.gridCellTextPr,
-                              !cell && s.gridCellEmpty,
-                            ]}
-                          >
-                            {cell ?? "—"}
-                          </Text>
+                          <View style={s.gridCellContent}>
+                            {isPr ? <View style={s.prDot} /> : null}
+                            <Text
+                              style={[
+                                s.gridCellText,
+                                isPr && s.gridCellTextPr,
+                                !cell && s.gridCellEmpty,
+                              ]}
+                            >
+                              {cell ?? "—"}
+                            </Text>
+                          </View>
                         </Pressable>
                       );
                     })}
@@ -308,13 +311,13 @@ export function HistoryView({
           <Text style={s.meta}>
             Highlighted cells were records. Tap any cell to view session.
           </Text>
-        </FCard>
+        </View>
       ) : (
         /* LIST VIEW */
         <>
           {/* 1. THIS WEEK SUMMARY HERO STRIP */}
-          <FCard style={s.summaryCard}>
-            <Text style={s.summaryEyebrow}>THIS WEEK</Text>
+          <View style={s.summaryCard}>
+            <Text style={s.summaryEyebrow}>This week</Text>
             <View style={s.summaryGrid}>
               <View style={s.summaryMetric}>
                 <Text style={s.metricValue}>{thisWeekStats.sessionsCount}</Text>
@@ -358,11 +361,11 @@ export function HistoryView({
                 <Text style={s.metricLabel}>Active</Text>
               </View>
             </View>
-          </FCard>
+          </View>
 
           {/* 2. MUSCLE BALANCE WITH RANGE CHIPS AND DRILL-DOWN */}
           {hasBalance ? (
-            <FCard style={s.gap}>
+            <View style={s.gap}>
               <View style={s.balanceHeader}>
                 <Label>Muscle balance</Label>
                 <View style={s.rangeChips}>
@@ -428,12 +431,12 @@ export function HistoryView({
                   </View>
                 );
               })}
-            </FCard>
+            </View>
           ) : null}
 
           {/* 3. PR FEED */}
           {prFeed.length > 0 ? (
-            <FCard style={s.gap}>
+            <View style={s.gap}>
               <View style={s.prHeaderRow}>
                 <Trophy size={16} color={F.acc} />
                 <Label>Personal records</Label>
@@ -465,11 +468,11 @@ export function HistoryView({
                   </Pressable>
                 );
               })}
-            </FCard>
+            </View>
           ) : null}
 
           {/* 4. WORKOUTS LIST GROUPED BY WEEK */}
-          <FCard style={s.gap}>
+          <View style={s.gap}>
             <Label>Workouts</Label>
             {groupedWeeks.map((week) => (
               <View key={week.title} style={s.weekGroup}>
@@ -539,7 +542,7 @@ export function HistoryView({
                 })}
               </View>
             ))}
-          </FCard>
+          </View>
         </>
       )}
 
@@ -586,13 +589,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  summaryCard: { gap: 10 },
+  summaryCard: { gap: 14, marginVertical: 8 },
   summaryEyebrow: {
-    fontFamily: Font.sans,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-    color: F.acc,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
   },
   summaryGrid: {
     flexDirection: "row",
@@ -603,22 +604,22 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   metricValue: {
-    fontFamily: FSerif,
-    fontSize: 22,
-    fontWeight: "300",
-    color: F.ink,
+    fontFamily: Q.font.displayMedium,
+    fontSize: 26,
+    fontWeight: "500",
+    color: Q.color.ink,
     fontVariant: ["tabular-nums"],
   },
   metricLabel: {
-    fontFamily: Font.sans,
+    fontFamily: Q.font.sansRegular,
     fontSize: 12,
-    color: F.mute,
+    color: Q.color.mute,
     marginTop: 2,
   },
   metricDelta: {
-    fontFamily: Font.sans,
+    fontFamily: Q.font.sansRegular,
     fontSize: 10,
-    color: F.acc,
+    color: Q.accent.ember,
     marginTop: 2,
   },
   balanceHeader: {
@@ -733,63 +734,53 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: F.line,
+    borderTopColor: Q.color.line,
   },
   rowLeft: { flex: 1, gap: 4 },
   rowRight: { flexDirection: "row", alignItems: "center", gap: 10 },
-  workoutName: { color: F.ink, fontSize: 16, fontWeight: "500" },
-  workoutVol: { color: F.mute, fontSize: 13, textAlign: "right", fontVariant: ["tabular-nums"] },
+  workoutName: { color: Q.color.ink, fontSize: 16, fontFamily: Q.font.sansMedium, fontWeight: "500" },
+  workoutVol: { color: Q.color.mute, fontSize: 14, textAlign: "right", fontVariant: ["tabular-nums"] },
   rowOverflowBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
   gridContainer: {
     flexDirection: "row",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: F.line,
-    overflow: "hidden",
     marginVertical: 4,
   },
   gridStickyCol: {
     width: 128,
     borderRightWidth: 1,
-    borderRightColor: F.line,
-    backgroundColor: F.card2,
+    borderRightColor: Q.color.line,
   },
-  gridStickyHead: {
-    backgroundColor: F.card2,
-  },
-  gridStickyCell: {
-    backgroundColor: F.card2,
-  },
+  gridStickyHead: {},
+  gridStickyCell: {},
   gridExerciseName: {
-    fontFamily: Font.sans,
-    fontSize: 12,
+    fontFamily: Q.font.sansMedium,
+    fontSize: 14,
     fontWeight: "500",
-    color: F.ink,
+    color: Q.color.ink,
   },
   gridRow: {
     flexDirection: "row",
   },
   gridCellHead: {
-    height: 36,
+    height: 38,
     paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
     borderBottomWidth: 1,
-    borderBottomColor: F.line,
+    borderBottomColor: Q.color.line,
   },
   gridHeadText: {
-    fontFamily: Font.sans,
-    fontSize: 11,
-    letterSpacing: 0.5,
-    fontWeight: "600",
-    color: F.mute,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    fontWeight: "400",
+    color: Q.color.mute,
   },
   gridColWidth: {
     width: 90,
@@ -799,25 +790,37 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: F.line,
+    borderBottomWidth: 1,
+    borderBottomColor: Q.color.line,
+  },
+  gridCellContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  prDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Q.accent.ember,
+    marginRight: 4,
   },
   gridCellText: {
-    fontFamily: Font.sans,
-    fontSize: 12,
-    color: F.ink,
+    fontFamily: Q.font.sansRegular,
+    fontSize: 14,
+    color: Q.color.ink,
     fontVariant: ["tabular-nums"],
   },
   gridCellEmpty: {
-    color: F.dim,
-  },
-  gridCellPr: {
-    backgroundColor: "rgba(217, 164, 65, 0.18)",
-    borderWidth: 1,
-    borderColor: F.acc,
+    color: Q.color.mute,
   },
   gridCellTextPr: {
-    color: F.acc,
-    fontWeight: "700",
+    fontWeight: "600",
+    color: Q.color.ink,
+  },
+  sectionTitle: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
   },
 });

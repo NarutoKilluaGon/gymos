@@ -7,7 +7,6 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { Metric } from "@/constants/design";
 import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 import { PressableScale } from "./pressable-scale";
@@ -44,7 +43,7 @@ export function Button({
   const v = variant ?? kind ?? "primary";
   const off = disabled || busy;
 
-  let bgColor: string = theme.accent ?? theme.acc;
+  let bgColor: string = Q.color.ink;
   let textColor: string = Q.color.bg;
   let borderColor: string | undefined = undefined;
 
@@ -57,8 +56,8 @@ export function Button({
     textColor = theme.ink;
   } else if (v === "danger") {
     bgColor = "transparent";
-    textColor = theme.bad;
-    borderColor = `${theme.bad}44`;
+    textColor = theme.ink;
+    borderColor = theme.line;
   }
 
   return (
@@ -97,8 +96,8 @@ export function Button({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: Metric.buttonHeight,
-    borderRadius: Q.radius.sm,
+    height: 58,
+    borderRadius: 14,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -106,9 +105,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   text: {
-    fontFamily: Q.font.sansMedium,
-    fontSize: 14,
-    fontWeight: "500",
+    fontFamily: Q.font.sansSemiBold,
+    fontSize: 17,
+    fontWeight: "600",
   },
   disabled: {
     opacity: 0.45,

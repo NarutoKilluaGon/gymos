@@ -1,11 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Plus } from "lucide-react-native";
 
-import { Card } from "@/components/ds/card";
-import { Chip } from "@/components/ds/chip";
-import { Font } from "@/constants/design";
-import { useTheme } from "@/contexts/theme-context";
+import { Q } from "@/constants/quiet";
 import { displayName } from "@/utils/format";
 
 export type CardioEntry = {
@@ -22,6 +18,7 @@ export type CardioSectionProps = {
   onAddPress: () => void;
   onRemovePress?: (entry: CardioEntry, index: number) => void;
   emptyText?: string;
+  accentColor?: string;
   cardStyle?: boolean;
 };
 
@@ -30,24 +27,25 @@ export function CardioSection({
   onAddPress,
   onRemovePress,
   emptyText = "Log cardio to track calories burned.",
-  cardStyle = true,
+  accentColor = Q.accent.ember,
 }: CardioSectionProps) {
-  const theme = useTheme();
-
-  const content = (
-    <>
+  return (
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.ink }]}>Cardio</Text>
-        <Chip
-          label="Cardio"
-          icon={<Plus size={14} color={theme.ink} />}
-          onPress={onAddPress}
+        <Text style={styles.title}>Cardio</Text>
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Log cardio"
-        />
+          hitSlop={8}
+          style={styles.addBtn}
+          onPress={onAddPress}
+        >
+          <Text style={[styles.addText, { color: accentColor }]}>+ Cardio</Text>
+        </Pressable>
       </View>
 
       {entries.length === 0 ? (
-        <Text style={[styles.empty, { color: theme.mute }]}>{emptyText}</Text>
+        <Text style={styles.empty}>{emptyText}</Text>
       ) : (
         <View style={styles.list}>
           {entries.map((entry, index) => {
@@ -65,25 +63,22 @@ export function CardioSection({
                 key={entry.id}
                 style={[
                   styles.entryRow,
-                  index < entries.length - 1 && {
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.line,
-                  },
+                  index > 0 && styles.entryRowBorder,
                 ]}
               >
                 <View style={styles.entryInfo}>
-                  <Text style={[styles.entryName, { color: theme.ink }]} numberOfLines={1}>
+                  <Text style={styles.entryName} numberOfLines={1}>
                     {displayName(entry.name)}
                   </Text>
                   {subtitle ? (
-                    <Text style={[styles.entryMeta, { color: theme.mute }]} numberOfLines={1}>
+                    <Text style={styles.entryMeta} numberOfLines={1}>
                       {subtitle}
                     </Text>
                   ) : null}
                 </View>
 
                 {entry.kcal !== undefined ? (
-                  <Text style={[styles.entryKcal, { color: theme.ink }]}>
+                  <Text style={styles.entryKcal}>
                     {Math.round(entry.kcal)} kcal
                   </Text>
                 ) : null}
@@ -96,7 +91,7 @@ export function CardioSection({
                     style={styles.removeBtn}
                     onPress={() => onRemovePress(entry, index)}
                   >
-                    <Text style={[styles.removeText, { color: theme.dim }]}>✕</Text>
+                    <Text style={styles.removeText}>✕</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -104,37 +99,40 @@ export function CardioSection({
           })}
         </View>
       )}
-    </>
+    </View>
   );
-
-  if (cardStyle) {
-    return <Card style={styles.card}>{content}</Card>;
-  }
-
-  return <View style={styles.container}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 4,
-  },
-  card: {
-    gap: 8,
-    marginVertical: 4,
+    marginVertical: 12,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   title: {
-    fontFamily: Font.serif,
-    fontSize: 20,
-    fontWeight: "300",
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
+    fontWeight: "400",
+  },
+  addBtn: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  addText: {
+    fontFamily: Q.font.sansSemiBold,
+    fontSize: 13,
+    fontWeight: "600",
   },
   empty: {
+    fontFamily: Q.font.sansRegular,
     fontSize: 14,
+    color: Q.color.mute,
     paddingVertical: 4,
   },
   list: {
@@ -144,29 +142,45 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    gap: 10,
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
+    gap: 12,
+  },
+  entryRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
   },
   entryInfo: {
     flex: 1,
   },
   entryName: {
-    fontSize: 15,
+    fontFamily: Q.font.sansMedium,
+    fontSize: 16,
     fontWeight: "500",
+    color: Q.color.ink,
   },
   entryMeta: {
+    fontFamily: Q.font.sansRegular,
     fontSize: 13,
+    color: Q.color.mute,
     marginTop: 2,
   },
   entryKcal: {
+    fontFamily: Q.font.sansRegular,
     fontSize: 14,
     fontVariant: ["tabular-nums"],
+    color: Q.color.mute,
   },
   removeBtn: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: -10,
   },
   removeText: {
-    fontSize: 16,
+    fontSize: 14,
+    color: Q.color.mute,
   },
 });

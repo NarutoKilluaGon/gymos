@@ -29,7 +29,6 @@ import {
   Plus,
   Target,
   Trash2,
-  Trophy,
   Unlink2,
 } from "lucide-react-native";
 
@@ -42,6 +41,7 @@ import {
   Sheet,
 } from "@/components/workouts/forge-ui";
 import { F } from "@/constants/forge-theme";
+import { Q } from "@/constants/quiet";
 import { type MuscleGroup } from "@/data/exercises";
 import { MUSCLES_BY_GROUP } from "@/data/muscles";
 import {
@@ -565,17 +565,27 @@ export function SummarySheet({
       visible={visible}
       onClose={onClose}
       title="Workout done"
-      footer={<Button label="Done" onPress={onClose} />}
+      footer={<Button label="Finish" onPress={onClose} />}
     >
-      <View style={s.summaryHeaderRow}>
-        <Animated.View style={{ transform: [{ scale: trophyScale }] }}>
-          <Trophy size={36} color={F.acc} />
-        </Animated.View>
-      </View>
-      <View style={s.stats}>
-        <Stat label="Time" value={durationLabel} />
-        <Stat label="Volume" value={volumeLabel} />
-        <Stat label="Sets" value={String(sets)} />
+      <View style={s.summaryStatsList}>
+        <View style={s.summaryStatRow}>
+          <Text style={s.summaryStatLabel}>Duration</Text>
+          <Text style={s.summaryStatValue}>{durationLabel}</Text>
+        </View>
+        <View style={s.summaryStatRow}>
+          <Text style={s.summaryStatLabel}>Volume</Text>
+          <Text style={s.summaryStatValue}>{volumeLabel}</Text>
+        </View>
+        <View style={s.summaryStatRow}>
+          <Text style={s.summaryStatLabel}>Sets</Text>
+          <Text style={s.summaryStatValue}>{String(sets)}</Text>
+        </View>
+        {prs.length > 0 ? (
+          <View style={s.summaryStatRow}>
+            <Text style={s.summaryStatLabel}>Records</Text>
+            <Text style={s.summaryStatValue}>{String(prs.length)}</Text>
+          </View>
+        ) : null}
       </View>
       {trimmed ? (
         <Text style={s.rowMeta}>
@@ -583,8 +593,8 @@ export function SummarySheet({
         </Text>
       ) : null}
       {prs.length > 0 ? (
-        <View style={s.plates}>
-          <Label>New records</Label>
+        <View style={{ marginTop: 14 }}>
+          <Text style={s.sectionTitle}>New records</Text>
           {prs.map((pr, index) => (
             <SummaryPrRow
               key={pr.exerciseId}
@@ -686,25 +696,19 @@ function SummaryPrRow({
   return (
     <Animated.View
       style={[
-        s.row,
+        s.summaryPrRow,
         {
           opacity,
           transform: [{ translateY }],
         },
       ]}
     >
-      <Text style={s.rowName}>{name}</Text>
-      <Text style={s.pr}>{prText}</Text>
+      <View style={s.summaryPrLeft}>
+        <View style={s.prDot} />
+        <Text style={s.rowName}>{name}</Text>
+      </View>
+      <Text style={s.prText}>{prText}</Text>
     </Animated.View>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={s.stat}>
-      <Text style={s.statValue}>{value}</Text>
-      <Text style={s.rowMeta}>{label}</Text>
-    </View>
   );
 }
 
@@ -1715,4 +1719,59 @@ const s = StyleSheet.create({
   calInspectActions: { gap: 10 },
   summaryHeaderRow: { alignItems: "center", marginBottom: 12 },
   calCellContent: { alignItems: "center", justifyContent: "center" },
+  summaryStatsList: {
+    borderTopWidth: 1,
+    borderTopColor: Q.color.line,
+    marginTop: 8,
+  },
+  summaryStatRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Q.color.line,
+  },
+  summaryStatLabel: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
+  },
+  summaryStatValue: {
+    fontFamily: Q.font.sansMedium,
+    fontSize: 14,
+    color: Q.color.ink,
+    fontVariant: ["tabular-nums"],
+  },
+  summaryPrRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Q.color.line,
+  },
+  summaryPrLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  prDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Q.accent.ember,
+  },
+  prText: {
+    fontFamily: Q.font.sansMedium,
+    fontSize: 14,
+    color: Q.color.ink,
+    fontVariant: ["tabular-nums"],
+  },
+  sectionTitle: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    color: Q.color.mute,
+    marginBottom: 4,
+  },
 });
