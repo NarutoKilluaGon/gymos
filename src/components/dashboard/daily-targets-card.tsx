@@ -1,10 +1,17 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { AppState, type AppStateStatus, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { GymCard } from "@/components/ui/gym-card";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { GymColors, Spacing, Typography } from "@/constants/theme";
+import { GymColors, Radius, Spacing, Typography } from "@/constants/theme";
 import { DAILY_TARGETS } from "@/constants/targets";
 import { formatNumber } from "@/utils/format";
+import {
+  getStepPermissionStatus,
+  requestStepPermission,
+  startStepTracking,
+  type StepPermissionStatus,
+} from "@/services/steps";
 
 type DailyTargetsCardProps = {
   water: number;
@@ -14,6 +21,8 @@ type DailyTargetsCardProps = {
   proteinTarget?: number;
   steps?: number;
   stepsTarget?: number;
+  stepStatus?: StepPermissionStatus;
+  onStepPermissionChange?: (status: StepPermissionStatus) => void;
   supplementsTaken?: number;
   supplementsTotal?: number;
   nutritionEnabled?: boolean;
@@ -32,6 +41,8 @@ export function DailyTargetsCard({
   proteinTarget,
   steps,
   stepsTarget,
+  stepStatus,
+  onStepPermissionChange,
   supplementsTaken,
   supplementsTotal,
   nutritionEnabled = true,
@@ -41,6 +52,51 @@ export function DailyTargetsCard({
   onSleepDeleteLongPress,
   compact = false,
 }: DailyTargetsCardProps) {
+  const [internalStepStatus, setInternalStepStatus] = useState<StepPermissionStatus>(
+    stepStatus ?? "not_granted",
+  );
+  const effectiveStepStatus = stepStatus ?? internalStepStatus;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkStatus() {
+      const s = await getStepPermissionStatus();
+      if (isMounted) {
+        setInternalStepStatus(s);
+        onStepPermissionChange?.(s);
+        if (s === "granted") {
+          void startStepTracking();
+        }
+      }
+    }
+
+    if (!stepStatus) {
+      void checkStatus();
+    }
+
+    const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
+      if (state === "active" && !stepStatus) {
+        void checkStatus();
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      sub.remove();
+    };
+  }, [stepStatus, onStepPermissionChange]);
+
+  async function handleEnableSteps() {
+    const result = await requestStepPermission();
+    setInternalStepStatus(result);
+    onStepPermissionChange?.(result);
+  }
+
+  function handleOpenSettings() {
+    void Linking.openSettings();
+  }
+
   const shouldShowNutrition = showNutrition ?? !nutritionEnabled;
   const hasProteinTarget =
     typeof proteinTarget === "number" && proteinTarget > 0;
@@ -120,15 +176,25 @@ export function DailyTargetsCard({
   );
 
   // Steps
-  if (typeof steps === "number") {
+  if (effectiveStepStatus === "unavailable") {
+    items.push(
+      <TargetRow
+        key="steps"
+        label="Steps"
+        value="Steps not supported on this phone"
+        muted
+        compact={compact}
+      />
+    );
+  } else if (effectiveStepStatus === "granted") {
     if (typeof stepsTarget === "number" && stepsTarget > 0) {
       items.push(
         <ProgressBar
           key="steps"
           label="Steps"
-          current={steps}
+          current={steps ?? 0}
           target={stepsTarget}
-          unit="steps"
+          unit="steps (since you opened the app)"
           compact={compact}
         />
       );
@@ -137,11 +203,37 @@ export function DailyTargetsCard({
         <TargetRow
           key="steps"
           label="Steps"
-          value={formatNumber(steps)}
+          value={`${formatNumber(steps ?? 0)} steps (since you opened the app)`}
           compact={compact}
         />
       );
     }
+  } else {
+    // "not_granted" or "blocked"
+    const isBlocked = effectiveStepStatus === "blocked";
+    const buttonLabel = isBlocked ? "Open settings" : "Enable step tracking";
+
+    items.push(
+      <View
+        key="steps"
+        style={[
+          styles.row,
+          compact && styles.rowCompact,
+          styles.stepPermissionRow,
+        ]}
+      >
+        <Text style={[styles.label, compact && styles.labelCompact]}>Steps</Text>
+
+        <Pressable
+          onPress={isBlocked ? handleOpenSettings : handleEnableSteps}
+          style={styles.stepPermissionButton}
+          accessibilityRole="button"
+          accessibilityLabel={buttonLabel}
+        >
+          <Text style={styles.stepPermissionButtonText}>{buttonLabel}</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   // Meals logged
@@ -318,6 +410,29 @@ const styles = StyleSheet.create({
 
   editText: {
     color: GymColors.semantic.accent,
+    fontSize: Typography.caption,
+    fontWeight: "600",
+  },
+
+  stepPermissionRow: {
+    minHeight: 44,
+  },
+
+  stepPermissionButton: {
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    backgroundColor: "rgba(242, 196, 109, 0.12)",
+    borderRadius: Radius.medium,
+    borderWidth: 1,
+    borderColor: "rgba(242, 196, 109, 0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  stepPermissionButtonText: {
+    color: "#f2c46d",
     fontSize: Typography.caption,
     fontWeight: "600",
   },

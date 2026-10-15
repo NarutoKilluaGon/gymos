@@ -26,33 +26,97 @@ function flush(): void {
   });
 }
 
+export type StepPermissionStatus =
+  | "granted"
+  | "not_granted"
+  | "blocked"
+  | "unavailable";
+
+/**
+ * Check the current pedometer permission status silently without prompting.
+ */
+export async function getStepPermissionStatus(): Promise<StepPermissionStatus> {
+  try {
+    const available = await Pedometer.isAvailableAsync();
+    if (!available) {
+      return "unavailable";
+    }
+
+    const permission = await Pedometer.getPermissionsAsync();
+    if (permission.granted) {
+      return "granted";
+    }
+
+    if (permission.canAskAgain === false) {
+      return "blocked";
+    }
+
+    return "not_granted";
+  } catch (error) {
+    console.warn("[Steps] Failed to get pedometer permission status", error);
+    return "unavailable";
+  }
+}
+
+/**
+ * Prompt the user for pedometer permission (ACTIVITY_RECOGNITION on Android).
+ * If granted, starts tracking immediately.
+ */
+export async function requestStepPermission(): Promise<StepPermissionStatus> {
+  try {
+    const available = await Pedometer.isAvailableAsync();
+    if (!available) {
+      return "unavailable";
+    }
+
+    const permission = await Pedometer.requestPermissionsAsync();
+    if (permission.granted) {
+      await startStepTracking();
+      return "granted";
+    }
+
+    if (permission.canAskAgain === false) {
+      return "blocked";
+    }
+
+    return "not_granted";
+  } catch (error) {
+    console.warn("[Steps] Failed to request pedometer permission", error);
+    return "not_granted";
+  }
+}
+
+export function isStepTrackingActive(): boolean {
+  return isTracking;
+}
+
 /**
  * Start listening to the system pedometer and persisting
  * the daily step count to storage.
  *
  * Safe to call multiple times — no-op if already tracking.
- * On unsupported devices or denied permission, logs and returns early.
+ * Checks permissions silently on launch — does NOT prompt.
+ * If permission is granted, starts watchStepCount.
  */
-export async function startStepTracking(): Promise<void> {
-  if (isTracking) return;
+export async function startStepTracking(): Promise<boolean> {
+  if (isTracking) return true;
 
   try {
     const available = await Pedometer.isAvailableAsync();
 
     if (!available) {
-      console.log("[Steps] Pedometer not available on this device");
-      return;
+      return false;
     }
 
-    const permission = await Pedometer.requestPermissionsAsync();
+    // Silent check — do not prompt on app launch
+    const permission = await Pedometer.getPermissionsAsync();
 
     if (!permission.granted) {
-      console.log("[Steps] Pedometer permission not granted");
-      return;
+      return false;
     }
   } catch (error) {
     console.warn("[Steps] Failed to initialise pedometer", error);
-    return;
+    return false;
   }
 
   isTracking = true;
@@ -82,12 +146,15 @@ export async function startStepTracking(): Promise<void> {
       if (state !== "active") flush();
     },
   );
+
+  return true;
 }
 
 export function stopStepTracking(): void {
   if (!isTracking) return;
 
   isTracking = false;
+  lastSeenSteps = null;
 
   stepSubscription?.remove();
   stepSubscription = null;
