@@ -1,4 +1,4 @@
-import { X } from "lucide-react-native";
+import { Star, X } from "lucide-react-native";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -58,7 +58,10 @@ export function NorthStarSetupCard({
   return (
     <>
       <GymCard style={styles.card}>
-        <Text style={styles.eyebrow}>NORTH STAR</Text>
+        <View style={styles.eyebrowRow}>
+          <Star size={12} color="#f2c46d" fill="#f2c46d" />
+          <Text style={styles.eyebrow}>NORTH STAR</Text>
+        </View>
 
         <Text style={styles.title}>Set your North Star</Text>
 
@@ -158,10 +161,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
 
-  eyebrow: {
-    color: GymColors.text.tertiary,
-    fontSize: Typography.caption,
+  eyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginBottom: Spacing.one,
+  },
+
+  eyebrow: {
+    color: "#f2c46d",
+    fontSize: Typography.caption,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 
   title: {

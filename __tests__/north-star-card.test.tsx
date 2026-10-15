@@ -4,6 +4,7 @@ import { Pressable, Text } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { NorthStarCard } from "@/components/dashboard/north-star-card";
+import { NorthStarSetupCard } from "@/components/dashboard/north-star-setup-card";
 import type { NorthStar } from "@/types/gymos";
 
 let mockReducedMotion = false;
@@ -114,4 +115,66 @@ describe("NorthStarCard Shooting Star & Night-Sky Background (Step 1)", () => {
     );
     expect(title.length).toBe(1);
   });
+
+  it("renders 7 to 10 static star dots across the card", () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(NorthStarCard, { northStar: mockNorthStar }),
+      );
+    });
+
+    const root = renderer!.root;
+    // Find all static star dots (matching host component 'View')
+    const starDots = root.findAll(
+      (n) => n.props?.testID === "static-star-dot" && typeof n.type === "string",
+    );
+
+    // Expect between 7 and 10 static star dots
+    expect(starDots.length).toBeGreaterThanOrEqual(7);
+    expect(starDots.length).toBeLessThanOrEqual(10);
+  });
+
+  it("renders gold star icon and gold Why label", () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(NorthStarCard, { northStar: mockNorthStar }),
+      );
+    });
+
+    const root = renderer!.root;
+    // Gold star icon
+    const starIcons = root.findAll(
+      (n) => n.props?.color === "#f2c46d" && n.props?.size === 12,
+    );
+    expect(starIcons.length).toBeGreaterThanOrEqual(1);
+
+    // Gold "Why" label
+    const whyLabelNode = root.find(
+      (n) => n.type === Text && n.props.children === "WHY",
+    );
+    expect(whyLabelNode).toBeDefined();
+    expect(whyLabelNode.props.style?.color).toBe("#f2c46d");
+  });
+
+  it("renders Set your North Star empty state when no North Star is set", () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(NorthStarSetupCard, { onCreated: jest.fn() }),
+      );
+    });
+
+    const root = renderer!.root;
+    const texts = root.findAllByType(Text).map((t) => t.props.children);
+    expect(texts).toContain("NORTH STAR");
+    expect(texts).toContain("Set your North Star");
+
+    const starIcons = root.findAll(
+      (n) => n.props?.color === "#f2c46d" && n.props?.size === 12,
+    );
+    expect(starIcons.length).toBeGreaterThanOrEqual(1);
+  });
 });
+

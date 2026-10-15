@@ -1,4 +1,4 @@
-import { X } from "lucide-react-native";
+import { Star, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -26,6 +26,17 @@ import type {
   MeasurementUnit,
   NorthStar,
 } from "@/types/gymos";
+
+const STATIC_STARS = [
+  { id: "s1", top: 16, left: 24, size: 2, opacity: 0.5 },
+  { id: "s2", top: 38, left: 120, size: 1.5, opacity: 0.6 },
+  { id: "s3", top: 22, right: 90, size: 2, opacity: 0.45 },
+  { id: "s4", top: 65, left: 45, size: 2.5, opacity: 0.7 },
+  { id: "s5", top: 78, right: 65, size: 1.5, opacity: 0.5 },
+  { id: "s6", bottom: 35, left: 140, size: 2, opacity: 0.5 },
+  { id: "s7", bottom: 20, left: 55, size: 1.5, opacity: 0.6 },
+  { id: "s8", bottom: 26, right: 110, size: 2.5, opacity: 0.55 },
+];
 
 function ShootingStar() {
   const reducedMotion = useReducedMotion();
@@ -259,11 +270,34 @@ export function NorthStarCard({
             end={{ x: 0.85, y: 1 }}
             style={styles.card}
           >
+            {STATIC_STARS.map((star) => (
+              <View
+                key={star.id}
+                testID="static-star-dot"
+                pointerEvents="none"
+                style={[
+                  styles.starDot,
+                  {
+                    top: star.top,
+                    bottom: star.bottom,
+                    left: star.left,
+                    right: star.right,
+                    width: star.size,
+                    height: star.size,
+                    borderRadius: star.size / 2,
+                    opacity: star.opacity,
+                  },
+                ]}
+              />
+            ))}
             <ShootingStar />
 
             <View style={styles.content}>
               <View style={styles.headerRow}>
-                <Text style={styles.eyebrow}>NORTH STAR</Text>
+                <View style={styles.eyebrowRow}>
+                  <Star size={12} color="#f2c46d" fill="#f2c46d" />
+                  <Text style={styles.eyebrow}>NORTH STAR</Text>
+                </View>
                 <Pressable
                   onPress={openEditor}
                   hitSlop={8}
@@ -569,6 +603,11 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
+  starDot: {
+    position: "absolute",
+    backgroundColor: "#FFFFFF",
+  },
+
   content: {
     position: "relative",
     zIndex: 1,
@@ -579,6 +618,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.one,
+  },
+
+  eyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 
   editButtonSmall: {
@@ -611,8 +656,10 @@ const styles = StyleSheet.create({
   },
 
   whyLabel: {
-    color: "rgba(255, 255, 255, 0.5)",
+    color: "#f2c46d",
     fontSize: Typography.caption,
+    fontWeight: "700",
+    letterSpacing: 0.6,
     marginBottom: Spacing.one,
   },
 
