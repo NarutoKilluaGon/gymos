@@ -22,24 +22,8 @@ export type CardProps = {
   accessibilityLabel?: string;
 };
 
-const TONE_ACCENTS: Record<CardTone, { border: string; wash: string }> = {
-  forge: {
-    border: Q.accent.ember,
-    wash: "transparent",
-  },
-  nourish: {
-    border: Q.accent.sage,
-    wash: "transparent",
-  },
-  gold: {
-    border: Q.accent.brass,
-    wash: "transparent",
-  },
-};
-
 export function Card({
   children,
-  tone,
   onPress,
   style,
   testID,
@@ -48,18 +32,9 @@ export function Card({
 }: CardProps) {
   const theme = useTheme();
 
-  const toneConfig = tone ? TONE_ACCENTS[tone] : null;
-
   const cardStyle: StyleProp<ViewStyle> = [
     styles.card,
-    {
-      backgroundColor: theme.card,
-      borderColor: theme.line,
-    },
-    toneConfig && {
-      borderTopColor: toneConfig.border,
-      borderTopWidth: 2,
-    },
+    { borderTopColor: theme.line },
     style,
   ];
 
@@ -93,9 +68,12 @@ export function Card({
 
 const styles = StyleSheet.create({
   card: {
+    // Quiet: no fill, no box, no accent rule. One hairline separates sections.
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderTopWidth: 1,
     borderRadius: Q.radius.none,
-    borderWidth: 1,
-    padding: 16,
-    overflow: "hidden",
+    paddingTop: 16,
+    paddingBottom: 4,
   },
 });

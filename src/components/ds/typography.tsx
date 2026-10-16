@@ -2,6 +2,7 @@ import React from "react";
 import { StyleProp, StyleSheet, Text as RNText, TextProps as RNTextProps, TextStyle } from "react-native";
 
 import { Type } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 
 export type TypeRole = keyof typeof Type;
@@ -61,12 +62,7 @@ export function Label({
 
   return (
     <RNText
-      style={[
-        Type.eyebrow,
-        styles.labelMargin,
-        { color: theme.mute },
-        style,
-      ]}
+      style={[styles.label, { color: theme.mute }, style]}
     >
       {children}
     </RNText>
@@ -74,7 +70,12 @@ export function Label({
 }
 
 const styles = StyleSheet.create({
-  labelMargin: {
+  label: {
+    fontFamily: Q.font.sansRegular,
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 0,
+    textTransform: "none",
     marginBottom: 6,
   },
 });

@@ -1,7 +1,6 @@
 import * as Haptics from "expo-haptics";
 import {
   ArrowUp,
-  Bookmark,
   Pencil,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -42,7 +41,7 @@ import {
   fmtInt,
   tap,
 } from "@/components/nutrition/nourish-ui";
-import { Q } from "@/constants/quiet";
+import { accentOutline, Q } from "@/constants/quiet";
 import { N, NSerif } from "@/constants/nourish-theme";
 import { useFoodLogger } from "@/hooks/use-food-logger";
 import type { useNourish } from "@/hooks/use-nourish";
@@ -986,9 +985,20 @@ function EntryRow({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Edit ${meal.name}`}
+        accessibilityHint="Long press to save this food to your library"
+        accessibilityActions={[
+          { name: "save", label: isSaved ? `${meal.name} is saved` : `Save ${meal.name}` },
+        ]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === "save") onBookmark();
+        }}
         onPress={() => {
           tap();
           onPress();
+        }}
+        onLongPress={() => {
+          tap();
+          onBookmark();
         }}
         style={s.entryMainPressable}
       >
@@ -996,27 +1006,11 @@ function EntryRow({
           <Text style={s.entryName} numberOfLines={2}>
             {meal.name}
           </Text>
-          <Text style={s.entrySubText}>
+          <Text style={s.entrySubText} numberOfLines={1}>
             {meal.qty ?? "1 serving"} · {Math.round(meal.protein ?? 0)}g protein
           </Text>
         </View>
         <Text style={s.entryKcal}>{fmtInt(meal.calories ?? 0)} kcal</Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={isSaved ? `${meal.name} is saved` : `Save ${meal.name}`}
-        hitSlop={12}
-        onPress={() => {
-          tap();
-          onBookmark();
-        }}
-        style={s.bookmarkBtn}
-      >
-        <Bookmark
-          size={16}
-          color={isSaved ? Q.accent.sage : Q.color.mute}
-          fill={isSaved ? Q.accent.sage : "none"}
-        />
       </Pressable>
     </View>
   );
@@ -1061,9 +1055,7 @@ const s = StyleSheet.create({
   stat: {},
   statLabel: {
     color: N.mute,
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: "uppercase",
+    fontSize: 13,
   },
   statValue: {
     color: N.ink,
@@ -1143,17 +1135,10 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
-    marginRight: 8,
-  },
-  bookmarkBtn: {
-    minWidth: 44,
-    minHeight: 44,
-    paddingHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
+    marginRight: 0,
   },
   entryLine: { borderBottomWidth: 1, borderBottomColor: Q.color.line },
-  entryMain: { flex: 1, paddingRight: 12 },
+  entryMain: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 12 },
   entryName: { fontFamily: Q.font.sansMedium, color: Q.color.ink, fontSize: 16, fontWeight: "500" },
   entrySubText: { fontFamily: Q.font.sansRegular, color: Q.color.mute, fontSize: 13, marginTop: 2 },
   entryKcal: {
@@ -1253,9 +1238,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
-    backgroundColor: "rgba(140, 197, 162, 0.15)",
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "rgba(140, 197, 162, 0.4)",
+    borderColor: accentOutline(Q.accent.sage),
   },
   feelCollapsedChipText: {
     fontFamily: Q.font.sansSemiBold,
@@ -1301,7 +1286,7 @@ const s = StyleSheet.create({
     backgroundColor: Q.color.bg,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(140, 197, 162, 0.4)",
+    borderColor: accentOutline(Q.accent.sage),
     paddingLeft: 16,
     paddingRight: 8,
     paddingVertical: 6,

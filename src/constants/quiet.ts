@@ -185,3 +185,8 @@ export const Q = {
 } as const;
 
 export type QuietTokens = typeof Q;
+
+/** 1px outline colour for accent-owned controls (accent at ~40% alpha). */
+export function accentOutline(color: string): string {
+  return `${color}66`;
+}

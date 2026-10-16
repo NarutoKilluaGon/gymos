@@ -189,7 +189,22 @@ function renderTodayView({
     act(() => (node!.props.onPress as () => void)());
   };
 
+  const longPress = (label: string | RegExp) => {
+    const hit = findByLabel(label)[0];
+    let node: Instance | null = hit ?? null;
+    while (node && typeof node.props.onLongPress !== "function") node = node.parent;
+    if (!node) throw new Error(`No long-press target for ${String(label)}`);
+    act(() => (node!.props.onLongPress as () => void)());
+  };
+
+  const actionLabels = (label: string | RegExp): string[] =>
+    ((findByLabel(label)[0]?.props.accessibilityActions ?? []) as { label: string }[]).map(
+      (a) => a.label,
+    );
+
   return {
+    longPress,
+    actionLabels,
     texts,
     findByLabel,
     press,
@@ -237,17 +252,17 @@ describe("TodayView Phase B UI Integration", () => {
     expect(findByLabel("Stuffed").length).toBe(1);
   });
 
-  it("renders bookmark icons for each food row, indicating saved state", () => {
-    const { findByLabel, press, createSavedFoodMock } = renderTodayView();
+  it("exposes save-to-library per food row (long press / accessibility action), indicating saved state", () => {
+    const { actionLabels, longPress, createSavedFoodMock } = renderTodayView();
 
-    // Roti was in mock saved foods -> labeled "Roti is saved"
-    expect(findByLabel("Roti is saved").length).toBe(1);
+    // Roti was in mock saved foods -> action labeled "Roti is saved"
+    expect(actionLabels("Edit Roti")).toContain("Roti is saved");
 
-    // Dal tadka was NOT in mock saved foods -> labeled "Save Dal tadka"
-    expect(findByLabel("Save Dal tadka").length).toBe(1);
+    // Dal tadka was NOT in mock saved foods -> action labeled "Save Dal tadka"
+    expect(actionLabels("Edit Dal tadka")).toContain("Save Dal tadka");
 
-    // Tapping bookmark on unsaved item triggers createSavedFood
-    press("Save Dal tadka");
+    // Long-pressing an unsaved food row triggers createSavedFood
+    longPress("Edit Dal tadka");
     expect(createSavedFoodMock).toHaveBeenCalledWith(
       "Dal tadka",
       expect.objectContaining({ calories: 170, protein: 9 }),
@@ -256,15 +271,15 @@ describe("TodayView Phase B UI Integration", () => {
     );
   });
 
-  it("tapping a filled bookmark with identical macros removes it from saved foods", () => {
-    const { press, removeSavedMock } = renderTodayView();
+  it("long-pressing a saved food with identical macros removes it from saved foods", () => {
+    const { longPress, removeSavedMock } = renderTodayView();
 
     // Roti in mock has 160 kcal, and saved Roti has 160 kcal
-    press("Roti is saved");
+    longPress("Edit Roti");
     expect(removeSavedMock).toHaveBeenCalledWith("s1");
   });
 
-  it("tapping a filled bookmark with differing macros prompts to update saved food", () => {
+  it("long-pressing a saved food with differing macros prompts to update saved food", () => {
     const { Alert } = require("react-native");
     const alertSpy = jest.spyOn(Alert, "alert");
 
@@ -277,11 +292,11 @@ describe("TodayView Phase B UI Integration", () => {
       },
     ];
 
-    const { press, removeSavedMock } = renderTodayView({
+    const { longPress, removeSavedMock } = renderTodayView({
       meals: mealsWithDiffMacros,
     });
 
-    press("Roti is saved");
+    longPress("Edit Roti");
 
     // Must NOT remove directly; must show alert
     expect(removeSavedMock).not.toHaveBeenCalled();

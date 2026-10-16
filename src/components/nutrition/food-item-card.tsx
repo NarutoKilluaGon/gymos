@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { N, NRadius } from "@/constants/nourish-theme";
+import { Q } from "@/constants/quiet";
 import { tap } from "@/components/nutrition/nourish-ui";
 import { hapticLight, hapticSuccess } from "@/utils/haptics";
 import type { DraftItem } from "@/types/nourish";
@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
   },
   cardUnapproved: {
     opacity: 0.7,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: Q.color.line,
   },
   headerRow: {
     flexDirection: "row",
@@ -394,19 +395,19 @@ const styles = StyleSheet.create({
     backgroundColor: N.card2,
   },
   chipMatched: {
-    backgroundColor: "rgba(76, 154, 106, 0.15)",
+    backgroundColor: Q.color.surface2,
   },
   chipEstimated: {
-    backgroundColor: "rgba(217, 164, 65, 0.15)",
+    backgroundColor: Q.color.surface2,
   },
   chipCheckThis: {
-    backgroundColor: "rgba(217, 164, 65, 0.25)",
+    backgroundColor: Q.color.surface2,
   },
   chipNeedsInput: {
-    backgroundColor: "rgba(200, 99, 75, 0.15)",
+    backgroundColor: Q.color.surface2,
   },
   chipLoading: {
-    backgroundColor: "rgba(129, 169, 150, 0.15)",
+    backgroundColor: Q.color.surface2,
   },
   chipText: {
     fontSize: 11,
@@ -488,7 +489,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: N.dim,
     marginBottom: 2,
-    textTransform: "uppercase",
   },
   fieldInput: {
     backgroundColor: N.card2,
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255,255,255,0.04)",
+    borderTopColor: Q.color.line,
   },
   stepper: {
     flexDirection: "row",

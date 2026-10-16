@@ -567,8 +567,6 @@ const s = StyleSheet.create({
   logSectionTitle: {
     color: N.mute,
     fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1,
     marginBottom: 8,
   },
   changeLogList: {

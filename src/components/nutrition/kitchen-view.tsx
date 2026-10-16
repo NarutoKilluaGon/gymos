@@ -20,6 +20,7 @@ import {
   tap,
 } from "@/components/nutrition/nourish-ui";
 import { FoodItemCard } from "@/components/nutrition/food-item-card";
+import { accentOutline, Q } from "@/constants/quiet";
 import { N, NRadius } from "@/constants/nourish-theme";
 import type { useNourish } from "@/hooks/use-nourish";
 import { recipePerServing } from "@/services/nourish/diary";
@@ -591,12 +592,15 @@ export function KitchenView({ nourish }: { nourish: Nourish }) {
                 </Pressable>
 
                 <View style={s.rowActions}>
-                  <Button
-                    label="Log"
-                    variant="secondary"
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Log"
+                    hitSlop={{ top: 3, bottom: 3, left: 4, right: 4 }}
                     onPress={() => openLogModal(item)}
                     style={s.logBtn}
-                  />
+                  >
+                    <Text style={s.logBtnText}>Log</Text>
+                  </Pressable>
                 </View>
               </View>
             );
@@ -1213,7 +1217,19 @@ const s = StyleSheet.create({
     marginLeft: 12,
   },
   logBtn: {
-    paddingHorizontal: 14,
+    height: 38,
+    paddingHorizontal: 16,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: accentOutline(Q.accent.sage),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logBtnText: {
+    fontFamily: Q.font.sansSemiBold,
+    fontSize: 14,
+    fontWeight: "600",
+    color: Q.accent.sage,
   },
   mute: { color: N.mute, fontSize: 13, lineHeight: 18 },
   top: { marginTop: 12 },
@@ -1238,12 +1254,10 @@ const s = StyleSheet.create({
   sectionHeader: {
     color: N.mute,
     fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1,
     marginBottom: 10,
   },
   unresolvedAlert: {
-    backgroundColor: "rgba(217, 164, 65, 0.12)",
+    backgroundColor: "transparent",
     borderColor: N.warn,
     borderWidth: 1,
     borderRadius: 8,
@@ -1275,9 +1289,9 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 999,
   },
-  chipMatched: { backgroundColor: "rgba(76, 154, 106, 0.15)" },
-  chipEstimated: { backgroundColor: "rgba(129, 169, 150, 0.15)" },
-  chipNeedsInput: { backgroundColor: "rgba(217, 164, 65, 0.15)" },
+  chipMatched: { backgroundColor: Q.color.surface2 },
+  chipEstimated: { backgroundColor: Q.color.surface2 },
+  chipNeedsInput: { backgroundColor: Q.color.surface2 },
   statusText: { fontSize: 11, fontWeight: "600" },
   statusTextMatched: { color: N.ok },
   statusTextEstimated: { color: N.acc },
@@ -1299,8 +1313,6 @@ const s = StyleSheet.create({
   resultTitle: {
     color: N.mute,
     fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1,
   },
   resultKcal: { color: N.ink, fontSize: 26, marginVertical: 4 },
   sheetContent: {
@@ -1371,8 +1383,6 @@ const s = StyleSheet.create({
   breakdownTitle: {
     color: N.mute,
     fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1,
     marginBottom: 8,
   },
   ingItem: {

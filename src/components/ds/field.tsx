@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   TextInput,
@@ -6,7 +6,7 @@ import {
   View,
 } from "react-native";
 
-import { Font, Radius } from "@/constants/design";
+import { Q } from "@/constants/quiet";
 import { useTheme } from "@/contexts/theme-context";
 import { Label } from "./typography";
 
@@ -16,20 +16,28 @@ export function Field({
   ...input
 }: TextInputProps & { label?: string }) {
   const theme = useTheme();
+  const [focused, setFocused] = useState(false);
 
   return (
     <View style={styles.field}>
       {label ? <Label>{label}</Label> : null}
       <TextInput
-        placeholderTextColor={theme.dim}
+        placeholderTextColor={Q.color.mute}
         selectionColor={theme.acc}
         {...input}
+        onFocus={(e) => {
+          setFocused(true);
+          input.onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          input.onBlur?.(e);
+        }}
         style={[
           styles.input,
           {
-            backgroundColor: theme.card2,
-            borderColor: theme.line,
-            color: theme.ink,
+            borderColor: focused ? theme.acc : Q.color.lineStrong,
+            color: Q.color.ink,
           },
           style,
         ]}
@@ -43,11 +51,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   input: {
-    borderRadius: Radius.control,
+    backgroundColor: "transparent",
+    borderRadius: 14,
     borderWidth: 1,
-    fontFamily: Font.sans,
+    minHeight: 56,
+    fontFamily: Q.font.sansRegular,
     fontSize: 16,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
 });
